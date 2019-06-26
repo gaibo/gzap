@@ -33,8 +33,8 @@ class Instrument(object):
         self.levels = construct_timeseries(ts_df)
         self.tradestats = tradestats
 
-    def prices(self, granularity='daily', time_start=None, time_end=None,
-               intraday_interval='5T', multiday_interval='M'):
+    def price(self, granularity='daily', time_start=None, time_end=None,
+              intraday_interval='5T', multiday_interval='M'):
         """ Output price levels with custom granularity
         :param time_start: start of time-series to use
         :param time_end: end of time-series to use
@@ -66,8 +66,8 @@ class Instrument(object):
         else:
             return truncd_levels
 
-    def log_returns(self, time_start=None, time_end=None, granularity='daily',
-                    intraday_interval='5T', multiday_interval='M'):
+    def log_return(self, time_start=None, time_end=None, granularity='daily',
+                   intraday_interval='5T', multiday_interval='M'):
         """ Calculate logarithmic returns with custom granularity
         :param time_start: start of time-series to use
         :param time_end: end of time-series to use
@@ -76,8 +76,8 @@ class Instrument(object):
         :param multiday_interval: interval to use with 'multiday'
         :return: pd.Series with 'time' and 'value'
         """
-        prices = self.prices(granularity, time_start, time_end,
-                             intraday_interval, multiday_interval)
+        prices = self.price(granularity, time_start, time_end,
+                            intraday_interval, multiday_interval)
         return np.log(prices).diff()
 
     def realized_vol(self, do_shift=False):
@@ -85,7 +85,7 @@ class Instrument(object):
         :param do_shift: set True to shift data back one month, to compare to implied vol
         :return: pd.Series with 'time' and 'value', with ~20 NaNs at beginning
         """
-        result = np.sqrt(self.log_returns().rolling(BUS_DAYS_IN_MONTH).var(ddof=0)
+        result = np.sqrt(self.log_return().rolling(BUS_DAYS_IN_MONTH).var(ddof=0)
                          * BUS_DAYS_IN_YEAR)
         if do_shift:
             return result.shift(-BUS_DAYS_IN_MONTH)
@@ -210,7 +210,7 @@ def main():
     # Look at implied volatility vs realized volatility
     start = pd.Timestamp('2015-01-01')
     end = pd.Timestamp('2018-01-01')
-    truncd_vix = vix.levels.truncate(start, end)
+    truncd_vix = vix.price().truncate(start, end)
     truncd_realized_vol = vix.undl_realized_vol().truncate(start, end)
     truncd_shifted_realized_vol = vix.undl_realized_vol(do_shift=True).truncate(start, end)
 
