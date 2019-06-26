@@ -4,18 +4,21 @@ import matplotlib.pyplot as plt
 
 BUS_DAYS_IN_MONTH = 21
 BUS_DAYS_IN_YEAR = 252
+ONE_DAY = pd.Timedelta(days=1)
+ONE_NANOSECOND = pd.Timedelta(nanoseconds=1)
 
 
 def construct_timeseries(ts_df):
     """ Construct pseudo-time-series object, i.e. a pandas Series with 'time' and 'value'
-    :param ts_df: DataFrame object with 2 columns: time and value
+    :param ts_df: DataFrame object with 1 index (time) and 1 column (value)
     :return: pd.Series object with 'time' as index and 'value' as name
     """
     ts_df = ts_df.reset_index()
     assert ts_df.shape[1] == 2   # 2 columns - time and value
     ts = pd.Series(ts_df.iloc[:, 1].values, index=ts_df.iloc[:, 0], name='value')
     ts.index.name = 'time'
-    return ts.sort_index()
+    ts = ts.sort_index()
+    return ts.truncate(ts.first_valid_index(), ts.last_valid_index())
 
 
 class Instrument(object):
@@ -32,30 +35,52 @@ class Instrument(object):
         self.is_intraday = is_intraday
         self.tradestats = tradestats
 
-    def log_returns(self, time_start=None, time_end=None,
-                    do_resample=False, resample_interval=pd.Timedelta(minutes=5)):
-        """ Calculate log returns
+    def prices(self, time_start=None, time_end=None, granularity='daily',
+               intraday_interval='5T', multiday_interval='M'):
+        """ Output price levels with custom granularity
         :param time_start: start of time-series to use
         :param time_end: end of time-series to use
-        :param do_resample: set True to resample to the granularity of <resample_interval>
-        :param resample_interval: only relevant if resampling
+        :param granularity: 'daily', 'intraday', 'multiday', or None
+        :param intraday_interval: interval to use with 'intraday'
+        :param multiday_interval: interval to use with 'multiday'
         :return: pd.Series with 'time' and 'value'
         """
+        # Get specified date/time range
         if time_start is None:
             time_start = self.levels.first_valid_index()
         if time_end is None:
             time_end = self.levels.last_valid_index()
         truncd_levels = self.levels.truncate(time_start, time_end)
-        if not self.is_intraday or not do_resample:
-            # Data is already regular (i.e. daily or fixed-interval intraday) -
-            # avoid messing with business days, etc.
-            return np.log(truncd_levels).diff()
+        # Return prices based on granularity choice
+        if granularity == 'daily':
+            days = truncd_levels.index.normalize().unique()
+            return construct_timeseries(
+                       pd.DataFrame([truncd_levels[day:day+ONE_DAY-ONE_NANOSECOND].iloc[-1]
+                                     for day in days], index=days))
+        elif granularity == 'intraday':
+            if time_start != time_end:
+                print("WARNING: only time_start parameter is used for intraday.")
+            intraday_day = truncd_levels.loc[time_start, time_start+ONE_DAY]
+            return intraday_day.resample(intraday_interval, label='right', closed='right').pad()
+        elif granularity == 'multiday':
+            # NOTE: perhaps this should be combined with 'intraday'
+            return truncd_levels.resample(multiday_interval).pad()
         else:
-            # Data is intraday and irregular - resample to get fixed intervals
-            resampled_truncd_levels = \
-                truncd_levels.resample(resample_interval,
-                                       label='right', closed='right').pad()
-            return np.log(resampled_truncd_levels).diff()
+            return truncd_levels
+
+    def log_returns(self, time_start=None, time_end=None, granularity='daily',
+                    intraday_interval='5T', multiday_interval='M'):
+        """ Calculate logarithmic returns with custom granularity
+        :param time_start: start of time-series to use
+        :param time_end: end of time-series to use
+        :param granularity: 'daily', 'intraday', 'multiday', or None
+        :param intraday_interval: interval to use with 'intraday'
+        :param multiday_interval: interval to use with 'multiday'
+        :return: pd.Series with 'time' and 'value'
+        """
+        prices = self.prices(time_start, time_end, granularity,
+                             intraday_interval, multiday_interval)
+        return np.log(prices).diff()
 
 
 class CashInstr(Instrument):
