@@ -25,14 +25,12 @@ class Instrument(object):
     """
     Financial instrument base class
     """
-    def __init__(self, ts_df, is_intraday=False, tradestats=pd.DataFrame(None)):
+    def __init__(self, ts_df, tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
-        :param is_intraday: set True if data is intraday to prepare additional handling
         :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
         self.levels = construct_timeseries(ts_df)
-        self.is_intraday = is_intraday
         self.tradestats = tradestats
 
     def prices(self, time_start=None, time_end=None, granularity='daily',
@@ -60,7 +58,7 @@ class Instrument(object):
         elif granularity == 'intraday':
             if time_start != time_end:
                 print("WARNING: only time_start parameter is used for intraday.")
-            intraday_day = truncd_levels.loc[time_start, time_start+ONE_DAY]
+            intraday_day = truncd_levels[time_start:time_start+ONE_DAY-ONE_NANOSECOND]
             return intraday_day.resample(intraday_interval, label='right', closed='right').pad()
         elif granularity == 'multiday':
             # NOTE: perhaps this should be combined with 'intraday'
@@ -87,97 +85,89 @@ class CashInstr(Instrument):
     """
     Cash instrument, derived from financial instrument
     """
-    def __init__(self, ts_df, is_intraday=False, tradestats=pd.DataFrame(None)):
+    def __init__(self, ts_df, tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
-        :param is_intraday: set True if data is intraday to prepare additional handling
         :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
-        super().__init__(ts_df, is_intraday, tradestats)
+        super().__init__(ts_df, tradestats)
 
 
 class Derivative(Instrument):
     """
     Derivative instrument, derived from financial instrument
     """
-    def __init__(self, ts_df, underlying, is_intraday=False, tradestats=pd.DataFrame(None)):
+    def __init__(self, ts_df, underlying, tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
         :param underlying: underlying Instrument
-        :param is_intraday: set True if data is intraday to prepare additional handling
         :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
-        super().__init__(ts_df, is_intraday, tradestats)
+        super().__init__(ts_df, tradestats)
         self.underlying = underlying
 
 
 class Index(CashInstr):
-    def __init__(self, ts_df, is_intraday=False):
+    def __init__(self, ts_df):
         """
         :param ts_df: time-series DataFrame with time and value
-        :param is_intraday: set True if data is intraday to prepare additional handling
         """
-        super().__init__(ts_df, is_intraday)
+        super().__init__(ts_df)
 
 
 class Stock(CashInstr):
-    def __init__(self, ts_df, is_intraday=False, tradestats=pd.DataFrame(None)):
+    def __init__(self, ts_df, tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
-        :param is_intraday: set True if data is intraday to prepare additional handling
         :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
-        super().__init__(ts_df, is_intraday, tradestats)
+        super().__init__(ts_df, tradestats)
 
 
 class ETF(CashInstr):
-    def __init__(self, ts_df, is_intraday=False, tradestats=pd.DataFrame(None)):
+    def __init__(self, ts_df, tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
-        :param is_intraday: set True if data is intraday to prepare additional handling
         :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
-        super().__init__(ts_df, is_intraday, tradestats)
+        super().__init__(ts_df, tradestats)
 
 
 class Futures(Derivative):
-    def __init__(self, ts_df, underlying, maturity, is_intraday=False, tradestats=pd.DataFrame(None)):
+    def __init__(self, ts_df, underlying, maturity, tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
         :param underlying: underlying Instrument
         :param maturity: maturity date of futures
-        :param is_intraday: set True if data is intraday to prepare additional handling
         :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
-        super().__init__(ts_df, underlying, is_intraday, tradestats)
+        super().__init__(ts_df, underlying, tradestats)
         self.maturity = maturity
 
 
 class Options(Derivative):
-    def __init__(self, ts_df, underlying, expiry, pc, strike, is_intraday=False, tradestats=pd.DataFrame(None)):
+    def __init__(self, ts_df, underlying, expiry, pc, strike, tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
         :param underlying: underlying Instrument
         :param expiry: expiration date of options contract
         :param pc: whether options contract is put or call
         :param strike: strike price of options contract
-        :param is_intraday: set True if data is intraday to prepare additional handling
         :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
-        super().__init__(ts_df, underlying, is_intraday, tradestats)
+        super().__init__(ts_df, underlying, tradestats)
         self.expiry = expiry
         self.pc = pc
         self.strike = strike
 
 
 class VolatilityIndex(Index):
-    def __init__(self, ts_df, underlying, is_intraday=False):
+    def __init__(self, ts_df, underlying):
         """
         :param ts_df: time-series DataFrame with time and value
         :param underlying: the underlying instrument whose volatility is being gauged
-        :param is_intraday: set True if data is intraday to prepare additional handling
         """
-        super().__init__(ts_df, is_intraday)
+        super().__init__(ts_df)
         self.underlying = underlying
 
     def realized_vol(self, do_shift=False):
