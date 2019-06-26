@@ -33,7 +33,7 @@ class Instrument(object):
         self.levels = construct_timeseries(ts_df)
         self.tradestats = tradestats
 
-    def prices(self, time_start=None, time_end=None, granularity='daily',
+    def prices(self, granularity='daily', time_start=None, time_end=None,
                intraday_interval='5T', multiday_interval='M'):
         """ Output price levels with custom granularity
         :param time_start: start of time-series to use
@@ -62,7 +62,7 @@ class Instrument(object):
             return intraday_day.resample(intraday_interval, label='right', closed='right').pad()
         elif granularity == 'multiday':
             # NOTE: perhaps this should be combined with 'intraday'
-            return truncd_levels.resample(multiday_interval).pad()
+            return truncd_levels.resample(multiday_interval).mean()     # Use mean to downsample
         else:
             return truncd_levels
 
@@ -76,9 +76,21 @@ class Instrument(object):
         :param multiday_interval: interval to use with 'multiday'
         :return: pd.Series with 'time' and 'value'
         """
-        prices = self.prices(time_start, time_end, granularity,
+        prices = self.prices(granularity, time_start, time_end,
                              intraday_interval, multiday_interval)
         return np.log(prices).diff()
+
+    def realized_vol(self, do_shift=False):
+        """ Calculate annualized realized vol from past month
+        :param do_shift: set True to shift data back one month, to compare to implied vol
+        :return: pd.Series with 'time' and 'value', with ~20 NaNs at beginning
+        """
+        result = np.sqrt(self.log_returns().rolling(BUS_DAYS_IN_MONTH).var(ddof=0)
+                         * BUS_DAYS_IN_YEAR)
+        if do_shift:
+            return result.shift(-BUS_DAYS_IN_MONTH)
+        else:
+            return result
 
 
 class CashInstr(Instrument):
@@ -105,6 +117,13 @@ class Derivative(Instrument):
         """
         super().__init__(ts_df, tradestats)
         self.underlying = underlying
+
+    def undl_realized_vol(self, do_shift=False):
+        """ Calculate annualized realized vol from past month for underlying asset
+        :param do_shift: set True to shift data back one month, to compare to implied vol
+        :return: pd.Series with 'time' and 'value', with ~20 NaNs at beginning
+        """
+        return self.underlying.realized_vol(do_shift)
 
 
 class Index(CashInstr):
@@ -170,17 +189,12 @@ class VolatilityIndex(Index):
         super().__init__(ts_df)
         self.underlying = underlying
 
-    def realized_vol(self, do_shift=False):
-        """ Calculate annualized realized vol from past month
+    def undl_realized_vol(self, do_shift=False):
+        """ Calculate annualized realized vol from past month for underlying asset
+        :param do_shift: set True to shift data back one month, to compare to implied vol
         :return: pd.Series with 'time' and 'value', with ~20 NaNs at beginning
         """
-        result = np.sqrt(self.underlying.log_returns()
-                         .rolling(BUS_DAYS_IN_MONTH).var(ddof=0)
-                         * BUS_DAYS_IN_YEAR)
-        if do_shift:
-            return result.shift(-BUS_DAYS_IN_MONTH)
-        else:
-            return result
+        return self.underlying.realized_vol(do_shift)
 
 
 def main():
@@ -197,8 +211,8 @@ def main():
     start = pd.Timestamp('2015-01-01')
     end = pd.Timestamp('2018-01-01')
     truncd_vix = vix.levels.truncate(start, end)
-    truncd_realized_vol = vix.realized_vol().truncate(start, end)
-    truncd_shifted_realized_vol = vix.realized_vol(do_shift=True).truncate(start, end)
+    truncd_realized_vol = vix.undl_realized_vol().truncate(start, end)
+    truncd_shifted_realized_vol = vix.undl_realized_vol(do_shift=True).truncate(start, end)
 
     fig, ax = plt.subplots()
     ax.plot(truncd_vix, label='VIX', linewidth=3)
