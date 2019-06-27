@@ -25,20 +25,22 @@ class Instrument(object):
     """
     Financial instrument base class
     """
-    def __init__(self, ts_df, tradestats=pd.DataFrame(None)):
+    def __init__(self, ts_df, name='', tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
+        :param name: name of the data
         :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
         self.levels = construct_timeseries(ts_df)
+        self.name = name
         self.tradestats = tradestats
 
     def price(self, granularity='daily', time_start=None, time_end=None,
               intraday_interval='5T', multiday_interval='M'):
         """ Output price levels with custom granularity
+        :param granularity: 'daily', 'intraday', 'multiday', or None
         :param time_start: start of time-series to use
         :param time_end: end of time-series to use
-        :param granularity: 'daily', 'intraday', 'multiday', or None
         :param intraday_interval: interval to use with 'intraday'
         :param multiday_interval: interval to use with 'multiday'
         :return: pd.Series with 'time' and 'value'
@@ -52,40 +54,54 @@ class Instrument(object):
         # Return prices based on granularity choice
         if granularity == 'daily':
             days = truncd_levels.index.normalize().unique()
-            return construct_timeseries(
-                       pd.DataFrame([truncd_levels[day:day+ONE_DAY-ONE_NANOSECOND].iloc[-1]
-                                     for day in days], index=days))
+            if len(days) == len(truncd_levels.index):
+                # We already have daily data
+                return truncd_levels
+            else:
+                # Create daily data
+                return construct_timeseries(
+                           pd.DataFrame([truncd_levels[day:day+ONE_DAY-ONE_NANOSECOND].iloc[-1]
+                                         for day in days], index=days))
         elif granularity == 'intraday':
+            # NOTE: currently unsure if we need to upsample (pad()) or downsample (mean()) or both
             if time_start != time_end:
                 print("WARNING: only time_start parameter is used for intraday.")
             intraday_day = truncd_levels[time_start:time_start+ONE_DAY-ONE_NANOSECOND]
-            return intraday_day.resample(intraday_interval, label='right', closed='right').pad()
+            day_upsample_pad = intraday_day.resample('S').pad()
+            day_downsample_mean = day_upsample_pad.resample(intraday_interval,
+                                                            label='right', closed='right').mean()
+            return day_downsample_mean
         elif granularity == 'multiday':
             # NOTE: perhaps this should be combined with 'intraday'
-            return truncd_levels.resample(multiday_interval).mean()     # Use mean to downsample
+            return truncd_levels.resample(multiday_interval, label='right', closed='right').mean()
         else:
             return truncd_levels
 
-    def log_return(self, time_start=None, time_end=None, granularity='daily',
-                   intraday_interval='5T', multiday_interval='M'):
-        """ Calculate logarithmic returns with custom granularity
+    def price_return(self, logarithmic=True,
+                     granularity='daily', time_start=None, time_end=None,
+                     intraday_interval='5T', multiday_interval='M'):
+        """ Calculate percent or logarithmic returns with custom granularity
+        :param logarithmic: set False for percent returns
+        :param granularity: 'daily', 'intraday', 'multiday', or None
         :param time_start: start of time-series to use
         :param time_end: end of time-series to use
-        :param granularity: 'daily', 'intraday', 'multiday', or None
         :param intraday_interval: interval to use with 'intraday'
         :param multiday_interval: interval to use with 'multiday'
         :return: pd.Series with 'time' and 'value'
         """
         prices = self.price(granularity, time_start, time_end,
                             intraday_interval, multiday_interval)
-        return np.log(prices).diff()
+        if logarithmic:
+            return np.log(prices).diff()
+        else:
+            return prices.pct_change()
 
     def realized_vol(self, do_shift=False):
         """ Calculate annualized realized vol from past month
         :param do_shift: set True to shift data back one month, to compare to implied vol
         :return: pd.Series with 'time' and 'value', with ~20 NaNs at beginning
         """
-        result = np.sqrt(self.log_return().rolling(BUS_DAYS_IN_MONTH).var(ddof=0)
+        result = np.sqrt(self.price_return().rolling(BUS_DAYS_IN_MONTH).var(ddof=0)
                          * BUS_DAYS_IN_YEAR)
         if do_shift:
             return result.shift(-BUS_DAYS_IN_MONTH)
@@ -97,25 +113,27 @@ class CashInstr(Instrument):
     """
     Cash instrument, derived from financial instrument
     """
-    def __init__(self, ts_df, tradestats=pd.DataFrame(None)):
+    def __init__(self, ts_df, name='', tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
+        :param name: name of the data
         :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
-        super().__init__(ts_df, tradestats)
+        super().__init__(ts_df, name, tradestats)
 
 
 class Derivative(Instrument):
     """
     Derivative instrument, derived from financial instrument
     """
-    def __init__(self, ts_df, underlying, tradestats=pd.DataFrame(None)):
+    def __init__(self, ts_df, underlying, name='', tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
         :param underlying: underlying Instrument
+        :param name: name of the data
         :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
-        super().__init__(ts_df, tradestats)
+        super().__init__(ts_df, name, tradestats)
         self.underlying = underlying
 
     def undl_realized_vol(self, do_shift=False):
@@ -127,66 +145,72 @@ class Derivative(Instrument):
 
 
 class Index(CashInstr):
-    def __init__(self, ts_df):
+    def __init__(self, ts_df, name=''):
         """
         :param ts_df: time-series DataFrame with time and value
+        :param name: name of the data
         """
-        super().__init__(ts_df)
+        super().__init__(ts_df, name)
 
 
 class Stock(CashInstr):
-    def __init__(self, ts_df, tradestats=pd.DataFrame(None)):
+    def __init__(self, ts_df, name='', tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
+        :param name: name of the data
         :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
-        super().__init__(ts_df, tradestats)
+        super().__init__(ts_df, name, tradestats)
 
 
 class ETF(CashInstr):
-    def __init__(self, ts_df, tradestats=pd.DataFrame(None)):
+    def __init__(self, ts_df, name='', tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
+        :param name: name of the data
         :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
-        super().__init__(ts_df, tradestats)
+        super().__init__(ts_df, name, tradestats)
 
 
 class Futures(Derivative):
-    def __init__(self, ts_df, underlying, maturity, tradestats=pd.DataFrame(None)):
+    def __init__(self, ts_df, underlying, maturity, name='', tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
         :param underlying: underlying Instrument
         :param maturity: maturity date of futures
+        :param name: name of the data
         :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
-        super().__init__(ts_df, underlying, tradestats)
+        super().__init__(ts_df, underlying, name, tradestats)
         self.maturity = maturity
 
 
 class Options(Derivative):
-    def __init__(self, ts_df, underlying, expiry, pc, strike, tradestats=pd.DataFrame(None)):
+    def __init__(self, ts_df, underlying, expiry, pc, strike, name='', tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
         :param underlying: underlying Instrument
         :param expiry: expiration date of options contract
         :param pc: whether options contract is put or call
         :param strike: strike price of options contract
+        :param name: name of the data
         :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
-        super().__init__(ts_df, underlying, tradestats)
+        super().__init__(ts_df, underlying, name, tradestats)
         self.expiry = expiry
         self.pc = pc
         self.strike = strike
 
 
 class VolatilityIndex(Index):
-    def __init__(self, ts_df, underlying):
+    def __init__(self, ts_df, underlying, name=''):
         """
         :param ts_df: time-series DataFrame with time and value
         :param underlying: the underlying instrument whose volatility is being gauged
+        :param name: name of the data
         """
-        super().__init__(ts_df)
+        super().__init__(ts_df, name)
         self.underlying = underlying
 
     def undl_realized_vol(self, do_shift=False):
