@@ -1,8 +1,15 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from itertools import zip_longest
+from sklearn.linear_model import LinearRegression
 
 from data_structures import ETF, Index, VolatilityIndex
+
+
+def share_dateindex(timeseries_list):
+    column_list = range(len(timeseries_list))
+    combined_df = pd.DataFrame(dict(zip(column_list, timeseries_list))).dropna()
+    return [combined_df[column].rename('value') for column in column_list]
 
 
 def make_lineplot(data_list, label_list=None, xlabel=None, ylabel=None, title=None, ax=None):
@@ -14,11 +21,62 @@ def make_lineplot(data_list, label_list=None, xlabel=None, ylabel=None, title=No
         fig, ax = plt.subplots()
     else:
         fig = None
-    # Plot
+    # Create lines
     for data, label in zip_longest(data_list, label_list):
         ax.plot(data, label=label, linewidth=3)
+    # Configure
     ax.legend()
-    ax.grid()
+    ax.grid(True)
+    # Set labels
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    if title:
+        ax.set_title(title)
+    return fig, ax
+
+
+def make_fillbetween(x, y1, y2=0, label='', xlabel=None, ylabel=None, title=None, ax=None):
+    # Prepare Figure and Axes
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = None
+    # Create filled line plot
+    ax.fill_between(x, y1, y2, color='g', label=label)
+    ax.legend()
+    ax.grid(True)
+    # Set labels
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    if title:
+        ax.set_title(title)
+    return fig, ax
+
+
+def make_scatterplot(x_data, y_data, do_center=False, xlabel=None, ylabel=None, title=None, ax=None):
+    # Prepare Figure and Axes
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = None
+    # Create scatter
+    [joined_x_data, joined_y_data] = share_dateindex([x_data, y_data])
+    ax.scatter(joined_x_data, joined_y_data)
+    # Create best fit line
+    x = joined_x_data.values.reshape(-1, 1)
+    y = joined_y_data.values
+    model = LinearRegression(fit_intercept=False).fit(x, y)
+    ax.plot(joined_x_data, model.coef_*joined_x_data, 'k')
+    # Configure
+    ax.grid(True)
+    if do_center:
+        lim = max(max(joined_x_data.abs()), max(joined_y_data.abs()))
+        ax.set_xlim(-lim, lim)
+        ax.set_ylim(-lim, lim)
     # Set labels
     if xlabel:
         ax.set_xlabel(xlabel)
@@ -83,6 +141,24 @@ def main():
     # Tables
     example_table = make_basicstatstable([spx, vix, hyg, vxhyg, ief, vxief, sx5e, vstoxx]).round(1)
     print(example_table)
+
+    # Scatterplots
+    make_scatterplot(spx.price_return(False), vix.price_return(False), False,
+                     '% Change in SPX', '% Change in VIX', '% Change: SPX vs. VIX')
+
+    # Line Plots with Difference
+    truncd_vix = vix.price().truncate('2004-01-01', '2018-01-01')
+    truncd_realvol = 100 * vix.undl_realized_vol(do_shift=True).truncate('2004-01-01', '2018-01-01')
+    [joined_vix, joined_realvol] = share_dateindex([truncd_vix, truncd_realvol])
+    fig, axs = plt.subplots(2, 1, sharex='all')
+    make_lineplot([joined_vix, joined_realvol],
+                  ['VIX Level', 'SPX Realized Vol (21 Days Shifted)'], ax=axs[0])
+    difference = joined_vix - joined_realvol
+    make_fillbetween(difference.index, joined_vix, joined_realvol,
+                     label='Difference', ax=axs[0])
+    make_fillbetween(difference.index, difference, label='Difference', ax=axs[1])
+
+    # Histograms
 
     return 0
 

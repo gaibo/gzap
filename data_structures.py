@@ -92,9 +92,9 @@ class Instrument(object):
         prices = self.price(granularity, time_start, time_end,
                             intraday_interval, multiday_interval)
         if logarithmic:
-            return np.log(prices).diff()
+            return np.log(prices).diff().iloc[1:]
         else:
-            return prices.pct_change()
+            return prices.pct_change().iloc[1:]
 
     def realized_vol(self, do_shift=False):
         """ Calculate annualized realized vol from past month
