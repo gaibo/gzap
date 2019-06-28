@@ -119,7 +119,10 @@ def make_histogram(data, hist=True, n_bins=10, line=True,
         ax.hist(data, bins=n_bins, density=True, label=label)
     # Create density plot line
     if line:
-        sns.distplot(data, hist=False, ax=ax, label=label)
+        if isinstance(data, list):
+            print("ERROR: can't make multiple density plot lines at same time.")
+        else:
+            sns.distplot(data, hist=False, ax=ax, label=label)
     # Configure
     ax.legend()
     ax.grid(True)
