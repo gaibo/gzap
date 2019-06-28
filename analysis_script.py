@@ -4,7 +4,7 @@ from itertools import zip_longest
 from sklearn.linear_model import LinearRegression
 import seaborn as sns
 
-from data_structures import ETF, Index, VolatilityIndex
+from model.data_structures import ETF, Index, VolatilityIndex
 
 
 def share_dateindex(timeseries_list):
@@ -138,9 +138,9 @@ def make_histogram(data, hist=True, n_bins=10, line=True,
 
 def main():
     # Import data sources with pandas
-    full_data = pd.read_csv('index_data.csv', index_col='Date', parse_dates=True)
-    eurostoxx_data = pd.read_csv('STOXX50E.csv', index_col='Date', parse_dates=True)
-    sptr_data = pd.read_csv('sptr_vix.csv', index_col='Date', parse_dates=True)
+    full_data = pd.read_csv('data/index_data.csv', index_col='Date', parse_dates=True)
+    eurostoxx_data = pd.read_csv('data/STOXX50E.csv', index_col='Date', parse_dates=True)
+    sptr_data = pd.read_csv('data/sptr_vix.csv', index_col='Date', parse_dates=True)
 
     # Create data objects
     spx = Index(sptr_data['SPTR'], 'SPX')
@@ -201,6 +201,29 @@ def main():
                              label=['VIX', 'VXHYG'], xlabel='Vol Points', title='Risk Premium')
     make_histogram(difference, hist=False, line=True, label='VIX', ax=ax)
     make_histogram(hyg_voldiff, hist=False, line=True, label='VXHYG', ax=ax)
+
+    # Matrix Analysis
+    fig, axs = plt.subplots(6, 6)
+    instr_list = [spx, vix, hyg, ief, sx5e, agg]
+    for row, instr_x in zip(range(5, -1, -1), instr_list):
+        for col, instr_y in zip(range(6), instr_list):
+            if col > (5-row):
+                # Top triangle
+                make_scatterplot(instr_x.price_return(), instr_y.price_return(), ax=axs[row, col])
+            elif (5-row) > col:
+                # Bottom triangle
+                [joined_x_data, joined_y_data] = share_dateindex([instr_x.price_return(),
+                                                                  instr_y.price_return()])
+                x = joined_x_data.values.reshape(-1, 1)
+                y = joined_y_data.values
+                model = LinearRegression(fit_intercept=False).fit(x, y)
+                r_sq = round(model.score(x, y), 2)
+                slope = round(model.coef_[0], 2)
+                axs[row, col].text(0.35, 0.4, "Slope: {}\nR^2: {}".format(slope, r_sq))
+            else:
+                # Diagonal
+                make_histogram(instr_x.price_return(), hist=True, n_bins=100, line=False,
+                               ax=axs[row, col])
 
     return 0
 

@@ -18,7 +18,7 @@ def construct_timeseries(ts_df):
     ts = pd.Series(ts_df.iloc[:, 1].values, index=ts_df.iloc[:, 0], name='value')
     ts.index.name = 'time'
     ts = ts.sort_index()
-    return ts.truncate(ts.first_valid_index(), ts.last_valid_index())
+    return ts.dropna()
 
 
 class Instrument(object):
