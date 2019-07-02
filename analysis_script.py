@@ -205,13 +205,16 @@ def main():
     # Matrix Analysis
     fig, axs = plt.subplots(6, 6)
     instr_list = [spx, vix, hyg, ief, sx5e, agg]
-    for row, instr_x in zip(range(5, -1, -1), instr_list):
-        for col, instr_y in zip(range(6), instr_list):
-            if col > (5-row):
-                # Top triangle
+    color_list = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6']
+    for x_pos, instr_x in zip(range(6), instr_list):
+        for y_pos, instr_y in zip(range(6), instr_list):
+            row = 5 - y_pos
+            col = x_pos
+            if x_pos > y_pos:
+                # Bottom triangle - scatter
                 make_scatterplot(instr_x.price_return(), instr_y.price_return(), ax=axs[row, col])
-            elif (5-row) > col:
-                # Bottom triangle
+            elif y_pos > x_pos:
+                # Top triangle - text
                 [joined_x_data, joined_y_data] = share_dateindex([instr_x.price_return(),
                                                                   instr_y.price_return()])
                 x = joined_x_data.values.reshape(-1, 1)
@@ -219,9 +222,9 @@ def main():
                 model = LinearRegression(fit_intercept=False).fit(x, y)
                 r_sq = round(model.score(x, y), 2)
                 slope = round(model.coef_[0], 2)
-                axs[row, col].text(0.35, 0.4, "Slope: {}\nR^2: {}".format(slope, r_sq))
+                axs[row, col].text(0.30, 0.4, "$Slope$: {}\n$R^2$: {}".format(slope, r_sq))
             else:
-                # Diagonal
+                # Diagonal - distribution
                 make_histogram(instr_x.price_return(), hist=True, n_bins=100, line=False,
                                ax=axs[row, col])
 
