@@ -8,17 +8,33 @@ ONE_DAY = pd.Timedelta(days=1)
 ONE_NANOSECOND = pd.Timedelta(nanoseconds=1)
 
 
-def construct_timeseries(ts_df):
+def construct_timeseries(ts_df, time_col=None, value_col=None):
     """ Construct pseudo-time-series object, i.e. a pandas Series with 'time' and 'value'
-    :param ts_df: DataFrame object with 1 index (time) and 1 column (value)
+    :param ts_df: DataFrame or Series object with at least a time column and a value column
+    :param time_col: DataFrame column that represents time
+    :param value_col: DataFrame column that represents value
     :return: pd.Series object with 'time' as index and 'value' as name
     """
-    ts_df = ts_df.reset_index()
-    assert ts_df.shape[1] == 2   # 2 columns - time and value
-    ts = pd.Series(ts_df.iloc[:, 1].values, index=ts_df.iloc[:, 0], name='value')
-    ts.index.name = 'time'
-    ts = ts.sort_index()
-    return ts.dropna()
+    ts = ts_df.copy()   # Avoid modifying original DataFrame
+    if isinstance(ts, pd.Series):
+        # Convert Series to 2-column DataFrame, since we strive to be overly robust
+        ts = ts.reset_index()
+    n_cols = ts.shape[1]
+    if n_cols == 0:
+        print("ERROR construct_timeseries: 0 columns in DataFrame.")
+        return None
+    elif n_cols == 1:
+        # Try restoring index to column
+        ts = ts.reset_index()
+    elif n_cols > 2:
+        # Get columns based on parameters if there are more than 2
+        if time_col is None or value_col is None:
+            print("ERROR construct_timeseries: more than 2 columns in DataFrame, "
+                  "please provide time and value column names.")
+            return None
+        ts = ts[[time_col, value_col]]
+    ts.columns = ['time', 'value']
+    return ts.set_index('time')['value'].sort_index().dropna()
 
 
 class Instrument(object):
@@ -174,33 +190,34 @@ class ETF(CashInstr):
 
 
 class Futures(Derivative):
-    def __init__(self, ts_df, underlying, maturity, name='', tradestats=pd.DataFrame(None)):
+    def __init__(self, ts_df, underlying, maturity_date, name='', tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
         :param underlying: underlying Instrument
-        :param maturity: maturity date of futures
+        :param maturity_date: maturity date of futures contract
         :param name: name of the data
         :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
         super().__init__(ts_df, underlying, name, tradestats)
-        self.maturity = maturity
+        self.maturity_date = maturity_date
 
 
 class Options(Derivative):
-    def __init__(self, ts_df, underlying, expiry, pc, strike, name='', tradestats=pd.DataFrame(None)):
+    def __init__(self, ts_df, underlying, expiry_date, pc, strike, name='', tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
         :param underlying: underlying Instrument
-        :param expiry: expiration date of options contract
+        :param expiry_date: expiration date of options contract
         :param pc: whether options contract is put or call
         :param strike: strike price of options contract
         :param name: name of the data
         :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
         super().__init__(ts_df, underlying, name, tradestats)
-        self.expiry = expiry
+        self.expiry_date = expiry_date
         self.pc = pc
         self.strike = strike
+        # TODO: may need more efficient way to store options in bulk
 
 
 class VolatilityIndex(Index):
@@ -223,7 +240,7 @@ class VolatilityIndex(Index):
 
 def main():
     # Load example data
-    sptr_vix_df = pd.read_csv('sptr_vix.csv')
+    sptr_vix_df = pd.read_csv('../data/sptr_vix.csv')
     sptr_vix_df['Date'] = pd.to_datetime(sptr_vix_df['Date'])
     sptr_vix_df = sptr_vix_df.set_index('Date')
 
