@@ -138,9 +138,10 @@ def make_histogram(data, hist=True, n_bins=10, line=True,
 
 def main():
     # Import data sources with pandas
-    full_data = pd.read_csv('data/index_data.csv', index_col='Date', parse_dates=True)
-    eurostoxx_data = pd.read_csv('data/STOXX50E.csv', index_col='Date', parse_dates=True)
-    sptr_data = pd.read_csv('data/sptr_vix.csv', index_col='Date', parse_dates=True)
+    full_data = pd.read_csv('data/price_index_data.csv', index_col='Date', parse_dates=True)
+    eurostoxx_data = pd.read_csv('data/sx5e_data.csv', index_col='Date', parse_dates=True)
+    sptr_data = pd.read_csv('data/sptr_vix_data.csv', index_col='Date', parse_dates=True)
+    agg_data = pd.read_csv('data/agg_data.csv', index_col='Date', parse_dates=True)
 
     # Create data objects
     spx = Index(sptr_data['SPTR'], 'SPX')
@@ -149,9 +150,9 @@ def main():
     vxhyg = VolatilityIndex(full_data['VXHYG.Index'], hyg, 'VXHYG')
     ief = ETF(full_data['IEF.US.Equity'], 'IEF')  # 7-10 year treasury bond ETF
     vxief = VolatilityIndex(full_data['VXHYG.Index'], ief, 'VXIEF')
-    sx5e = Index(eurostoxx_data['Close'], 'Euro Stoxx 50')
+    sx5e = Index(eurostoxx_data['TOT_RETURN_INDEX_GROSS_DVDS'], 'Euro Stoxx 50')
     vstoxx = VolatilityIndex(full_data['V2X.Index'], sx5e, 'VSTOXX')
-    agg = ETF(full_data['AGG.US.Equity'], 'AGG')
+    agg = ETF(agg_data['TOT_RETURN_INDEX_GROSS_DVDS'], 'AGG')
     lqd = ETF(full_data['LQD.US.Equity'], 'LQD')
     jgbvix = VolatilityIndex(full_data['SPJGBV.Index'], None, 'JGB VIX')    # Need futures data
     tyvix = VolatilityIndex(full_data['TYVIX.Index'], None, 'TYVIX')  # Need futures data
@@ -205,7 +206,7 @@ def main():
     # Matrix Analysis
     fig, axs = plt.subplots(6, 6)
     instr_list = [spx, vix, hyg, ief, sx5e, agg]
-    color_list = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6']
+    color_dict = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6']
     for x_pos, instr_x in zip(range(6), instr_list):
         for y_pos, instr_y in zip(range(6), instr_list):
             row = 5 - y_pos
@@ -213,6 +214,7 @@ def main():
             if x_pos > y_pos:
                 # Bottom triangle - scatter
                 make_scatterplot(instr_x.price_return(), instr_y.price_return(), ax=axs[row, col])
+                axs[row, col].set_color(color_dict[3])
             elif y_pos > x_pos:
                 # Top triangle - text
                 [joined_x_data, joined_y_data] = share_dateindex([instr_x.price_return(),
