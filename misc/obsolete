@@ -1,3 +1,9 @@
+[joined_x_data, joined_y_data] = share_dateindex([instr_x.price_return(),
+                                                                  instr_y.price_return()])
+                x = joined_x_data.values.reshape(-1, 1)
+                y = joined_y_data.values
+                model = LinearRegression(fit_intercept=False).fit(x, y)
+
 color_dict = {frozenset({spx, vix}): 'C1', frozenset({spx, hyg}): 'C2', frozenset({spx, ief}): 'C3',
                   frozenset({spx, sx5e}): 'C4', frozenset({spx, agg}): 'C5',
                   frozenset({vix, hyg}): 'C1', frozenset({vix, ief}): 'C2', frozenset({vix, sx5e}): 'C3',

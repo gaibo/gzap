@@ -13,6 +13,16 @@ def share_dateindex(timeseries_list):
     return [combined_df[column].rename('value') for column in column_list]
 
 
+def get_best_fit(x_data, y_data, fit_intercept=True):
+    [joined_x_data, joined_y_data] = share_dateindex([x_data, y_data])
+    x = joined_x_data.values.reshape(-1, 1)
+    y = joined_y_data.values
+    model = LinearRegression(fit_intercept=fit_intercept).fit(x, y)
+    r_sq = model.score(x, y)
+    slope = model.coef_[0]
+    return r_sq, slope, model
+
+
 def make_basicstatstable(instr_list):
     table_out = pd.DataFrame()
     for instr in instr_list:
@@ -91,13 +101,11 @@ def make_scatterplot(x_data, y_data, do_center=False, color=None,
     else:
         fig = None
     # Create scatter
-    [joined_x_data, joined_y_data] = share_dateindex([x_data, y_data])
+    [joined_x_data, joined_y_data] = share_dateindex([x_data, y_data])  # Scatter must have matching x-y
     ax.scatter(joined_x_data, joined_y_data, c=color)
     # Create best fit line
-    x = joined_x_data.values.reshape(-1, 1)
-    y = joined_y_data.values
-    model = LinearRegression(fit_intercept=False).fit(x, y)
-    ax.plot(joined_x_data, model.coef_*joined_x_data, 'k')
+    _, slope, _ = get_best_fit(x_data, y_data, fit_intercept=False)
+    ax.plot(joined_x_data, slope*joined_x_data, 'k')
     # Configure
     ax.grid(True)
     if do_center:
@@ -142,6 +150,55 @@ def make_histogram(data, hist=True, n_bins=10, line=True, label=None, color=None
     if title:
         ax.set_title(title)
     return fig, ax
+
+
+def make_correlation_matrix(data_list, color_list, label_list=None):
+    n_data = len(data_list)
+    n_colors = len(color_list)
+    # Prepare labels
+    if label_list is None:
+        label_list = n_data * [None]
+    # Prepare coloring pattern
+    color_dict = {}
+    i = 0
+    for combo in combinations(label_list, 2):
+        color_dict[frozenset(combo)] = color_list[i]
+        i = (i + 1) % n_colors
+    # Create figure and subplots
+    fig, axs = plt.subplots(n_data, n_data)
+    for x_pos, data_x in enumerate(data_list):
+        for y_pos, data_y in enumerate(data_list):
+            # Use labels if subplot is on an axis
+            xlabel = None
+            ylabel = None
+            if x_pos == 0:
+                ylabel = label_list[y_pos]
+            if y_pos == 0:
+                xlabel = label_list[x_pos]
+            # Convert x and y to row and col (y bottom to top -> matrix row top to bottom)
+            row = n_data-1 - y_pos
+            col = x_pos
+            if x_pos > y_pos:
+                # Bottom triangle - scatter
+                make_scatterplot(data_x, data_y, ax=axs[row, col],
+                                 color=color_dict[frozenset({label_list[x_pos], label_list[y_pos]})],
+                                 xlabel=xlabel, ylabel=ylabel)
+            elif y_pos > x_pos:
+                # Top triangle - text
+                # NOTE: reverse x-y to match scatter slope
+                r_sq, slope, _ = get_best_fit(data_y, data_x, fit_intercept=False)
+                text_str = "$Slope$: {}\n$R^2$: {}".format(round(slope, 2), round(r_sq, 2))
+                axs[row, col].text(0.3, 0.4, text_str,
+                                   color=color_dict[frozenset({label_list[x_pos], label_list[y_pos]})])
+                if xlabel:
+                    axs[row, col].set_xlabel(xlabel)
+                if ylabel:
+                    axs[row, col].set_ylabel(ylabel)
+            else:
+                # Diagonal - distribution
+                make_histogram(data_x, hist=True, n_bins=100, line=False,
+                               ax=axs[row, col], xlabel=xlabel, ylabel=ylabel)
+    return fig, axs
 
 
 def main():
@@ -210,51 +267,12 @@ def main():
     make_histogram(difference, hist=False, line=True, label='VIX', ax=ax)
     make_histogram(hyg_voldiff, hist=False, line=True, label='VXHYG', ax=ax)
 
-    # Matrix Analysis
+    # Correlation Matrix
     instr_list = [spx, vix, hyg, ief, sx5e, agg]
+    data_list = list(map(lambda instr: instr.price_return(), instr_list))
     color_list = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6']
-    color_dict = {}
-    i = 0
-    n_color = len(color_list)
-    for combo in combinations(instr_list, 2):
-        color_dict[frozenset(combo)] = color_list[i]
-        i = (i+1) % n_color
-    n_instr = len(instr_list)
-    fig, axs = plt.subplots(n_instr, n_instr)
-    for x_pos, instr_x in enumerate(instr_list):
-        for y_pos, instr_y in enumerate(instr_list):
-            xlabel = None
-            ylabel = None
-            if x_pos == 0:
-                ylabel = instr_y.name
-            if y_pos == 0:
-                xlabel = instr_x.name
-            row = n_instr-1 - y_pos     # Matrix row goes top to bottom; we picture y_pos as bottom to top
-            col = x_pos
-            if x_pos > y_pos:
-                # Bottom triangle - scatter
-                make_scatterplot(instr_x.price_return(), instr_y.price_return(), ax=axs[row, col],
-                                 color=color_dict[frozenset({instr_x, instr_y})],
-                                 xlabel=xlabel, ylabel=ylabel)
-            elif y_pos > x_pos:
-                # Top triangle - text
-                [joined_x_data, joined_y_data] = share_dateindex([instr_x.price_return(),
-                                                                  instr_y.price_return()])
-                x = joined_x_data.values.reshape(-1, 1)
-                y = joined_y_data.values
-                model = LinearRegression(fit_intercept=False).fit(x, y)
-                r_sq = round(model.score(x, y), 2)
-                slope = round(model.coef_[0], 2)
-                axs[row, col].text(0.30, 0.4, "$Slope$: {}\n$R^2$: {}".format(slope, r_sq),
-                                   color=color_dict[frozenset({instr_x, instr_y})])
-                if xlabel:
-                    axs[row, col].set_xlabel(xlabel)
-                if ylabel:
-                    axs[row, col].set_ylabel(ylabel)
-            else:
-                # Diagonal - distribution
-                make_histogram(instr_x.price_return(), hist=True, n_bins=100, line=False,
-                               ax=axs[row, col], xlabel=xlabel, ylabel=ylabel)
+    label_list = list(map(lambda instr: instr.name, instr_list))
+    make_correlation_matrix(data_list, color_list, label_list=label_list)
 
     return 0
 
