@@ -31,18 +31,22 @@ def make_basicstatstable(instr_list):
     return table_out
 
 
-def make_lineplot(data_list, label_list=None, xlabel=None, ylabel=None, title=None, ax=None):
-    # Prepare labels
+def make_lineplot(data_list, label_list=None, color_list=None,
+                  xlabel=None, ylabel=None, title=None, ax=None):
+    # Prepare labels and colors
+    none_list = len(data_list) * [None]
     if label_list is None:
-        label_list = len(data_list) * ['']
+        label_list = none_list
+    if color_list is None:
+        color_list = none_list
     # Prepare Figure and Axes
     if ax is None:
         fig, ax = plt.subplots()
     else:
         fig = None
     # Create lines
-    for data, label in zip_longest(data_list, label_list):
-        ax.plot(data, label=label, linewidth=3)
+    for data, label, color in zip_longest(data_list, label_list, color_list):
+        ax.plot(data, label=label, color=color, linewidth=3)
     # Configure
     ax.legend()
     ax.grid(True)
@@ -56,14 +60,15 @@ def make_lineplot(data_list, label_list=None, xlabel=None, ylabel=None, title=No
     return fig, ax
 
 
-def make_fillbetween(x, y1, y2=0, label=None, xlabel=None, ylabel=None, title=None, ax=None):
+def make_fillbetween(x, y1, y2=0, label=None, color=None,
+                     xlabel=None, ylabel=None, title=None, ax=None):
     # Prepare Figure and Axes
     if ax is None:
         fig, ax = plt.subplots()
     else:
         fig = None
     # Create filled line plot
-    ax.fill_between(x, y1, y2, color='g', label=label)
+    ax.fill_between(x, y1, y2, color=color, label=label)
     ax.legend()
     ax.grid(True)
     # Set labels
@@ -76,7 +81,7 @@ def make_fillbetween(x, y1, y2=0, label=None, xlabel=None, ylabel=None, title=No
     return fig, ax
 
 
-def make_scatterplot(x_data, y_data, do_center=False,
+def make_scatterplot(x_data, y_data, do_center=False, color=None,
                      xlabel=None, ylabel=None, title=None, ax=None):
     # Prepare Figure and Axes
     if ax is None:
@@ -85,7 +90,7 @@ def make_scatterplot(x_data, y_data, do_center=False,
         fig = None
     # Create scatter
     [joined_x_data, joined_y_data] = share_dateindex([x_data, y_data])
-    ax.scatter(joined_x_data, joined_y_data)
+    ax.scatter(joined_x_data, joined_y_data, c=color)
     # Create best fit line
     x = joined_x_data.values.reshape(-1, 1)
     y = joined_y_data.values
@@ -107,8 +112,8 @@ def make_scatterplot(x_data, y_data, do_center=False,
     return fig, ax
 
 
-def make_histogram(data, hist=True, n_bins=10, line=True,
-                   label=None, xlabel=None, ylabel=None, title=None, ax=None):
+def make_histogram(data, hist=True, n_bins=10, line=True, label=None, color=None,
+                   xlabel=None, ylabel=None, title=None, ax=None):
     # Prepare Figure and Axes
     if ax is None:
         fig, ax = plt.subplots()
@@ -116,13 +121,13 @@ def make_histogram(data, hist=True, n_bins=10, line=True,
         fig = None
     # Create distribution histogram
     if hist:
-        ax.hist(data, bins=n_bins, density=True, label=label)
+        ax.hist(data, bins=n_bins, density=True, label=label, color=color)
     # Create density plot line
     if line:
         if isinstance(data, list):
             print("ERROR: can't make multiple density plot lines at same time.")
         else:
-            sns.distplot(data, hist=False, ax=ax, label=label)
+            sns.distplot(data, hist=False, ax=ax, label=label, color=color)
     # Configure
     ax.legend()
     ax.grid(True)
@@ -180,7 +185,7 @@ def main():
     print(example_table)
 
     # Scatterplots
-    make_scatterplot(spx.price_return(logarithmic=False), vix.price_return(logarithmic=False), False,
+    make_scatterplot(spx.price_return(logarithmic=False), vix.price_return(logarithmic=False), False, None,
                      '% Change in SPX', '% Change in VIX', '% Change: SPX vs. VIX')
 
     # Line Plots with Difference
@@ -190,9 +195,8 @@ def main():
     make_lineplot([joined_vix, joined_realvol],
                   ['VIX Level', 'SPX Realized Vol (21 Days Shifted)'], ax=axs[0])
     difference = joined_vix - joined_realvol
-    make_fillbetween(difference.index, joined_vix, joined_realvol,
-                     label='Difference', ax=axs[0])
-    make_fillbetween(difference.index, difference, label='Difference', ax=axs[1])
+    make_fillbetween(difference.index, joined_vix, joined_realvol, label='Difference', color='g', ax=axs[0])
+    make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
 
     # Histograms
     [joined_vxhyg, joined_realhygvol] = share_dateindex([vxhyg.price(),
@@ -206,7 +210,6 @@ def main():
     # Matrix Analysis
     fig, axs = plt.subplots(6, 6)
     instr_list = [spx, vix, hyg, ief, sx5e, agg]
-    color_dict = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6']
     for x_pos, instr_x in zip(range(6), instr_list):
         for y_pos, instr_y in zip(range(6), instr_list):
             row = 5 - y_pos
@@ -214,7 +217,6 @@ def main():
             if x_pos > y_pos:
                 # Bottom triangle - scatter
                 make_scatterplot(instr_x.price_return(), instr_y.price_return(), ax=axs[row, col])
-                axs[row, col].set_color(color_dict[3])
             elif y_pos > x_pos:
                 # Top triangle - text
                 [joined_x_data, joined_y_data] = share_dateindex([instr_x.price_return(),
