@@ -1,6 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-from itertools import zip_longest
+from itertools import zip_longest, combinations
 from sklearn.linear_model import LinearRegression
 import seaborn as sns
 
@@ -48,7 +48,8 @@ def make_lineplot(data_list, label_list=None, color_list=None,
     for data, label, color in zip_longest(data_list, label_list, color_list):
         ax.plot(data, label=label, color=color, linewidth=3)
     # Configure
-    ax.legend()
+    if label_list == none_list:
+        ax.legend()
     ax.grid(True)
     # Set labels
     if xlabel:
@@ -69,7 +70,8 @@ def make_fillbetween(x, y1, y2=0, label=None, color=None,
         fig = None
     # Create filled line plot
     ax.fill_between(x, y1, y2, color=color, label=label)
-    ax.legend()
+    if label is not None:
+        ax.legend()
     ax.grid(True)
     # Set labels
     if xlabel:
@@ -129,7 +131,8 @@ def make_histogram(data, hist=True, n_bins=10, line=True, label=None, color=None
         else:
             sns.distplot(data, hist=False, ax=ax, label=label, color=color)
     # Configure
-    ax.legend()
+    if label is not None:
+        ax.legend()
     ax.grid(True)
     # Set labels
     if xlabel:
@@ -143,10 +146,10 @@ def make_histogram(data, hist=True, n_bins=10, line=True, label=None, color=None
 
 def main():
     # Import data sources with pandas
-    full_data = pd.read_csv('data/price_index_data.csv', index_col='Date', parse_dates=True)
-    eurostoxx_data = pd.read_csv('data/sx5e_data.csv', index_col='Date', parse_dates=True)
-    sptr_data = pd.read_csv('data/sptr_vix_data.csv', index_col='Date', parse_dates=True)
-    agg_data = pd.read_csv('data/agg_data.csv', index_col='Date', parse_dates=True)
+    full_data = pd.read_csv('../data/price_index_data.csv', index_col='Date', parse_dates=True)
+    eurostoxx_data = pd.read_csv('../data/sx5e_data.csv', index_col='Date', parse_dates=True)
+    sptr_data = pd.read_csv('../data/sptr_vix_data.csv', index_col='Date', parse_dates=True)
+    agg_data = pd.read_csv('../data/agg_data.csv', index_col='Date', parse_dates=True)
 
     # Create data objects
     spx = Index(sptr_data['SPTR'], 'SPX')
@@ -208,15 +211,31 @@ def main():
     make_histogram(hyg_voldiff, hist=False, line=True, label='VXHYG', ax=ax)
 
     # Matrix Analysis
-    fig, axs = plt.subplots(6, 6)
     instr_list = [spx, vix, hyg, ief, sx5e, agg]
-    for x_pos, instr_x in zip(range(6), instr_list):
-        for y_pos, instr_y in zip(range(6), instr_list):
-            row = 5 - y_pos
+    color_list = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6']
+    color_dict = {}
+    i = 0
+    n_color = len(color_list)
+    for combo in combinations(instr_list, 2):
+        color_dict[frozenset(combo)] = color_list[i]
+        i = (i+1) % n_color
+    n_instr = len(instr_list)
+    fig, axs = plt.subplots(n_instr, n_instr)
+    for x_pos, instr_x in enumerate(instr_list):
+        for y_pos, instr_y in enumerate(instr_list):
+            xlabel = None
+            ylabel = None
+            if x_pos == 0:
+                ylabel = instr_y.name
+            if y_pos == 0:
+                xlabel = instr_x.name
+            row = n_instr-1 - y_pos     # Matrix row goes top to bottom; we picture y_pos as bottom to top
             col = x_pos
             if x_pos > y_pos:
                 # Bottom triangle - scatter
-                make_scatterplot(instr_x.price_return(), instr_y.price_return(), ax=axs[row, col])
+                make_scatterplot(instr_x.price_return(), instr_y.price_return(), ax=axs[row, col],
+                                 color=color_dict[frozenset({instr_x, instr_y})],
+                                 xlabel=xlabel, ylabel=ylabel)
             elif y_pos > x_pos:
                 # Top triangle - text
                 [joined_x_data, joined_y_data] = share_dateindex([instr_x.price_return(),
@@ -226,11 +245,16 @@ def main():
                 model = LinearRegression(fit_intercept=False).fit(x, y)
                 r_sq = round(model.score(x, y), 2)
                 slope = round(model.coef_[0], 2)
-                axs[row, col].text(0.30, 0.4, "$Slope$: {}\n$R^2$: {}".format(slope, r_sq))
+                axs[row, col].text(0.30, 0.4, "$Slope$: {}\n$R^2$: {}".format(slope, r_sq),
+                                   color=color_dict[frozenset({instr_x, instr_y})])
+                if xlabel:
+                    axs[row, col].set_xlabel(xlabel)
+                if ylabel:
+                    axs[row, col].set_ylabel(ylabel)
             else:
                 # Diagonal - distribution
                 make_histogram(instr_x.price_return(), hist=True, n_bins=100, line=False,
-                               ax=axs[row, col])
+                               ax=axs[row, col], xlabel=xlabel, ylabel=ylabel)
 
     return 0
 
