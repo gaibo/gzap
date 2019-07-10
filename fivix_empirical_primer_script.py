@@ -46,15 +46,15 @@ def main():
         .drop('IndexSymbol', axis=1).rename({'CreditVix_pc': 'pc', 'CreditVix_bp': 'bp'}, axis=1)
     vixxo_data = \
         credit_vix_data[credit_vix_data['IndexSymbol'] == 'VIXXO'] \
-            .drop('IndexSymbol', axis=1).rename({'CreditVix_pc': 'pc', 'CreditVix_bp': 'bp'}, axis=1)
+        .drop('IndexSymbol', axis=1).rename({'CreditVix_pc': 'pc', 'CreditVix_bp': 'bp'}, axis=1)
     vixfs = VolatilityIndex(vixfs_data['pc'], None, 'VIXFS')
     vixhy = VolatilityIndex(vixhy_data['pc'], None, 'VIXHY')
     vixig = VolatilityIndex(vixig_data['pc'], None, 'VIXIG')
     vixie = VolatilityIndex(vixie_data['pc'], None, 'VIXIE')
     vixxo = VolatilityIndex(vixxo_data['pc'], None, 'VIXXO')
     vixfs_bp = VolatilityIndex(vixfs_data['bp'], None, 'BP VIXFS')
-    vixhy_bp = VolatilityIndex(vixhy_data['bp'], None, 'BP VIXHY')
     vixig_bp = VolatilityIndex(vixig_data['bp'], None, 'BP VIXIG')
+    vixhy_bp = VolatilityIndex(vixhy_data['bp'], None, 'BP VIXHY')
     vixie_bp = VolatilityIndex(vixie_data['bp'], None, 'BP VIXIE')
     vixxo_bp = VolatilityIndex(vixxo_data['bp'], None, 'BP VIXXO')
 
@@ -94,11 +94,13 @@ def main():
         .to_csv('Basic Statistics for Interest Rate VIX Indexes.csv')
 
     # Basis Point Version of Credit Group
-    make_lineplot([vixig_bp.price(), vixhy_bp.price(), vixie.price(), vixxo.price()],
+    make_lineplot([vixig_bp.price(), vixhy_bp.price(), vixie_bp.price(), vixxo_bp.price()],
                   ['BP VIXIG', 'BP VIXHY', 'BP VIXIE', 'BP VIXXO'],
                   ylabel='Volatility Index (bps)', title='Basis Point Version of Credit Group')
 
     # Basis Point Version of Rates Group
     # Missing basis point JGB VIX
 
-    #
+    # VIXIG Daily % Change vs. CDX NAIG Index Daily bps Change
+    # Missing CDX NAIG data
+
