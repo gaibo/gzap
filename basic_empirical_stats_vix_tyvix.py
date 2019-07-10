@@ -35,8 +35,8 @@ make_lineplot([truncd_spx/truncd_spx[0], truncd_ief/truncd_ief[0]],
     share_dateindex([spx.price_return(), ief.price_return(), risk_free_rate/252])
 spx_excess_ret = truncd_spx_ret - truncd_rfr
 ief_excess_ret = truncd_ief_ret - truncd_rfr
-spx_sharpe = spx_excess_ret.mean() / spx_excess_ret.std()
-ief_sharpe = ief_excess_ret.mean() / ief_excess_ret.std()
+spx_sharpe = spx_excess_ret.mean() / spx_excess_ret.std() * np.sqrt(252)
+ief_sharpe = ief_excess_ret.mean() / ief_excess_ret.std() * np.sqrt(252)
 
 # Deciles and distribution chart
 vix_deciles = vix.price().quantile(np.arange(0, 1.1, 0.1))
