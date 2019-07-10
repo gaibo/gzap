@@ -1,3 +1,7 @@
+[truncd_spx, truncd_ty1] = share_dateindex([spx.price(), ty1.price()])
+make_lineplot([truncd_spx/truncd_spx[0], truncd_ty1/truncd_ty1[0]],
+              ['SPX cumulative return', 'TY1 cumulative return'])
+
 [joined_x_data, joined_y_data] = share_dateindex([instr_x.price_return(),
                                                                   instr_y.price_return()])
                 x = joined_x_data.values.reshape(-1, 1)
