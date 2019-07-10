@@ -16,6 +16,7 @@ def main():
     credit_vix_data = pd.read_csv('data/creditvix_data.csv',
                                   usecols=['Date', 'IndexSymbol', 'CreditVix_pc', 'CreditVix_bp'],
                                   index_col='Date', parse_dates=True)
+    srvix_data = pd.read_csv('data/srvix_data.csv', index_col='Date', parse_dates=True)
 
     # Create data objects
     spx = Index(sptr_data['SPTR'], 'SPX')
@@ -30,6 +31,7 @@ def main():
     lqd = ETF(full_data['LQD.US.Equity'], 'LQD')
     jgbvix = VolatilityIndex(full_data['SPJGBV.Index'], None, 'JGB VIX')  # Need futures data
     tyvix = VolatilityIndex(full_data['TYVIX.Index'], None, 'TYVIX')  # Need futures data
+    srvix = VolatilityIndex(srvix_data, None, 'SRVIX')  # Need swaptions data
     vixfs_data = \
         credit_vix_data[credit_vix_data['IndexSymbol'] == 'VIXFS'] \
         .drop('IndexSymbol', axis=1).rename({'CreditVix_pc': 'pc', 'CreditVix_bp': 'bp'}, axis=1)
@@ -45,11 +47,16 @@ def main():
     vixxo_data = \
         credit_vix_data[credit_vix_data['IndexSymbol'] == 'VIXXO'] \
             .drop('IndexSymbol', axis=1).rename({'CreditVix_pc': 'pc', 'CreditVix_bp': 'bp'}, axis=1)
-    vixfs = Index(vixfs_data['pc'], 'VIXFS')
-    vixhy = Index(vixhy_data['pc'], 'VIXHY')
-    vixig = Index(vixig_data['pc'], 'VIXIG')
-    vixie = Index(vixie_data['pc'], 'VIXIE')
-    vixxo = Index(vixxo_data['pc'], 'VIXXO')
+    vixfs = VolatilityIndex(vixfs_data['pc'], None, 'VIXFS')
+    vixhy = VolatilityIndex(vixhy_data['pc'], None, 'VIXHY')
+    vixig = VolatilityIndex(vixig_data['pc'], None, 'VIXIG')
+    vixie = VolatilityIndex(vixie_data['pc'], None, 'VIXIE')
+    vixxo = VolatilityIndex(vixxo_data['pc'], None, 'VIXXO')
+    vixfs_bp = VolatilityIndex(vixfs_data['bp'], None, 'BP VIXFS')
+    vixhy_bp = VolatilityIndex(vixhy_data['bp'], None, 'BP VIXHY')
+    vixig_bp = VolatilityIndex(vixig_data['bp'], None, 'BP VIXIG')
+    vixie_bp = VolatilityIndex(vixie_data['bp'], None, 'BP VIXIE')
+    vixxo_bp = VolatilityIndex(vixxo_data['bp'], None, 'BP VIXXO')
 
     # FI VIX Empirical Primer Document Reproduction
 
@@ -60,13 +67,38 @@ def main():
                   ylabel='Normalized Level', title='S&P 500 Index and AGG Total Return')
 
     # North American Credit VIXs with VIX Index
-    [truncd_vix, truncd_vixig, truncd_vixhy] = share_dateindex([vix.price(), vixig.price(), vixhy.price()])
-    make_lineplot([truncd_vix, truncd_vixig, truncd_vixhy],
+    make_lineplot([vix.price(), vixig.price(), vixhy.price()],
                   ['S&P 500 VIX', 'VIXIG', 'VIXHY'],
                   ylabel='Volatility Index', title='North American Credit VIXs with VIX Index')
 
     # European Credit VIXs with VIX Index
-    [truncd_vix, truncd_vixie, truncd_vixxo] = share_dateindex([vix.price(), vixie.price(), vixxo.price()])
-    make_lineplot([truncd_vix, truncd_vixie, truncd_vixxo],
+    make_lineplot([vix.price(), vixie.price(), vixxo.price()],
                   ['S&P 500 VIX', 'VIXIE', 'VIXXO'],
                   ylabel='Volatility Index', title='European Credit VIXs with VIX Index')
+
+    # VIXs in Rates Group with VIX Index
+    make_lineplot([vix.price(), tyvix.price(), jgbvix.price(), srvix.price()],
+                  ['S&P 500 VIX', 'TYVIX', 'JGB VIX', 'SRVIX'],
+                  ylabel='Volatility Index (% Price)', title='VIXs in Rates Group with VIX Index')
+
+    # Basic Statistics for Credit VIX Indexes
+    make_basicstatstable([vix, vixig, vixhy, vixie, vixxo]) \
+        .to_csv('Basic Statistics for Credit VIX Indexes.csv')
+
+    # Basic Statistics for Basis Point Credit VIX Indexes
+    make_basicstatstable([vix, vixig_bp, vixhy_bp, vixie_bp, vixxo_bp]) \
+        .to_csv('Basic Statistics for Basis Point Credit VIX Indexes.csv')
+
+    # Basic Statistics for Interest Rate VIX Indexes
+    make_basicstatstable([vix, tyvix, jgbvix, srvix]) \
+        .to_csv('Basic Statistics for Interest Rate VIX Indexes.csv')
+
+    # Basis Point Version of Credit Group
+    make_lineplot([vixig_bp.price(), vixhy_bp.price(), vixie.price(), vixxo.price()],
+                  ['BP VIXIG', 'BP VIXHY', 'BP VIXIE', 'BP VIXXO'],
+                  ylabel='Volatility Index (bps)', title='Basis Point Version of Credit Group')
+
+    # Basis Point Version of Rates Group
+    # Missing basis point JGB VIX
+
+    #
