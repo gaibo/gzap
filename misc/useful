@@ -2,5 +2,8 @@ pd.set_option('display.max_rows', 30)
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 1000)
 
+import model.data_structures
+import utility.graph_utilities
 import importlib
 importlib.reload(model.data_structures)
+importlib.reload(utility.graph_utilities)

@@ -122,7 +122,7 @@ def make_scatterplot(x_data, y_data, do_center=False, color=None,
     return fig, ax
 
 
-def make_histogram(data, hist=True, n_bins=10, line=True, label=None, color=None,
+def make_histogram(data, hist=True, n_bins=10, line=True, label=None, color=None, color_line=None,
                    xlabel=None, ylabel=None, title=None, ax=None):
     # Prepare Figure and Axes
     if ax is None:
@@ -137,7 +137,7 @@ def make_histogram(data, hist=True, n_bins=10, line=True, label=None, color=None
         if isinstance(data, list):
             print("ERROR: can't make multiple density plot lines at same time.")
         else:
-            sns.distplot(data, hist=False, ax=ax, label=label, color=color)
+            sns.distplot(data, hist=False, ax=ax, label=label, color=color_line)
     # Configure
     if label:
         ax.legend()
