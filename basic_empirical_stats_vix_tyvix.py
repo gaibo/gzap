@@ -65,3 +65,31 @@ make_histogram((tyvix.undl_realized_vol()*100).dropna(), n_bins=100,
                title='TYVIX Underlying Realized Vol Distribution')
 
 # Level vs. RV difference deciles + distribution chart
+vix_diff = (vix.price() - vix.undl_realized_vol(do_shift=True)*100).dropna()
+vix_diff_abs_deciles = vix_diff.abs().quantile(np.arange(0, 1.1, 0.1))
+tyvix_diff = (tyvix.price() - tyvix.undl_realized_vol(do_shift=True)*100).dropna()
+tyvix_diff_abs_deciles = tyvix_diff.abs().quantile(np.arange(0, 1.1, 0.1))
+print("VIX vs Underlying Realized Vol Difference Deciles:\n{}".format(vix_diff_abs_deciles))
+print("TYVIX vs Underlying Realized Vol Difference Deciles:\n{}".format(tyvix_diff_abs_deciles))
+make_histogram(vix_diff, n_bins=100,
+               xlabel='Volatility (%)', ylabel='Probability',
+               title='VIX - Underlying Realized Vol (Implied Vol Premium) Distribution')
+make_histogram(tyvix_diff, n_bins=100,
+               xlabel='Volatility (%)', ylabel='Probability',
+               title='TYVIX - Underlying Realized Vol (Implied Vol Premium) Distribution')
+
+# Rolling 6-month vol of VIX deciles
+six_month_vol_of_vix = np.sqrt(vix.price_return().rolling(6*21).var(ddof=0) * 252).dropna()
+six_month_vol_of_tyvix = np.sqrt(tyvix.price_return().rolling(6*21).var(ddof=0) * 252).dropna()
+vol_of_vix_deciles = six_month_vol_of_vix.quantile(np.arange(0, 1.1, 0.1))
+vol_of_tyvix_deciles = six_month_vol_of_tyvix.quantile(np.arange(0, 1.1, 0.1))
+print("Vol of VIX Deciles:\n{}".format(vol_of_vix_deciles))
+print("Vol of TYVIX Deciles:\n{}".format(vol_of_tyvix_deciles))
+
+# Daily range in levels deciles
+
+# Rolling 6-month correlation between VIX and TYVIX
+
+# Rolling 6-month correlation with underlying
+
+# Levels divided by sqrt(12) to show implied change range (68% confidence level)
