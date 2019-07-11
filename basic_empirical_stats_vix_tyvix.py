@@ -30,16 +30,38 @@ risk_free_rate = three_month_t_bill['DTB3'].replace('.', np.NaN).dropna().astype
 make_lineplot([truncd_spx/truncd_spx[0], truncd_ief/truncd_ief[0]],
               ['SPX cumulative return', 'IEF cumulative return'])
 
-# Sharpe ratio
+# Sharpe ratios of SPX and IEF
+daily_risk_free_rate = np.exp(risk_free_rate*1/252) - 1
 [truncd_spx_ret, truncd_ief_ret, truncd_rfr] = \
-    share_dateindex([spx.price_return(), ief.price_return(), risk_free_rate/252])
+    share_dateindex([spx.price_return(), ief.price_return(), daily_risk_free_rate])
 spx_excess_ret = truncd_spx_ret - truncd_rfr
 ief_excess_ret = truncd_ief_ret - truncd_rfr
 spx_sharpe = spx_excess_ret.mean() / spx_excess_ret.std() * np.sqrt(252)
 ief_sharpe = ief_excess_ret.mean() / ief_excess_ret.std() * np.sqrt(252)
+print("SPX Sharpe Ratio: {}\nIEF Sharpe Ratio: {}".format(spx_sharpe, ief_sharpe))
 
-# Deciles and distribution chart
+# Level deciles + distribution chart
 vix_deciles = vix.price().quantile(np.arange(0, 1.1, 0.1))
-vix_deciles.index *= 100
 tyvix_deciles = tyvix.price().quantile(np.arange(0, 1.1, 0.1))
-tyvix_deciles.index *= 100
+print("VIX Deciles:\n{}".format(vix_deciles))
+print("TYVIX Deciles:\n{}".format(tyvix_deciles))
+make_histogram(vix.price(), n_bins=100,
+               xlabel='Volatility Index (%)', ylabel='Probability',
+               title='VIX Level Distribution')
+make_histogram(tyvix.price(), n_bins=100,
+               xlabel='Volatility Index (%)', ylabel='Probability',
+               title='TYVIX Level Distribution')
+
+# Realized vol level deciles + distribution chart
+vix_rv_deciles = vix.undl_realized_vol().quantile(np.arange(0, 1.1, 0.1)) * 100
+tyvix_rv_deciles = tyvix.undl_realized_vol().quantile(np.arange(0, 1.1, 0.1)) * 100
+print("VIX Underlying Realized Vol Deciles:\n{}".format(vix_rv_deciles))
+print("TYVIX Underlying Realized Vol Deciles:\n{}".format(tyvix_rv_deciles))
+make_histogram((vix.undl_realized_vol()*100).dropna(), n_bins=100,
+               xlabel='Realized Volatility (%)', ylabel='Probability',
+               title='VIX Underlying Realized Vol Distribution')
+make_histogram((tyvix.undl_realized_vol()*100).dropna(), n_bins=100,
+               xlabel='Realized Volatility (%)', ylabel='Probability',
+               title='TYVIX Underlying Realized Vol Distribution')
+
+# Level vs. RV difference deciles + distribution chart

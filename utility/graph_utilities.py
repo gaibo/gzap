@@ -80,7 +80,7 @@ def make_fillbetween(x, y1, y2=0, label=None, color=None,
         fig = None
     # Create filled line plot
     ax.fill_between(x, y1, y2, color=color, label=label)
-    if label is not None:
+    if label:
         ax.legend()
     ax.grid(True)
     # Set labels
@@ -139,7 +139,7 @@ def make_histogram(data, hist=True, n_bins=10, line=True, label=None, color=None
         else:
             sns.distplot(data, hist=False, ax=ax, label=label, color=color)
     # Configure
-    if label is not None:
+    if label:
         ax.legend()
     ax.grid(True)
     # Set labels
