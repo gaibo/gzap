@@ -9,18 +9,18 @@ from utility.graph_utilities import \
 
 # Load raw data
 spx_data = pd.read_csv('data/spxt_data.csv', index_col='Date', parse_dates=True)
-vix_data = pd.read_csv('data/vix_data.csv', index_col='Date', parse_dates=True)
+vix_data = pd.read_csv('data/vix_ohlc.csv', index_col='Date', parse_dates=True)
 ty1_futures_data = pd.read_csv('data/ty1_futures_data.csv', index_col='Date', parse_dates=True)
-tyvix_data = pd.read_csv('data/tyvix_data.csv', index_col='Date', parse_dates=True)
+tyvix_data = pd.read_csv('data/tyvix_ohlc.csv', index_col='Date', parse_dates=True)
 tyvix_bp_data = pd.read_csv('data/tyvix_bp_data.csv', index_col='Trade Date', parse_dates=True)
 ief_data = pd.read_csv('data/bbg_ief_data.csv', index_col='Date', parse_dates=True)
 three_month_t_bill = pd.read_csv('data/three_month_t_bill.csv', index_col='Date', parse_dates=True)
 
 # Create data structures
 spx = Index(spx_data['PX_LAST'], 'SPX')
-vix = VolatilityIndex(vix_data['Close'], spx, 'VIX')
+vix = VolatilityIndex(vix_data['VIX Close'], spx, 'VIX', vix_data.drop('VIX Close', axis=1))
 ty1 = Futures(ty1_futures_data['PX_LAST'], None, 'TY1')
-tyvix = VolatilityIndex(tyvix_data['Close'], ty1, 'TYVIX')
+tyvix = VolatilityIndex(tyvix_data['Close'], ty1, 'TYVIX', tyvix_data.drop('Close', axis=1))
 tyvix_bp = VolatilityIndex(tyvix_bp_data['BP TYVIX'], ty1, 'TYVIX BP')
 ief = ETF(ief_data['TOT_RETURN_INDEX_GROSS_DVDS'], 'IEF')
 risk_free_rate = three_month_t_bill['DTB3'].replace('.', np.NaN).dropna().astype(float) / 100
@@ -87,9 +87,36 @@ print("Vol of VIX Deciles:\n{}".format(vol_of_vix_deciles))
 print("Vol of TYVIX Deciles:\n{}".format(vol_of_tyvix_deciles))
 
 # Daily range in levels deciles
+vix_daily_ranges = (vix.tradestats['VIX High'] - vix.tradestats['VIX Low']).dropna()
+vix_daily_range_deciles = vix_daily_ranges.quantile(np.arange(0, 1.1, 0.1))
+tyvix_daily_ranges = (tyvix.tradestats['High'] - tyvix.tradestats['Low']).dropna()
+tyvix_daily_range_deciles = tyvix_daily_ranges.quantile(np.arange(0, 1.1, 0.1))
+print("VIX Daily High-Low Difference Deciles:\n{}".format(vix_daily_range_deciles))
+print("TYVIX Daily High-Low Difference Deciles:\n{}".format(tyvix_daily_range_deciles))
+make_histogram(vix_daily_ranges, n_bins=100,
+               xlabel='Volatility (%)', ylabel='Probability',
+               title='VIX Daily High-Low Difference Distribution')
+make_histogram(tyvix_daily_ranges, n_bins=100,
+               xlabel='Volatility (%)', ylabel='Probability',
+               title='TYVIX Daily High-Low Difference Distribution')
 
 # Rolling 6-month correlation between VIX and TYVIX
+[truncd_vix_ret, truncd_tyvix_ret] = share_dateindex([vix.price_return(), tyvix.price_return()])
+six_month_rolling_corr = truncd_vix_ret.rolling(6*21).corr(truncd_tyvix_ret).dropna()
+make_lineplot([six_month_rolling_corr], title='VIX-TYVIX 6-Month Rolling Correlation')
 
 # Rolling 6-month correlation with underlying
+[truncd_vix_level_ret, truncd_vix_undl_ret] = share_dateindex([vix.price_return(), vix.underlying.price_return()])
+six_month_rolling_vix_undl_corr = truncd_vix_level_ret.rolling(6*21).corr(truncd_vix_undl_ret).dropna()
+[truncd_tyvix_level_ret, truncd_tyvix_undl_ret] = share_dateindex([tyvix.price_return(), tyvix.underlying.price_return()])
+six_month_rolling_tyvix_undl_corr = truncd_tyvix_level_ret.rolling(6*21).corr(truncd_tyvix_undl_ret).dropna()
+make_lineplot([six_month_rolling_vix_undl_corr, six_month_rolling_tyvix_undl_corr],
+              ['VIX-SPX Rolling Correlation', 'TYVIX-TY1 Rolling Correlation'],
+              title='Index-Underlying 6-Month Rolling Correlation')
 
-# Levels divided by sqrt(12) to show implied change range (68% confidence level)
+# Levels divided by sqrt(12) to show implied change range for next 30 days (68% confidence level)
+vix_implied_undl_change_percentage = vix.price() / np.sqrt(12)
+tyvix_implied_undl_change_percentage = tyvix.price() / np.sqrt(12)
+make_lineplot([vix_implied_undl_change_percentage, tyvix_implied_undl_change_percentage],
+              ['VIX-Implied SPX Fluctuation', 'TYVIX-Implied TY1 Fluctuation'],
+              title='Index-Implied (68% Confidence) Underlying % Change Limit for Upcoming 30 Days')

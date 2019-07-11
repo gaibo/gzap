@@ -161,12 +161,13 @@ class Derivative(Instrument):
 
 
 class Index(CashInstr):
-    def __init__(self, ts_df, name=''):
+    def __init__(self, ts_df, name='', tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
         :param name: name of the data
+        :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
-        super().__init__(ts_df, name)
+        super().__init__(ts_df, name, tradestats)
 
 
 class Stock(CashInstr):
@@ -221,13 +222,14 @@ class Options(Derivative):
 
 
 class VolatilityIndex(Index):
-    def __init__(self, ts_df, underlying, name=''):
+    def __init__(self, ts_df, underlying, name='', tradestats=pd.DataFrame(None)):
         """
         :param ts_df: time-series DataFrame with time and value
         :param underlying: the underlying instrument whose volatility is being gauged
         :param name: name of the data
+        :param tradestats: (optional) trade statistics to be included, as a DataFrame
         """
-        super().__init__(ts_df, name)
+        super().__init__(ts_df, name, tradestats)
         self.underlying = underlying
 
     def undl_realized_vol(self, do_shift=False):
