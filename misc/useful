@@ -33,3 +33,9 @@ intraday_2016 = intraday_2016.set_index('TRADE_DATE')
 intraday = pd.concat([intraday_2015, intraday_2016]).sort_index()
 intraday_VIX = intraday[intraday['UNDLY_INST_SYM']=='VIX'].drop('UNDLY_INST_SYM', axis=1)
 intraday_TYVIX = intraday[intraday['UNDLY_INST_SYM']=='TYVIX'].drop('UNDLY_INST_SYM', axis=1)
+
+intraday_vix_data = pd.read_csv('data/vix_intraday.csv', index_col='TRADE_DATE', parse_dates=True)
+intraday_tyvix_data = pd.read_csv('data/tyvix_intraday.csv', index_col='TRADE_DATE', parse_dates=True)
+
+vix_i = VolatilityIndex(intraday_vix_data, spx, 'VIX', vix_data.drop('VIX Close', axis=1))
+tyvix_i = VolatilityIndex(intraday_tyvix_data, ty1, 'TYVIX', tyvix_data.drop('Close', axis=1))

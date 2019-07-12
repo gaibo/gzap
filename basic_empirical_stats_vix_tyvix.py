@@ -6,17 +6,18 @@ from model.data_structures import ETF, Futures, Index, VolatilityIndex
 from utility.graph_utilities import share_dateindex, make_lineplot, make_histogram, make_fillbetween
 
 # Load raw data
-spx_data = pd.read_csv('data/spxt_data.csv', index_col='Date', parse_dates=True)
+spx_data = pd.read_csv('data/spxt.csv', index_col='Date', parse_dates=True)
 vix_data = pd.read_csv('data/vix_ohlc.csv', index_col='Date', parse_dates=True)
-ty1_futures_data = pd.read_csv('data/ty1_futures_data.csv', index_col='Date', parse_dates=True)
+ty1_futures_data = pd.read_csv('data/ty1.csv', index_col='Date', parse_dates=True)
 tyvix_data = pd.read_csv('data/tyvix_ohlc.csv', index_col='Date', parse_dates=True)
-tyvix_bp_data = pd.read_csv('data/tyvix_bp_data.csv', index_col='Trade Date', parse_dates=True)
-ief_data = pd.read_csv('data/bbg_ief_data.csv', index_col='Date', parse_dates=True)
+tyvix_bp_data = pd.read_csv('data/tyvix_bp.csv', index_col='Trade Date', parse_dates=True)
+ief_data = pd.read_csv('data/bbg_ief.csv', index_col='Date', parse_dates=True)
 three_month_t_bill = pd.read_csv('data/three_month_t_bill.csv', index_col='Date', parse_dates=True)
 
 # Create data structures
 spx = Index(spx_data['PX_LAST'], 'SPX')
-vix = VolatilityIndex(vix_data['VIX Close'], spx, 'VIX', vix_data.drop('VIX Close', axis=1))
+vix = VolatilityIndex(vix_data['VIX Close'], spx, 'VIX',
+                      vix_data.drop('VIX Close', axis=1))
 ty1 = Futures(ty1_futures_data['PX_LAST'], None, 'TY1')
 tyvix = VolatilityIndex(tyvix_data['Close'], ty1, 'TYVIX',
                         tyvix_data.drop('Close', axis=1).drop(pd.to_datetime('2015-12-11')))    # Weird High on date
