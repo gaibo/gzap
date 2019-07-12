@@ -1,3 +1,8 @@
+full_data = pd.read_csv('../data/price_index_data.csv', index_col='Date', parse_dates=True)
+eurostoxx_data = pd.read_csv('../data/sx5e_data.csv', index_col='Date', parse_dates=True)
+sptr_data = pd.read_csv('../data/sptr_vix_data.csv', index_col='Date', parse_dates=True)
+agg_data = pd.read_csv('../data/agg_data.csv', index_col='Date', parse_dates=True)
+
 import sys
 sys.path.insert(0, '/Users/gaibo.zhang/PycharmProjects/analysis_package/utility/')
 

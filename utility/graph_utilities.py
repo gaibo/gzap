@@ -203,24 +203,30 @@ def make_correlation_matrix(data_list, color_list, label_list=None):
 
 def main():
     # Import data sources with pandas
-    full_data = pd.read_csv('../data/price_index_data.csv', index_col='Date', parse_dates=True)
-    eurostoxx_data = pd.read_csv('../data/sx5e_data.csv', index_col='Date', parse_dates=True)
-    sptr_data = pd.read_csv('../data/sptr_vix_data.csv', index_col='Date', parse_dates=True)
-    agg_data = pd.read_csv('../data/agg_data.csv', index_col='Date', parse_dates=True)
+    spxt_df = pd.read_csv('../data/spxt.csv', index_col='Date', parse_dates=True)  # SPX otal return ETF
+    vix_df = pd.read_csv('../data/vix_ohlc.csv', index_col='Date', parse_dates=True)
+    hyg_df = pd.read_csv('../data/bbg_hyg.csv', index_col='Date', parse_dates=True)
+    ief_df = pd.read_csv('../data/bbg_ief.csv', index_col='Date', parse_dates=True)
+    sx5e_df = pd.read_csv('../data/bbg_sx5e.csv', index_col='Date', parse_dates=True)
+    agg_df = pd.read_csv('../data/bbg_agg.csv', index_col='Date', parse_dates=True)
+    lqd_df = pd.read_csv('../data/bbg_lqd.csv', index_col='Date', parse_dates=True)
+    jgbvix_df = pd.read_csv('../data/jgbvix.csv', index_col='Date', parse_dates=True)
+    tyvix_df = pd.read_csv('../data/tyvix_ohlc.csv', index_col='Date', parse_dates=True)
+    misc_vols_df = pd.read_csv('../data/misc_vols.csv', index_col='Date', parse_dates=True)
 
     # Create data objects
-    spx = Index(sptr_data['SPTR'], 'SPX')
-    vix = VolatilityIndex(full_data['VIX.Index'], spx, 'VIX')
-    hyg = ETF(full_data['HYG.US.Equity'], 'HYG')
-    vxhyg = VolatilityIndex(full_data['VXHYG.Index'], hyg, 'VXHYG')
-    ief = ETF(full_data['IEF.US.Equity'], 'IEF')  # 7-10 year treasury bond ETF
-    vxief = VolatilityIndex(full_data['VXHYG.Index'], ief, 'VXIEF')
-    sx5e = Index(eurostoxx_data['TOT_RETURN_INDEX_GROSS_DVDS'], 'Euro Stoxx 50')
-    vstoxx = VolatilityIndex(full_data['V2X.Index'], sx5e, 'VSTOXX')
-    agg = ETF(agg_data['TOT_RETURN_INDEX_GROSS_DVDS'], 'AGG')
-    lqd = ETF(full_data['LQD.US.Equity'], 'LQD')
-    jgbvix = VolatilityIndex(full_data['SPJGBV.Index'], None, 'JGB VIX')    # Need futures data
-    tyvix = VolatilityIndex(full_data['TYVIX.Index'], None, 'TYVIX')  # Need futures data
+    spx = Index(spxt_df['PX_LAST'], 'SPX')
+    vix = VolatilityIndex(vix_df['VIX Close'], spx, 'VIX')
+    hyg = ETF(hyg_df['TOT_RETURN_INDEX_GROSS_DVDS'], 'HYG')
+    vxhyg = VolatilityIndex(misc_vols_df['VXHYG.Index'], hyg, 'VXHYG')
+    ief = ETF(ief_df['TOT_RETURN_INDEX_GROSS_DVDS'], 'IEF')  # 7-10 year treasury bond ETF
+    vxief = VolatilityIndex(misc_vols_df['VXHYG.Index'], ief, 'VXIEF')
+    sx5e = Index(sx5e_df['TOT_RETURN_INDEX_GROSS_DVDS'], 'Euro Stoxx 50')
+    vstoxx = VolatilityIndex(misc_vols_df['V2X.Index'], sx5e, 'VSTOXX')
+    agg = ETF(agg_df['TOT_RETURN_INDEX_GROSS_DVDS'], 'AGG')
+    lqd = ETF(lqd_df['TOT_RETURN_INDEX_GROSS_DVDS'], 'LQD')
+    jgbvix = VolatilityIndex(jgbvix_df['SPJGBVIX.Index'], None, 'JGB VIX')    # Need futures data
+    tyvix = VolatilityIndex(tyvix_df['Close'], None, 'TYVIX')  # Need futures data
 
     # Name some truncated timeseries
     start_date = '2004-01-01'
