@@ -7,3 +7,29 @@ import utility.graph_utilities
 import importlib
 importlib.reload(model.data_structures)
 importlib.reload(utility.graph_utilities)
+
+month_ret_ief = np.log(ief.price()).diff(21).dropna()
+month_ret_vix = np.log(vix.price()).diff(21).dropna()
+month_ret_tyvix = np.log(tyvix.price()).diff(21).dropna()
+month_ret_spx = np.log(spx.price()).diff(21).dropna()
+make_scatterplot(month_ret_vix, month_ret_ief)
+make_scatterplot(month_ret_tyvix, month_ret_ief)
+make_scatterplot(month_ret_vix, month_ret_spx)
+
+
+spx_intraday_trade = pd.read_csv('data/spx_intraday_trade.csv')
+combined_time = (spx_intraday_trade['TRADE_TIME'] +
+                 ':' +
+                 spx_intraday_trade['TRADE_TIME_THOU'].apply('{:0>3}'.format))
+trade_time = pd.to_datetime(combined_time, format='%d%b%Y:%H:%M:%S:%f')
+
+
+intraday_2015 = pd.read_csv('data/VIX_TYVIX_2015.csv')
+intraday_2015['TRADE_DATE'] = pd.to_datetime(intraday_2015['TRADE_DATE'], format='%d%b%Y %H:%M:%S')
+intraday_2015 = intraday_2015.set_index('TRADE_DATE')
+intraday_2016 = pd.read_csv('data/VIX_TYVIX_2016.csv')
+intraday_2016['TRADE_DATE'] = pd.to_datetime(intraday_2016['TRADE_DATE'], format='%d%b%Y %H:%M:%S')
+intraday_2016 = intraday_2016.set_index('TRADE_DATE')
+intraday = pd.concat([intraday_2015, intraday_2016]).sort_index()
+intraday_VIX = intraday[intraday['UNDLY_INST_SYM']=='VIX'].drop('UNDLY_INST_SYM', axis=1)
+intraday_TYVIX = intraday[intraday['UNDLY_INST_SYM']=='TYVIX'].drop('UNDLY_INST_SYM', axis=1)

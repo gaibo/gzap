@@ -8,6 +8,16 @@ ONE_DAY = pd.Timedelta(days=1)
 ONE_NANOSECOND = pd.Timedelta(nanoseconds=1)
 
 
+def share_dateindex(timeseries_list):
+    """ Align a list of time-series by their shared date-times
+    :param timeseries_list: list of time-series
+    :return: list of aligned/truncated time-series
+    """
+    column_list = range(len(timeseries_list))
+    combined_df = pd.DataFrame(dict(zip(column_list, timeseries_list))).dropna()
+    return [combined_df[column].rename('value') for column in column_list]
+
+
 def construct_timeseries(ts_df, time_col=None, value_col=None):
     """ Construct pseudo-time-series object, i.e. a pandas Series with 'time' and 'value'
     :param ts_df: DataFrame or Series object with at least a time column and a value column
@@ -239,28 +249,57 @@ class VolatilityIndex(Index):
         """
         return self.underlying.realized_vol(do_shift)
 
+    def produce_volatility_regime(self, low_threshold=0.1, high_threshold=0.9, window=126,
+                                  time_start=None, time_end=None):
+        """ Produce a label of 'high' or 'low' volatility regime for each day
+        :param low_threshold: low quantile - a break would switch high regime to low
+        :param high_threshold: high quantile - a break would switch low regime to high
+        :param window: number of data points in rolling window
+        :param time_start: start of time-series to use
+        :param time_end: end of time-series to use
+        :return: pd.Series with 'time' and 'value', with 'high' and 'low' labels as value
+        """
+        # Get prices, find corresponding rolling high and low thresholds
+        prices = self.price('daily', time_start, time_end)  # Currently only daily vol regimes
+        rolling_low = prices.rolling(window).quantile(low_threshold).dropna()
+        rolling_high = prices.rolling(window).quantile(high_threshold).dropna()
+        [joined_prices, joined_rolling_low, joined_rolling_high] = \
+            share_dateindex([prices, rolling_low, rolling_high])
+        # Find where prices break the high and low thresholds (to change regimes)
+        high_breakthrough = joined_prices[joined_prices > joined_rolling_high].index
+        low_breakthrough = joined_prices[joined_prices < joined_rolling_low].index
+        # Track chronologically to identify regime changes
+        curr_state = 'low'
+        regime = joined_prices.copy()   # Copy joined_prices as template with dates
+        for day in regime.index:
+            if curr_state == 'low' and day in high_breakthrough:
+                curr_state = 'high'     # Change low to high
+            elif curr_state == 'high' and day in low_breakthrough:
+                curr_state = 'low'      # Change high to low
+            regime[day] = curr_state
+        return regime
+
 
 def main():
     # Load example data
-    sptr_vix_df = pd.read_csv('../data/sptr_vix.csv')
-    sptr_vix_df['Date'] = pd.to_datetime(sptr_vix_df['Date'])
-    sptr_vix_df = sptr_vix_df.set_index('Date')
+    vix_df = pd.read_csv('../data/vix_ohlc.csv', index_col='Date', parse_dates=True)
+    spxt_df = pd.read_csv('../data/spxt.csv', index_col='Date', parse_dates=True)   # SPX otal return ETF
 
     # Create objects
-    sptr = Index(sptr_vix_df['SPTR'])
-    vix = VolatilityIndex(sptr_vix_df['VIX'], sptr)
+    spx = Index(spxt_df['PX_LAST'])
+    vix = VolatilityIndex(vix_df['VIX Close'], spx)
 
     # Look at implied volatility vs realized volatility
     start = pd.Timestamp('2015-01-01')
     end = pd.Timestamp('2018-01-01')
     truncd_vix = vix.price().truncate(start, end)
-    truncd_realized_vol = vix.undl_realized_vol().truncate(start, end)
-    truncd_shifted_realized_vol = vix.undl_realized_vol(do_shift=True).truncate(start, end)
+    truncd_realized_vol = vix.undl_realized_vol().truncate(start, end) * 100
+    truncd_shifted_realized_vol = vix.undl_realized_vol(do_shift=True).truncate(start, end) * 100
 
     fig, ax = plt.subplots()
     ax.plot(truncd_vix, label='VIX', linewidth=3)
-    ax.plot(100 * truncd_realized_vol, label='SPTR Realized Vol')
-    ax.plot(100 * truncd_shifted_realized_vol, label='SPTR Realized Vol from 21 Days Ahead', linewidth=3)
+    ax.plot(truncd_realized_vol, label='SPX Realized Vol')
+    ax.plot(truncd_shifted_realized_vol, label='SPX Realized Vol from 21 Days Ahead', linewidth=3)
     ax.legend()
 
     return 0
