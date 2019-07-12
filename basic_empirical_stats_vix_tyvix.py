@@ -43,14 +43,16 @@ ief_sharpe = ief_excess_ret.mean() / ief_excess_ret.std() * np.sqrt(252)
 print("SPX Sharpe Ratio: {}\nIEF Sharpe Ratio: {}".format(spx_sharpe, ief_sharpe))
 
 # Level deciles + distribution chart
-vix_deciles = vix.price().quantile(np.arange(0, 1.1, 0.1))
-tyvix_deciles = tyvix.price().quantile(np.arange(0, 1.1, 0.1))
+vix_price = vix.price()['2014-01-01':]
+tyvix_price = tyvix.price()['2014-01-01':]
+vix_deciles = vix_price.quantile(np.arange(0, 1.1, 0.1))
+tyvix_deciles = tyvix_price.quantile(np.arange(0, 1.1, 0.1))
 print("VIX Deciles:\n{}".format(vix_deciles))
 print("TYVIX Deciles:\n{}".format(tyvix_deciles))
-make_histogram(vix.price(), n_bins=100,
-               xlabel='Volatility Index (%)', ylabel='Probability',
-               title='VIX Level Distribution', color='C0', color_line='C1')
-make_histogram(tyvix.price(), n_bins=100,
+_, ax = make_histogram(vix_price, n_bins=100,
+                       xlabel='Volatility Index (%)', ylabel='Probability',
+                       title='VIX Level Distribution', color='C0', color_line='C1')
+make_histogram(tyvix_price, n_bins=100,
                xlabel='Volatility Index (%)', ylabel='Probability',
                title='TYVIX Level Distribution', color='C2', color_line='C3')
 
@@ -70,23 +72,23 @@ make_histogram((tyvix.undl_realized_vol()*100).dropna(), n_bins=100,
 _, ax_vix_rv = make_histogram([vix.price(), (vix.undl_realized_vol()*100).dropna()], n_bins=100,
                               label=['VIX', 'SPX Realized Vol'],
                               xlabel='Volatility Index (%)', ylabel='Probability',
-                              title='VIX Level Distribution', color=['C0', 'C1'], line=False)
+                              title='VIX vs. Underlying Realized Vol - Distribution', color=['C0', 'C1'], line=False)
 make_histogram(vix.price(),
                xlabel='Volatility Index (%)', ylabel='Probability',
-               title='VIX Level Distribution', hist=False, color_line='C0', ax=ax_vix_rv)
+               title='VIX vs. Underlying Realized Vol - Distribution', hist=False, color_line='C0', ax=ax_vix_rv)
 make_histogram((vix.undl_realized_vol()*100).dropna(),
                xlabel='Volatility Index (%)', ylabel='Probability',
-               title='VIX Level Distribution', hist=False, color_line='C1', ax=ax_vix_rv)
+               title='VIX vs. Underlying Realized Vol - Distribution', hist=False, color_line='C1', ax=ax_vix_rv)
 _, ax_tyvix_rv = make_histogram([tyvix.price(), (tyvix.undl_realized_vol()*100).dropna()], n_bins=100,
                                 label=['TYVIX', 'TY1 Realized Vol'],
                                 xlabel='Volatility Index (%)', ylabel='Probability',
-                                title='TYVIX Level Distribution', color=['C2', 'C3'], line=False)
+                                title='TYVIX vs. Underlying Realized Vol - Distribution', color=['C2', 'C3'], line=False)
 make_histogram(tyvix.price(),
                xlabel='Volatility Index (%)', ylabel='Probability',
-               title='VIX Level Distribution', hist=False, color_line='C2', ax=ax_tyvix_rv)
+               title='TYVIX vs. Underlying Realized Vol - Distribution', hist=False, color_line='C2', ax=ax_tyvix_rv)
 make_histogram((tyvix.undl_realized_vol()*100).dropna(),
                xlabel='Volatility Index (%)', ylabel='Probability',
-               title='VIX Level Distribution', hist=False, color_line='C3', ax=ax_tyvix_rv)
+               title='TYVIX vs. Underlying Realized Vol - Distribution', hist=False, color_line='C3', ax=ax_tyvix_rv)
 
 # Level vs. RV difference deciles + distribution chart
 vix_diff = (vix.price() - vix.undl_realized_vol(do_shift=True)*100).dropna()
@@ -133,7 +135,11 @@ make_histogram(tyvix_daily_ranges, n_bins=100,
 # Rolling 6-month correlation between VIX and TYVIX
 [truncd_vix_ret, truncd_tyvix_ret] = share_dateindex([vix.price_return(), tyvix.price_return()])
 six_month_rolling_corr = truncd_vix_ret.rolling(6*21).corr(truncd_tyvix_ret).dropna()
-make_lineplot([six_month_rolling_corr], color_list=['C5'], title='VIX-TYVIX 6-Month Rolling Correlation')
+_, ax = make_lineplot([six_month_rolling_corr], label_list=['Correlation'], color_list=['C5'],
+                      title='VIX-TYVIX 6-Month Rolling Correlation')
+corr_mean = six_month_rolling_corr.mean()
+ax.axhline(y=corr_mean, linestyle='--', color='k', label="Mean: {}".format(round(corr_mean,2)))
+ax.legend()
 
 # Rolling 6-month correlation with underlying
 [truncd_vix_level_ret, truncd_vix_undl_ret] = share_dateindex([vix.price_return(), vix.underlying.price_return()])
@@ -157,6 +163,12 @@ make_lineplot([vix_implied_undl_change_percentage, tyvix_implied_undl_change_per
 # VIX vs. TYVIX levels
 make_lineplot([vix.price(), tyvix.price()], ['VIX', 'TYVIX'], ['C0', 'C2'],
               ylabel='Volatility Index (%)', title='VIX vs. TYVIX')
+
+# TYVIX what is considered too high
+_, ax = make_lineplot([tyvix_price], ['TYVIX'], ['C2'],
+                      ylabel='Volatility Index (%)', title='TYVIX Levels')
+ax.axhline(y=5.5, linestyle='--', color='r', label='5.5% (80th Percentile)')
+ax.legend()
 
 # Line Plots with Difference
 fig, axs = plt.subplots(2, 1, sharex='all')
