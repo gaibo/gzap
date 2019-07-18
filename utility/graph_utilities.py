@@ -152,7 +152,7 @@ def make_histogram(data, hist=True, n_bins=10, line=True, label=None, color=None
     return fig, ax
 
 
-def make_correlation_matrix(data_list, color_list, label_list=None):
+def make_scatter_matrix(data_list, color_list, label_list=None):
     n_data = len(data_list)
     n_colors = len(color_list)
     # Prepare labels
@@ -184,12 +184,14 @@ def make_correlation_matrix(data_list, color_list, label_list=None):
                                  color=color_dict[frozenset({label_list[x_pos], label_list[y_pos]})],
                                  xlabel=xlabel, ylabel=ylabel)
             elif y_pos > x_pos:
-                # Top triangle - text
+                # Top triangle - text of best fit line slope and R^2
                 # NOTE: reverse x-y to match scatter slope
                 r_sq, slope, _ = get_best_fit(data_y, data_x, fit_intercept=False)
                 text_str = "$Slope$: {}\n$R^2$: {}".format(round(slope, 2), round(r_sq, 2))
                 axs[row, col].text(0.3, 0.4, text_str,
                                    color=color_dict[frozenset({label_list[x_pos], label_list[y_pos]})])
+                axs[row, col].xaxis.set_ticks([])
+                axs[row, col].yaxis.set_ticks([])
                 if xlabel:
                     axs[row, col].set_xlabel(xlabel)
                 if ylabel:
@@ -201,40 +203,89 @@ def make_correlation_matrix(data_list, color_list, label_list=None):
     return fig, axs
 
 
+def make_correlation_matrix(data_list, color_list, label_list=None):
+    n_data = len(data_list)
+    n_colors = len(color_list)
+    # Prepare labels
+    if label_list is None:
+        label_list = n_data * [None]
+    # Prepare coloring pattern
+    color_dict = {}
+    i = 0
+    for combo in combinations(label_list, 2):
+        color_dict[frozenset(combo)] = color_list[i]
+        i = (i + 1) % n_colors
+    # Create figure and subplots
+    fig, axs = plt.subplots(n_data, n_data)
+    for x_pos, data_x in enumerate(data_list):
+        for y_pos, data_y in enumerate(data_list):
+            # Use labels if subplot is on an axis
+            xlabel = None
+            ylabel = None
+            if x_pos == 0:
+                ylabel = label_list[y_pos]
+            if y_pos == 0:
+                xlabel = label_list[x_pos]
+            # Convert x and y to row and col (y bottom to top -> matrix row top to bottom)
+            row = n_data-1 - y_pos
+            col = x_pos
+            # Calculate 6-month rolling correlation
+            [joined_data_x, joined_data_y] = share_dateindex([data_x, data_y])
+            six_month_rolling_corr = joined_data_x.rolling(6 * 21).corr(joined_data_y).dropna()
+            if x_pos > y_pos:
+                # Bottom triangle - rolling correlation plot
+                make_lineplot([six_month_rolling_corr],
+                              color_list=[color_dict[frozenset({label_list[x_pos], label_list[y_pos]})]],
+                              ax=axs[row, col], xlabel=xlabel, ylabel=ylabel)
+                axs[row, col].xaxis.set_major_locator(plt.MaxNLocator(3))
+            elif y_pos > x_pos:
+                # Top triangle - text of mean rolling correlation
+                mean_rolling_corr = six_month_rolling_corr.mean()
+                text_str = "$Mean$ $Correlation$: {}%".format(round(mean_rolling_corr*100))
+                axs[row, col].text(0.1, 0.4, text_str,
+                                   color=color_dict[frozenset({label_list[x_pos], label_list[y_pos]})])
+                axs[row, col].xaxis.set_ticks([])
+                axs[row, col].yaxis.set_ticks([])
+                if xlabel:
+                    axs[row, col].set_xlabel(xlabel)
+                if ylabel:
+                    axs[row, col].set_ylabel(ylabel)
+            else:
+                # Diagonal - do nothing except show labels
+                axs[row, col].xaxis.set_ticks([])
+                axs[row, col].yaxis.set_ticks([])
+                if xlabel:
+                    axs[row, col].set_xlabel(xlabel)
+                if ylabel:
+                    axs[row, col].set_ylabel(ylabel)
+    return fig, axs
+
+
 def main():
     # Import data sources with pandas
-    spxt_df = pd.read_csv('../data/spxt.csv', index_col='Date', parse_dates=True)  # SPX otal return ETF
-    vix_df = pd.read_csv('../data/vix_ohlc.csv', index_col='Date', parse_dates=True)
-    hyg_df = pd.read_csv('../data/bbg_hyg.csv', index_col='Date', parse_dates=True)
-    ief_df = pd.read_csv('../data/bbg_ief.csv', index_col='Date', parse_dates=True)
-    sx5e_df = pd.read_csv('../data/bbg_sx5e.csv', index_col='Date', parse_dates=True)
-    agg_df = pd.read_csv('../data/bbg_agg.csv', index_col='Date', parse_dates=True)
-    lqd_df = pd.read_csv('../data/bbg_lqd.csv', index_col='Date', parse_dates=True)
-    jgbvix_df = pd.read_csv('../data/jgbvix.csv', index_col='Date', parse_dates=True)
-    tyvix_df = pd.read_csv('../data/tyvix_ohlc.csv', index_col='Date', parse_dates=True)
-    misc_vols_df = pd.read_csv('../data/misc_vols.csv', index_col='Date', parse_dates=True)
+    bbg_data = pd.read_csv('../data/bbg_automated_pull.csv',
+                           index_col=0, parse_dates=True, header=[0, 1])
 
     # Create data objects
-    spx = Index(spxt_df['PX_LAST'], 'SPX')
-    vix = VolatilityIndex(vix_df['VIX Close'], spx, 'VIX')
-    hyg = ETF(hyg_df['TOT_RETURN_INDEX_GROSS_DVDS'], 'HYG')
-    vxhyg = VolatilityIndex(misc_vols_df['VXHYG.Index'], hyg, 'VXHYG')
-    ief = ETF(ief_df['TOT_RETURN_INDEX_GROSS_DVDS'], 'IEF')  # 7-10 year treasury bond ETF
-    vxief = VolatilityIndex(misc_vols_df['VXHYG.Index'], ief, 'VXIEF')
-    sx5e = Index(sx5e_df['TOT_RETURN_INDEX_GROSS_DVDS'], 'Euro Stoxx 50')
-    vstoxx = VolatilityIndex(misc_vols_df['V2X.Index'], sx5e, 'VSTOXX')
-    agg = ETF(agg_df['TOT_RETURN_INDEX_GROSS_DVDS'], 'AGG')
-    lqd = ETF(lqd_df['TOT_RETURN_INDEX_GROSS_DVDS'], 'LQD')
-    jgbvix = VolatilityIndex(jgbvix_df['SPJGBVIX.Index'], None, 'JGB VIX')    # Need futures data
-    tyvix = VolatilityIndex(tyvix_df['Close'], None, 'TYVIX')  # Need futures data
+    spx = Index(bbg_data['SPX Index']['PX_LAST'], 'SPX')
+    vix = VolatilityIndex(bbg_data['VIX Index']['PX_LAST'], spx, 'VIX')
+    ty1 = Index(bbg_data['TY1 Comdty']['PX_LAST'], 'TY1')
+    tyvix = VolatilityIndex(bbg_data['TYVIX Index']['PX_LAST'], ty1, 'TYVIX')
+    jb1 = Index(bbg_data['JB1 Comdty']['PX_LAST'], 'JB1')
+    jgbvix = VolatilityIndex(bbg_data['SPJGBV Index']['PX_LAST'], jb1, 'JGB VIX')
+    sx5e_tr = Index(bbg_data['SX5E Index']['TOT_RETURN_INDEX_GROSS_DVDS'], 'Euro Stoxx 50')
+    agg_tr = ETF(bbg_data['AGG Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'AGG')
+    hyg_tr = ETF(bbg_data['HYG Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'HYG')
+    ief_tr = ETF(bbg_data['IEF Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'IEF')
+    lqd_tr = ETF(bbg_data['LQD Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'LQD')
 
     # Name some truncated timeseries
     start_date = '2004-01-01'
     end_date = '2018-01-01'
     truncd_vix = vix.price().truncate(start_date, end_date)
     truncd_spx = spx.price().truncate(start_date, end_date)
-    truncd_agg = agg.price().truncate(start_date, end_date)
-    truncd_lqd = lqd.price().truncate(start_date, end_date)
+    truncd_agg = agg_tr.price().truncate(start_date, end_date)
+    truncd_lqd = lqd_tr.price().truncate(start_date, end_date)
     truncd_jgbvix = jgbvix.price().truncate(start_date, end_date)
     truncd_tyvix = tyvix.price().truncate(start_date, end_date)
 
@@ -247,7 +298,7 @@ def main():
                   ylabel='Normalized Level', title='SPX and AGG')
 
     # Tables
-    example_table = make_basicstatstable([spx, vix, hyg, vxhyg, ief, vxief, sx5e, vstoxx]).round(1)
+    example_table = make_basicstatstable([spx, vix, hyg_tr, ief_tr, sx5e_tr]).round(1)
     print(example_table)
 
     # Scatterplots
@@ -265,19 +316,20 @@ def main():
     make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
 
     # Histograms
-    [joined_vxhyg, joined_realhygvol] = share_dateindex([vxhyg.price(),
-                                                         vxhyg.undl_realized_vol(do_shift=True) * 100])
-    hyg_voldiff = joined_vxhyg - joined_realhygvol
-    fig, ax = make_histogram([difference, hyg_voldiff], hist=True, n_bins=100, line=False,
-                             label=['VIX', 'VXHYG'], xlabel='Vol Points', title='Risk Premium')
+    [joined_jgbvix, joined_jb1_rv] = \
+        share_dateindex([jgbvix.price(), jgbvix.undl_realized_vol(do_shift=True) * 100])
+    jgbvix_jb1_rv_diff = joined_jgbvix - joined_jb1_rv
+    fig, ax = make_histogram([difference, jgbvix_jb1_rv_diff], hist=True, n_bins=100, line=False,
+                             label=['VIX', 'JGB VIX'], xlabel='Vol Points', title='Risk Premium')
     make_histogram(difference, hist=False, line=True, label='VIX', ax=ax)
-    make_histogram(hyg_voldiff, hist=False, line=True, label='VXHYG', ax=ax)
+    make_histogram(jgbvix_jb1_rv_diff, hist=False, line=True, label='JGB VIX', ax=ax)
 
-    # Correlation Matrix
-    instr_list = [spx, vix, hyg, ief, sx5e, agg]
+    # Scatter and Correlation Matrix
+    instr_list = [spx, vix, hyg_tr, ief_tr, sx5e_tr, agg_tr]
     data_list = list(map(lambda instr: instr.price_return(), instr_list))
     color_list = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6']
     label_list = list(map(lambda instr: instr.name, instr_list))
+    make_scatter_matrix(data_list, color_list, label_list=label_list)
     make_correlation_matrix(data_list, color_list, label_list=label_list)
 
     return 0
