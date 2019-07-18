@@ -56,7 +56,7 @@ def make_lineplot(data_list, label_list=None, color_list=None,
         fig = None
     # Create lines
     for data, label, color in zip_longest(data_list, label_list, color_list):
-        ax.plot(data, label=label, color=color, linewidth=2)
+        ax.plot(data, label=label, color=color, linewidth=1)
     # Configure
     if label_list != none_list:
         ax.legend()

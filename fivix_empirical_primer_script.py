@@ -7,130 +7,226 @@ from utility.graph_utilities import \
     make_scatterplot, make_histogram
 
 
-def main():
-    # Import data sources with pandas
-    bbg_data = pd.read_csv('data/bbg_automated_pull.csv',
-                           index_col=0, parse_dates=True, header=[0, 1])
-    creditvix_data = pd.read_csv('data/creditvix_pc_bp_missing_4_months.csv',
-                                 index_col='Date', parse_dates=True)
-    tyvix_bp_data = pd.read_csv('data/tyvix_bp_data.csv',
-                                index_col='Trade Date', parse_dates=True)
+# Import data sources with pandas
+bbg_data = pd.read_csv('data/bbg_automated_pull.csv',
+                       index_col=0, parse_dates=True, header=[0, 1])
+creditvix_data = pd.read_csv('data/creditvix_pc_bp_missing_4_months.csv',
+                             index_col='Date', parse_dates=True)
+tyvix_bp_data = pd.read_csv('data/tyvix_bp.csv',
+                            index_col='Trade Date', parse_dates=True)
 
-    # Create data objects
-    agg_tr = ETF(bbg_data['AGG Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'AGG')
-    hyg_tr = ETF(bbg_data['HYG Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'HYG')
-    ief_tr = ETF(bbg_data['IEF Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'IEF')
-    lqd_tr = ETF(bbg_data['LQD Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'LQD')
-    spx_tr = Index(bbg_data['SPX Index']['TOT_RETURN_INDEX_GROSS_DVDS'], 'SPX')
-    sx5e_tr = Index(bbg_data['SX5E Index']['TOT_RETURN_INDEX_GROSS_DVDS'], 'Euro Stoxx 50')
-    vixig = VolatilityIndex(creditvix_data['VIXIG Percent'], None, 'VIXIG')
-    vixig_bp = VolatilityIndex(creditvix_data['VIXIG Basis Point'], None, 'BP VIXIG')
-    vixhy = VolatilityIndex(creditvix_data['VIXHY Percent'], None, 'VIXHY')
-    vixhy_bp = VolatilityIndex(creditvix_data['VIXHY Basis Point'], None, 'BP VIXHY')
-    vixie = VolatilityIndex(creditvix_data['VIXIE Percent'], None, 'VIXIE')
-    vixie_bp = VolatilityIndex(creditvix_data['VIXIE Basis Point'], None, 'BP VIXIE')
-    vixxo = VolatilityIndex(creditvix_data['VIXXO Percent'], None, 'VIXXO')
-    vixxo_bp = VolatilityIndex(creditvix_data['VIXXO Basis Point'], None, 'BP VIXXO')
-    vixfs = VolatilityIndex(creditvix_data['VIXFS Percent'], None, 'VIXFS')
-    vixfs_bp = VolatilityIndex(creditvix_data['VIXFS Basis Point'], None, 'BP VIXFS')
-    jgbvix = VolatilityIndex(bbg_data['SPJGBV Index']['PX_LAST'], None, 'JGB VIX')
-    srvix = VolatilityIndex(bbg_data['SRVIX Index']['PX_LAST'], None, 'SRVIX')
-    tyvix = VolatilityIndex(bbg_data['TYVIX Index']['PX_LAST'], None, 'TYVIX')
-    tyvix_bp = VolatilityIndex(tyvix_bp_data['BP TYVIX'], None, 'BP TYVIX')
-    vix = VolatilityIndex(bbg_data['VIX Index']['PX_LAST'], spx_tr, 'VIX')
+# Create data objects
+spx = Index(bbg_data['SPX Index']['PX_LAST'], 'SPX')
+vix = VolatilityIndex(bbg_data['VIX Index']['PX_LAST'], spx, 'VIX')
+ty1 = Index(bbg_data['TY1 Comdty']['PX_LAST'], 'TY1')
+tyvix = VolatilityIndex(bbg_data['TYVIX Index']['PX_LAST'], ty1, 'TYVIX')
+tyvix_bp = VolatilityIndex(tyvix_bp_data['BP TYVIX'], ty1, 'BP TYVIX')
+cdx_ig = Index(bbg_data['IBOXUMAE CBBT Curncy']['PX_LAST'], 'CDX NA IG')
+cdx_hy = Index(bbg_data['IBOXHYSE CBBT Curncy']['PX_LAST'], 'CDX NA HY')
+itraxx_ie = Index(bbg_data['ITRXEBE CBBT Curncy']['PX_LAST'], 'iTraxx EU Main')
+itraxx_xo = Index(bbg_data['ITRXEXE CBBT Curncy']['PX_LAST'], 'iTraxx EU Xover')
+itraxx_fs = Index(bbg_data['ITRXESE CBBT Curncy']['PX_LAST'], 'iTraxx EU SenFin')
+vixig = VolatilityIndex(creditvix_data['VIXIG Percent'], cdx_ig, 'VIXIG')
+vixig_bp = VolatilityIndex(creditvix_data['VIXIG Basis Point'], cdx_ig, 'BP VIXIG')
+vixhy = VolatilityIndex(creditvix_data['VIXHY Percent'], cdx_hy, 'VIXHY')
+vixhy_bp = VolatilityIndex(creditvix_data['VIXHY Basis Point'], cdx_hy, 'BP VIXHY')
+vixie = VolatilityIndex(creditvix_data['VIXIE Percent'], itraxx_ie, 'VIXIE')
+vixie_bp = VolatilityIndex(creditvix_data['VIXIE Basis Point'], itraxx_ie, 'BP VIXIE')
+vixxo = VolatilityIndex(creditvix_data['VIXXO Percent'], itraxx_xo, 'VIXXO')
+vixxo_bp = VolatilityIndex(creditvix_data['VIXXO Basis Point'], itraxx_xo, 'BP VIXXO')
+vixfs = VolatilityIndex(creditvix_data['VIXFS Percent'], itraxx_fs, 'VIXFS')
+vixfs_bp = VolatilityIndex(creditvix_data['VIXFS Basis Point'], itraxx_fs, 'BP VIXFS')
+jb1 = Index(bbg_data['JB1 Comdty']['PX_LAST'], 'JB1')
+jgbvix = VolatilityIndex(bbg_data['SPJGBV Index']['PX_LAST'], jb1, 'JGB VIX')
+srvix = VolatilityIndex(bbg_data['SRVIX Index']['PX_LAST'], None, 'SRVIX')
+spx_tr = Index(bbg_data['SPX Index']['TOT_RETURN_INDEX_GROSS_DVDS'], 'SPX')
+sx5e_tr = Index(bbg_data['SX5E Index']['TOT_RETURN_INDEX_GROSS_DVDS'], 'Euro Stoxx 50')
+agg_tr = ETF(bbg_data['AGG Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'AGG')
+hyg_tr = ETF(bbg_data['HYG Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'HYG')
+ihyg_tr = ETF(bbg_data['IHYG EU Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'IHYG')
+ief_tr = ETF(bbg_data['IEF Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'IEF')
+lqd_tr = ETF(bbg_data['LQD Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'LQD')
 
-    # FI VIX Empirical Primer Document Reproduction
+# FI VIX Empirical Primer Document Reproduction
 
-    # S&P 500 Index and AGG Total Return
-    [truncd_spx, truncd_agg] = share_dateindex([spx_tr.price(), agg_tr.price()])
-    make_lineplot([truncd_spx/truncd_spx[0], truncd_agg/truncd_agg[0]],
-                  ['SPX total return', 'AGG total return'],
-                  ylabel='Normalized Level', title='S&P 500 Index and AGG Total Return')
+# S&P 500 Index and AGG Total Return
+[truncd_spx, truncd_agg] = share_dateindex([spx_tr.price(), agg_tr.price()])
+make_lineplot([truncd_spx/truncd_spx[0], truncd_agg/truncd_agg[0]],
+              ['SPX total return', 'AGG total return'],
+              ylabel='Normalized Level', title='S&P 500 Index and AGG Total Return')
 
-    # North American Credit VIXs with VIX Index
-    make_lineplot([vix.price(), vixig.price(), vixhy.price()],
-                  ['S&P 500 VIX', 'VIXIG', 'VIXHY'],
-                  ylabel='Volatility Index', title='North American Credit VIXs with VIX Index')
+# North American Credit VIXs with VIX Index
+[truncd_vix, truncd_vixig, truncd_vixhy] = share_dateindex([vix.price(), vixig.price(), vixhy.price()])
+make_lineplot([truncd_vix, truncd_vixig, truncd_vixhy],
+              ['S&P 500 VIX', 'VIXIG', 'VIXHY'],
+              ylabel='Volatility Index', title='North American Credit VIXs with VIX Index')
 
-    # European Credit VIXs with VIX Index
-    make_lineplot([vix.price(), vixie.price(), vixxo.price()],
-                  ['S&P 500 VIX', 'VIXIE', 'VIXXO'],
-                  ylabel='Volatility Index', title='European Credit VIXs with VIX Index')
+# European Credit VIXs with VIX Index
+[truncd_vix, truncd_vixie, truncd_vixxo, truncd_vixfs] = \
+    share_dateindex([vix.price(), vixie.price(), vixxo.price(), vixfs.price()])
+make_lineplot([truncd_vix, truncd_vixie, truncd_vixxo, truncd_vixfs],
+              ['S&P 500 VIX', 'VIXIE', 'VIXXO', 'VIXFS'],
+              ylabel='Volatility Index', title='European Credit VIXs with VIX Index')
 
-    # VIXs in Rates Group with VIX Index
-    make_lineplot([vix.price(), tyvix.price(), jgbvix.price(), srvix.price()],
-                  ['S&P 500 VIX', 'TYVIX', 'JGB VIX', 'SRVIX'],
-                  ylabel='Volatility Index (% Price)', title='VIXs in Rates Group with VIX Index')
+# VIXs in Rates Group with VIX Index
+start_date = tyvix.price().index[0]
+[truncd_vix, truncd_tyvix, truncd_jgbvix, truncd_srvix] = \
+    map(lambda p: p.truncate(start_date), [vix.price(), tyvix.price(), jgbvix.price(), srvix.price()])
+_, axleft = plt.subplots()
+axleft.plot(truncd_vix, label='S&P 500 VIX')
+axleft.plot(truncd_tyvix, label='TYVIX')
+axleft.plot(truncd_jgbvix, label='JGB VIX')
+axleft.legend(loc=2)
+axleft.set_ylabel('Volatility Index (% Price)')
+axleft.set_title('VIXs in Rates Group with VIX Index')
+axright = axleft.twinx()
+axright.plot(truncd_srvix, label='SRVIX', color='C3')
+axright.legend(loc=1)
+axright.set_ylabel('Volatility Index (SRVIX) (bps)')
+axright.set_ylim(20, 115)
 
-    # Basic Statistics for Credit VIX Indexes
-    make_basicstatstable([vix, vixig, vixhy, vixie, vixxo]) \
-        .to_csv('Basic Statistics for Credit VIX Indexes.csv')
+# Basic Statistics for Credit VIX Indexes
+make_basicstatstable([vix, vixig, vixhy, vixie, vixxo, vixfs]) \
+    .to_csv('Basic Statistics for Credit VIX Indexes.csv')
 
-    # Basic Statistics for Basis Point Credit VIX Indexes
-    make_basicstatstable([vix, vixig_bp, vixhy_bp, vixie_bp, vixxo_bp]) \
-        .to_csv('Basic Statistics for Basis Point Credit VIX Indexes.csv')
+# Basic Statistics for Basis Point Credit VIX Indexes
+make_basicstatstable([vix, vixig_bp, vixhy_bp, vixie_bp, vixxo_bp, vixfs_bp]) \
+    .to_csv('Basic Statistics for Basis Point Credit VIX Indexes.csv')
 
-    # Basic Statistics for Interest Rate VIX Indexes
-    make_basicstatstable([vix, tyvix, jgbvix, srvix]) \
-        .to_csv('Basic Statistics for Interest Rate VIX Indexes.csv')
+# Basic Statistics for Interest Rate VIX Indexes
+make_basicstatstable([vix, tyvix, jgbvix, srvix, tyvix_bp]) \
+    .to_csv('Basic Statistics for Interest Rate VIX Indexes.csv')
 
-    # Basis Point Version of Credit Group
-    make_lineplot([vixig_bp.price(), vixhy_bp.price(), vixie_bp.price(), vixxo_bp.price()],
-                  ['BP VIXIG', 'BP VIXHY', 'BP VIXIE', 'BP VIXXO'],
-                  ylabel='Volatility Index (bps)', title='Basis Point Version of Credit Group')
+# Basis Point Version of Credit Group
+make_lineplot([vixig_bp.price(), vixhy_bp.price(), vixie_bp.price(), vixxo_bp.price(), vixfs_bp.price()],
+              ['BP VIXIG', 'BP VIXHY', 'BP VIXIE', 'BP VIXXO', 'BP VIXFS'],
+              ylabel='Volatility Index (bps)', title='Basis Point Version of Credit Group')
 
-    # Basis Point Version of Rates Group
-    # Missing basis point JGB VIX
-    make_lineplot([tyvix_bp.price(), srvix.price()],
-                  ['BP TYVIX', 'SRVIX'],
-                  ylabel='Volatility Index (bps)', title='Basis Point Version of Rates Group')
+# Basis Point Version of Rates Group
+# TODO: basis point JGB VIX
+make_lineplot([tyvix_bp.price(), srvix.price()],
+              ['BP TYVIX', 'SRVIX'],
+              ylabel='Volatility Index (bps)', title='Basis Point Version of Rates Group')
 
-    # VIXIG Daily % Change vs. CDX NAIG Index Daily bps Change
-    # Missing CDX NAIG data
-    # make_scatterplot(vixig.price_return(), cdx_naig.price().diff(),
-    #                  xlabel='% Change', ylabel='bps Change',
-    #                  title='VIXIG Daily % Change vs. CDX NAIG Index Daily bps Change')
+# VIXIG Daily % Change vs. CDX NAIG Index Daily bps Change
+make_scatterplot(vixig.price_return(False), cdx_ig.price_return(False),
+                 xlabel='% Change', ylabel='bps Change',
+                 title='VIXIG Daily % Change vs. CDX NAIG Index Daily bps Change')
 
-    # SRVIX Daily Change vs. LQD Daily Change
-    make_scatterplot(srvix.price_return(False), lqd_tr.price_return(False),
-                     xlabel='% Change', ylabel='% Change',
-                     title='SRVIX Daily % Change vs. LQD Daily % Change')
+# SRVIX Daily Change vs. LQD Daily Change
+make_scatterplot(srvix.price_return(False), lqd_tr.price_return(False),
+                 xlabel='% Change', ylabel='% Change',
+                 title='SRVIX Daily % Change vs. LQD Daily % Change')
 
-    # Four Scatter Plots
-    fig, axs = plt.subplots(2, 2)
-    make_scatterplot(vixhy_bp.price_return(False), hyg_tr.price_return(False),
-                     xlabel='% Change', ylabel='% Change',
-                     title='BP VIXHY Daily % Change vs. HYG Daily % Change',
-                     ax=axs[0, 0])
-    # make_scatterplot(vixxo_bp.price_return(False), ihyg.price_return(False),
-    #                  xlabel='% Change', ylabel='% Change',
-    #                  title='BP VIXXO Daily % Change vs. IHYG Daily % Change',
-    #                  ax=axs[0, 1])
-    make_scatterplot(tyvix_bp.price_return(False), ief_tr.price_return(False),
-                     xlabel='% Change', ylabel='% Change',
-                     title='BP TYVIX Daily % Change vs. IEF Daily % Change',
-                     ax=axs[1, 0])
-    make_scatterplot(srvix.price_return(False), ief_tr.price_return(False),
-                     xlabel='% Change', ylabel='% Change',
-                     title='SRVIX Daily % Change vs. IEF Daily % Change',
-                     ax=axs[1, 1])
+# Change per 10% Change in Implied Vol Index Table
+# TODO
 
-    # Four Difference Plots
-    fig, axs = plt.subplots(2, 2)
-    make_lineplot([vixig.price(), 100*vixig.undl_realized_vol(do_shift=True)],
-                  ['VIXIG', 'Realized Volatility'],
-                  xlabel='% Change', ylabel='% Change',
-                  title='BP VIXHY Daily % Change vs. HYG Daily % Change',
-                  ax=axs[0, 0])
-    # make_scatterplot(vixxo_bp.price_return(False), ihyg.price_return(False),
-    #                  xlabel='% Change', ylabel='% Change',
-    #                  title='BP VIXXO Daily % Change vs. IHYG Daily % Change',
-    #                  ax=axs[0, 1])
-    make_scatterplot(tyvix_bp.price_return(False), ief_tr.price_return(False),
-                     xlabel='% Change', ylabel='% Change',
-                     title='BP TYVIX Daily % Change vs. IEF Daily % Change',
-                     ax=axs[1, 0])
-    make_scatterplot(srvix.price_return(False), ief_tr.price_return(False),
-                     xlabel='% Change', ylabel='% Change',
-                     title='SRVIX Daily % Change vs. IEF Daily % Change',
-                     ax=axs[1, 1])
+# Four Scatter Plots
+_, axs = plt.subplots(2, 2)
+make_scatterplot(vixhy_bp.price_return(False), hyg_tr.price_return(False),
+                 xlabel='% Change', ylabel='% Change',
+                 title='BP VIXHY Daily % Change vs. HYG Daily % Change',
+                 ax=axs[0, 0])
+make_scatterplot(vixxo_bp.price_return(False), ihyg_tr.price_return(False),
+                 xlabel='% Change', ylabel='% Change',
+                 title='BP VIXXO Daily % Change vs. IHYG Daily % Change',
+                 ax=axs[0, 1])
+make_scatterplot(tyvix_bp.price_return(False), ief_tr.price_return(False),
+                 xlabel='% Change', ylabel='% Change',
+                 title='BP TYVIX Daily % Change vs. IEF Daily % Change',
+                 ax=axs[1, 0])
+make_scatterplot(srvix.price_return(False), ief_tr.price_return(False),
+                 xlabel='% Change', ylabel='% Change',
+                 title='SRVIX Daily % Change vs. IEF Daily % Change',
+                 ax=axs[1, 1])
+
+# Credit VIX Difference Charts
+_, axs = plt.subplots(2, 1, sharex='all')
+[joined_index, joined_undl_rv] = \
+    share_dateindex([vixig.price(), 100*vixig.undl_realized_vol(do_shift=True)])
+make_lineplot([joined_index, joined_undl_rv], ['VIXIG', 'Realized Volatility'],
+              ylabel='Volatility (% Spread bps)',
+              title='VIXIG with Realized (21 Days Shifted)', ax=axs[0])
+difference = joined_index - joined_undl_rv
+make_fillbetween(difference.index, joined_index, joined_undl_rv,
+                 label='Difference', color='g', ax=axs[0])
+make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
+
+_, axs = plt.subplots(2, 1, sharex='all')
+[joined_index, joined_undl_rv] = \
+    share_dateindex([vixhy.price(), 100*vixhy.undl_realized_vol(do_shift=True)])
+make_lineplot([joined_index, joined_undl_rv], ['VIXHY', 'Realized Volatility'],
+              ylabel='Volatility (% Spread bps)',
+              title='VIXHY with Realized (21 Days Shifted)', ax=axs[0])
+difference = joined_index - joined_undl_rv
+make_fillbetween(difference.index, joined_index, joined_undl_rv,
+                 label='Difference', color='g', ax=axs[0])
+make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
+
+_, axs = plt.subplots(2, 1, sharex='all')
+[joined_index, joined_undl_rv] = \
+    share_dateindex([vixie.price(), 100*vixie.undl_realized_vol(do_shift=True)])
+make_lineplot([joined_index, joined_undl_rv], ['VIXIE', 'Realized Volatility'],
+              ylabel='Volatility (% Spread bps)',
+              title='VIXIE with Realized (21 Days Shifted)', ax=axs[0])
+difference = joined_index - joined_undl_rv
+make_fillbetween(difference.index, joined_index, joined_undl_rv,
+                 label='Difference', color='g', ax=axs[0])
+make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
+
+_, axs = plt.subplots(2, 1, sharex='all')
+[joined_index, joined_undl_rv] = \
+    share_dateindex([vixxo.price(), 100*vixxo.undl_realized_vol(do_shift=True)])
+make_lineplot([joined_index, joined_undl_rv], ['VIXXO', 'Realized Volatility'],
+              ylabel='Volatility (% Spread bps)',
+              title='VIXXO with Realized (21 Days Shifted)', ax=axs[0])
+difference = joined_index - joined_undl_rv
+make_fillbetween(difference.index, joined_index, joined_undl_rv,
+                 label='Difference', color='g', ax=axs[0])
+make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
+
+_, axs = plt.subplots(2, 1, sharex='all')
+[joined_index, joined_undl_rv] = \
+    share_dateindex([vixfs.price(), 100*vixfs.undl_realized_vol(do_shift=True)])
+make_lineplot([joined_index, joined_undl_rv], ['VIXFS', 'Realized Volatility'],
+              ylabel='Volatility (% Spread bps)',
+              title='VIXFS with Realized (21 Days Shifted)', ax=axs[0])
+difference = joined_index - joined_undl_rv
+make_fillbetween(difference.index, joined_index, joined_undl_rv,
+                 label='Difference', color='g', ax=axs[0])
+make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
+
+# Risk Premium Distribution
+[joined_index, joined_undl_rv] = \
+    share_dateindex([vixig.price(), 100*vixig.undl_realized_vol(do_shift=True)])
+_, ax_prem = make_histogram(joined_index - joined_undl_rv, hist=False,
+                            label='VIXIG', xlabel='Volatility Premium (%)', ylabel='Probability',
+                            title='Risk Premium Distribution',
+                            color_line='C0')
+[joined_index, joined_undl_rv] = \
+    share_dateindex([vixhy.price(), 100*vixhy.undl_realized_vol(do_shift=True)])
+make_histogram(joined_index - joined_undl_rv, hist=False,
+               label='VIXHY', xlabel='Volatility Premium (%)', ylabel='Probability',
+               title='Risk Premium Distribution',
+               color_line='C1', ax=ax_prem)
+[joined_index, joined_undl_rv] = \
+    share_dateindex([vixie.price(), 100*vixie.undl_realized_vol(do_shift=True)])
+make_histogram(joined_index - joined_undl_rv, hist=False,
+               label='VIXIE', xlabel='Volatility Premium (%)', ylabel='Probability',
+               title='Risk Premium Distribution',
+               color_line='C2', ax=ax_prem)
+[joined_index, joined_undl_rv] = \
+    share_dateindex([vixxo.price(), 100*vixxo.undl_realized_vol(do_shift=True)])
+make_histogram(joined_index - joined_undl_rv, hist=False,
+               label='VIXXO', xlabel='Volatility Premium (%)', ylabel='Probability',
+               title='Risk Premium Distribution',
+               color_line='C3', ax=ax_prem)
+[joined_index, joined_undl_rv] = \
+    share_dateindex([vixfs.price(), 100*vixfs.undl_realized_vol(do_shift=True)])
+make_histogram(joined_index - joined_undl_rv, hist=False,
+               label='VIXFS', xlabel='Volatility Premium (%)', ylabel='Probability',
+               title='Risk Premium Distribution',
+               color_line='C4', ax=ax_prem)
+
+# Risk Premium Tails Table
+# TODO
