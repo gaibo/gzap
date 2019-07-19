@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from model.data_structures import ETF, Index, VolatilityIndex
 from utility.graph_utilities import \
     share_dateindex, make_basicstatstable, make_lineplot, make_fillbetween,\
-    make_scatterplot, make_histogram
+    make_scatterplot, make_histogram, make_scatter_matrix, make_correlation_matrix
 
 
 # Import data sources with pandas
@@ -16,36 +16,38 @@ tyvix_bp_data = pd.read_csv('data/tyvix_bp.csv',
                             index_col='Trade Date', parse_dates=True)
 
 # Create data objects
-spx = Index(bbg_data['SPX Index']['PX_LAST'], 'SPX')
-vix = VolatilityIndex(bbg_data['VIX Index']['PX_LAST'], spx, 'VIX')
-ty1 = Index(bbg_data['TY1 Comdty']['PX_LAST'], 'TY1')
-tyvix = VolatilityIndex(bbg_data['TYVIX Index']['PX_LAST'], ty1, 'TYVIX')
+spx = Index(bbg_data['SPX Index', 'PX_LAST'], 'SPX')
+vix = VolatilityIndex(bbg_data['VIX Index', 'PX_LAST'], spx, 'VIX')
+ty1 = Index(bbg_data['TY1 Comdty', 'PX_LAST'], 'TY1')
+tyvix = VolatilityIndex(bbg_data['TYVIX Index', 'PX_LAST'], ty1, 'TYVIX')
 tyvix_bp = VolatilityIndex(tyvix_bp_data['BP TYVIX'], ty1, 'BP TYVIX')
-cdx_ig = Index(bbg_data['IBOXUMAE CBBT Curncy']['PX_LAST'], 'CDX NA IG')
-cdx_hy = Index(bbg_data['IBOXHYSE CBBT Curncy']['PX_LAST'], 'CDX NA HY')
-itraxx_ie = Index(bbg_data['ITRXEBE CBBT Curncy']['PX_LAST'], 'iTraxx EU Main')
-itraxx_xo = Index(bbg_data['ITRXEXE CBBT Curncy']['PX_LAST'], 'iTraxx EU Xover')
-itraxx_fs = Index(bbg_data['ITRXESE CBBT Curncy']['PX_LAST'], 'iTraxx EU SenFin')
+cdx_ig = Index(bbg_data['IBOXUMAE CBBT Curncy', 'PX_LAST'], 'CDX NA IG')
 vixig = VolatilityIndex(creditvix_data['VIXIG Percent'], cdx_ig, 'VIXIG')
 vixig_bp = VolatilityIndex(creditvix_data['VIXIG Basis Point'], cdx_ig, 'BP VIXIG')
+cdx_hy = Index(bbg_data['IBOXHYSE CBBT Curncy', 'PX_LAST'], 'CDX NA HY')
 vixhy = VolatilityIndex(creditvix_data['VIXHY Percent'], cdx_hy, 'VIXHY')
 vixhy_bp = VolatilityIndex(creditvix_data['VIXHY Basis Point'], cdx_hy, 'BP VIXHY')
+itraxx_ie = Index(bbg_data['ITRXEBE CBBT Curncy', 'PX_LAST'], 'iTraxx EU Main')
 vixie = VolatilityIndex(creditvix_data['VIXIE Percent'], itraxx_ie, 'VIXIE')
 vixie_bp = VolatilityIndex(creditvix_data['VIXIE Basis Point'], itraxx_ie, 'BP VIXIE')
+itraxx_xo = Index(bbg_data['ITRXEXE CBBT Curncy', 'PX_LAST'], 'iTraxx EU Xover')
 vixxo = VolatilityIndex(creditvix_data['VIXXO Percent'], itraxx_xo, 'VIXXO')
 vixxo_bp = VolatilityIndex(creditvix_data['VIXXO Basis Point'], itraxx_xo, 'BP VIXXO')
+itraxx_fs = Index(bbg_data['ITRXESE CBBT Curncy', 'PX_LAST'], 'iTraxx EU SenFin')
 vixfs = VolatilityIndex(creditvix_data['VIXFS Percent'], itraxx_fs, 'VIXFS')
 vixfs_bp = VolatilityIndex(creditvix_data['VIXFS Basis Point'], itraxx_fs, 'BP VIXFS')
-jb1 = Index(bbg_data['JB1 Comdty']['PX_LAST'], 'JB1')
-jgbvix = VolatilityIndex(bbg_data['SPJGBV Index']['PX_LAST'], jb1, 'JGB VIX')
-srvix = VolatilityIndex(bbg_data['SRVIX Index']['PX_LAST'], None, 'SRVIX')
-spx_tr = Index(bbg_data['SPX Index']['TOT_RETURN_INDEX_GROSS_DVDS'], 'SPX')
-sx5e_tr = Index(bbg_data['SX5E Index']['TOT_RETURN_INDEX_GROSS_DVDS'], 'Euro Stoxx 50')
-agg_tr = ETF(bbg_data['AGG Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'AGG')
-hyg_tr = ETF(bbg_data['HYG Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'HYG')
-ihyg_tr = ETF(bbg_data['IHYG EU Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'IHYG')
-ief_tr = ETF(bbg_data['IEF Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'IEF')
-lqd_tr = ETF(bbg_data['LQD Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'LQD')
+jb1 = Index(bbg_data['JB1 Comdty', 'PX_LAST'], 'JB1')
+jgbvix = VolatilityIndex(bbg_data['SPJGBV Index', 'PX_LAST'], jb1, 'JGB VIX')
+usfs0110 = Index(bbg_data['USFS0110 CMPN Curncy', 'PX_LAST'], '1Y-10Y Forward Swap Rate')
+srvix = VolatilityIndex(bbg_data['SRVIX Index', 'PX_LAST'], usfs0110, 'SRVIX')
+sx5e = Index(bbg_data['SX5E Index', 'PX_LAST'], 'Euro Stoxx 50')
+vstoxx = VolatilityIndex(bbg_data['V2X Index', 'PX_LAST'], sx5e, 'VSTOXX')
+spx_tr = Index(bbg_data['SPX Index', 'TOT_RETURN_INDEX_GROSS_DVDS'], 'SPX')
+agg_tr = ETF(bbg_data['AGG Equity', 'TOT_RETURN_INDEX_GROSS_DVDS'], 'AGG')
+hyg_tr = ETF(bbg_data['HYG Equity', 'TOT_RETURN_INDEX_GROSS_DVDS'], 'HYG')
+ihyg_tr = ETF(bbg_data['IHYG EU Equity', 'TOT_RETURN_INDEX_GROSS_DVDS'], 'IHYG')
+ief_tr = ETF(bbg_data['IEF Equity', 'TOT_RETURN_INDEX_GROSS_DVDS'], 'IEF')
+lqd_tr = ETF(bbg_data['LQD Equity', 'TOT_RETURN_INDEX_GROSS_DVDS'], 'LQD')
 
 # FI VIX Empirical Primer Document Reproduction
 
@@ -198,35 +200,41 @@ make_fillbetween(difference.index, difference, label='Difference', color='g', ax
 
 # Credit VIX Risk Premium Distribution
 [joined_index, joined_undl_rv] = \
-    share_dateindex([vixig.price(), 100*vixig.undl_realized_vol(do_shift=True)])
+    share_dateindex([vix.price(), 100*vix.undl_realized_vol(do_shift=True)])
 _, ax_prem = make_histogram(joined_index - joined_undl_rv, hist=False,
-                            label='VIXIG', xlabel='Volatility Premium (%)', ylabel='Probability',
+                            label='VIX', xlabel='Volatility Premium (%)', ylabel='Probability',
                             title='Risk Premium Distribution',
                             color_line='C0')
+[joined_index, joined_undl_rv] = \
+    share_dateindex([vixig.price(), 100*vixig.undl_realized_vol(do_shift=True)])
+make_histogram(joined_index - joined_undl_rv, hist=False,
+               label='VIXIG', xlabel='Volatility Premium (%)', ylabel='Probability',
+               title='Risk Premium Distribution',
+               color_line='C1', ax=ax_prem)
 [joined_index, joined_undl_rv] = \
     share_dateindex([vixhy.price(), 100*vixhy.undl_realized_vol(do_shift=True)])
 make_histogram(joined_index - joined_undl_rv, hist=False,
                label='VIXHY', xlabel='Volatility Premium (%)', ylabel='Probability',
                title='Risk Premium Distribution',
-               color_line='C1', ax=ax_prem)
+               color_line='C2', ax=ax_prem)
 [joined_index, joined_undl_rv] = \
     share_dateindex([vixie.price(), 100*vixie.undl_realized_vol(do_shift=True)])
 make_histogram(joined_index - joined_undl_rv, hist=False,
                label='VIXIE', xlabel='Volatility Premium (%)', ylabel='Probability',
                title='Risk Premium Distribution',
-               color_line='C2', ax=ax_prem)
+               color_line='C3', ax=ax_prem)
 [joined_index, joined_undl_rv] = \
     share_dateindex([vixxo.price(), 100*vixxo.undl_realized_vol(do_shift=True)])
 make_histogram(joined_index - joined_undl_rv, hist=False,
                label='VIXXO', xlabel='Volatility Premium (%)', ylabel='Probability',
                title='Risk Premium Distribution',
-               color_line='C3', ax=ax_prem)
+               color_line='C4', ax=ax_prem)
 [joined_index, joined_undl_rv] = \
     share_dateindex([vixfs.price(), 100*vixfs.undl_realized_vol(do_shift=True)])
 make_histogram(joined_index - joined_undl_rv, hist=False,
                label='VIXFS', xlabel='Volatility Premium (%)', ylabel='Probability',
                title='Risk Premium Distribution',
-               color_line='C4', ax=ax_prem)
+               color_line='C5', ax=ax_prem)
 
 # Risk Premium Tails Table
 # TODO
@@ -303,9 +311,21 @@ make_histogram(joined_index - joined_undl_rv, hist=False,
                color_line='C3', ax=ax_prem)
 
 # Credit VIX Scatter Matrix
+instr_list = [vix, vstoxx, vixig, vixhy, vixie, vixxo, vixfs]
+data_list = list(map(lambda instr: instr.price_return(), instr_list))
+color_list = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']
+label_list = list(map(lambda instr: instr.name, instr_list))
+make_scatter_matrix(data_list, color_list, label_list=label_list, title='Credit VIX Scatter Matrix')
 
 # Credit VIX Correlation Matrix
+make_correlation_matrix(data_list, color_list, label_list=label_list, title='Credit VIX Correlation Matrix')
 
 # Interest Rate VIX Scatter Matrix
+instr_list = [vix, tyvix, jgbvix, srvix]
+data_list = list(map(lambda instr: instr.price_return(), instr_list))
+color_list = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']
+label_list = list(map(lambda instr: instr.name, instr_list))
+make_scatter_matrix(data_list, color_list, label_list=label_list, title='Interest Rate VIX Scatter Matrix')
 
 # Interest Rate VIX Correlation Matrix
+make_correlation_matrix(data_list, color_list, label_list=label_list, title='Interest Rate VIX Correlation Matrix')

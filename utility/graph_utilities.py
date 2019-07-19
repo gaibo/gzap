@@ -152,7 +152,7 @@ def make_histogram(data, hist=True, n_bins=10, line=True, label=None, color=None
     return fig, ax
 
 
-def make_scatter_matrix(data_list, color_list, label_list=None):
+def make_scatter_matrix(data_list, color_list, label_list=None, title=None):
     n_data = len(data_list)
     n_colors = len(color_list)
     # Prepare labels
@@ -200,10 +200,11 @@ def make_scatter_matrix(data_list, color_list, label_list=None):
                 # Diagonal - distribution
                 make_histogram(data_x, hist=True, n_bins=100, line=False,
                                ax=axs[row, col], xlabel=xlabel, ylabel=ylabel)
+    fig.suptitle(title)
     return fig, axs
 
 
-def make_correlation_matrix(data_list, color_list, label_list=None):
+def make_correlation_matrix(data_list, color_list, label_list=None, title=None):
     n_data = len(data_list)
     n_colors = len(color_list)
     # Prepare labels
@@ -237,6 +238,7 @@ def make_correlation_matrix(data_list, color_list, label_list=None):
                 make_lineplot([six_month_rolling_corr],
                               color_list=[color_dict[frozenset({label_list[x_pos], label_list[y_pos]})]],
                               ax=axs[row, col], xlabel=xlabel, ylabel=ylabel)
+                axs[row, col].axhline(y=0, color='k')
                 axs[row, col].xaxis.set_major_locator(plt.MaxNLocator(3))
             elif y_pos > x_pos:
                 # Top triangle - text of mean rolling correlation
@@ -258,6 +260,7 @@ def make_correlation_matrix(data_list, color_list, label_list=None):
                     axs[row, col].set_xlabel(xlabel)
                 if ylabel:
                     axs[row, col].set_ylabel(ylabel)
+    fig.suptitle(title)
     return fig, axs
 
 
@@ -267,17 +270,17 @@ def main():
                            index_col=0, parse_dates=True, header=[0, 1])
 
     # Create data objects
-    spx = Index(bbg_data['SPX Index']['PX_LAST'], 'SPX')
-    vix = VolatilityIndex(bbg_data['VIX Index']['PX_LAST'], spx, 'VIX')
-    ty1 = Index(bbg_data['TY1 Comdty']['PX_LAST'], 'TY1')
-    tyvix = VolatilityIndex(bbg_data['TYVIX Index']['PX_LAST'], ty1, 'TYVIX')
-    jb1 = Index(bbg_data['JB1 Comdty']['PX_LAST'], 'JB1')
-    jgbvix = VolatilityIndex(bbg_data['SPJGBV Index']['PX_LAST'], jb1, 'JGB VIX')
-    sx5e_tr = Index(bbg_data['SX5E Index']['TOT_RETURN_INDEX_GROSS_DVDS'], 'Euro Stoxx 50')
-    agg_tr = ETF(bbg_data['AGG Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'AGG')
-    hyg_tr = ETF(bbg_data['HYG Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'HYG')
-    ief_tr = ETF(bbg_data['IEF Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'IEF')
-    lqd_tr = ETF(bbg_data['LQD Equity']['TOT_RETURN_INDEX_GROSS_DVDS'], 'LQD')
+    spx = Index(bbg_data[('SPX Index', 'PX_LAST')], 'SPX')
+    vix = VolatilityIndex(bbg_data[('VIX Index', 'PX_LAST')], spx, 'VIX')
+    ty1 = Index(bbg_data[('TY1 Comdty', 'PX_LAST')], 'TY1')
+    tyvix = VolatilityIndex(bbg_data[('TYVIX Index', 'PX_LAST')], ty1, 'TYVIX')
+    jb1 = Index(bbg_data[('JB1 Comdty', 'PX_LAST')], 'JB1')
+    jgbvix = VolatilityIndex(bbg_data[('SPJGBV Index', 'PX_LAST')], jb1, 'JGB VIX')
+    sx5e_tr = Index(bbg_data[('SX5E Index', 'TOT_RETURN_INDEX_GROSS_DVDS')], 'Euro Stoxx 50')
+    agg_tr = ETF(bbg_data[('AGG Equity', 'TOT_RETURN_INDEX_GROSS_DVDS')], 'AGG')
+    hyg_tr = ETF(bbg_data[('HYG Equity', 'TOT_RETURN_INDEX_GROSS_DVDS')], 'HYG')
+    ief_tr = ETF(bbg_data[('IEF Equity', 'TOT_RETURN_INDEX_GROSS_DVDS')], 'IEF')
+    lqd_tr = ETF(bbg_data[('LQD Equity', 'TOT_RETURN_INDEX_GROSS_DVDS')], 'LQD')
 
     # Name some truncated timeseries
     start_date = '2004-01-01'

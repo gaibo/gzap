@@ -283,11 +283,12 @@ class VolatilityIndex(Index):
 def main():
     # Load example data
     vix_df = pd.read_csv('../data/vix_ohlc.csv', index_col='Date', parse_dates=True)
-    spxt_df = pd.read_csv('../data/spxt.csv', index_col='Date', parse_dates=True)   # SPX otal return ETF
+    bbg_data = pd.read_csv('../data/bbg_automated_pull.csv',
+                           index_col=0, parse_dates=True, header=[0, 1])
 
     # Create objects
-    spx = Index(spxt_df['PX_LAST'])
-    vix = VolatilityIndex(vix_df['VIX Close'], spx)
+    spx = Index(bbg_data[('SPX Index', 'PX_LAST')], 'SPX')
+    vix = VolatilityIndex(vix_df['VIX Close'], spx, 'VIX')
 
     # Look at implied volatility vs realized volatility
     start = pd.Timestamp('2015-01-01')
