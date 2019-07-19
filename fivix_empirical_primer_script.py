@@ -14,6 +14,8 @@ creditvix_data = pd.read_csv('data/creditvix_pc_bp_missing_4_months.csv',
                              index_col='Date', parse_dates=True)
 tyvix_bp_data = pd.read_csv('data/tyvix_bp.csv',
                             index_col='Trade Date', parse_dates=True)
+jgbvix_bp_data = pd.read_csv('data/jgbvix_bp.csv',
+                             index_col='Trade Date', parse_dates=True)  # Rough estimate
 
 # Create data objects
 spx = Index(bbg_data['SPX Index', 'PX_LAST'], 'SPX')
@@ -38,6 +40,7 @@ vixfs = VolatilityIndex(creditvix_data['VIXFS Percent'], itraxx_fs, 'VIXFS')
 vixfs_bp = VolatilityIndex(creditvix_data['VIXFS Basis Point'], itraxx_fs, 'BP VIXFS')
 jb1 = Index(bbg_data['JB1 Comdty', 'PX_LAST'], 'JB1')
 jgbvix = VolatilityIndex(bbg_data['SPJGBV Index', 'PX_LAST'], jb1, 'JGB VIX')
+jgbvix_bp = VolatilityIndex(jgbvix_bp_data['BP JGBVIX'], jb1, 'BP JGB VIX')
 usfs0110 = Index(bbg_data['USFS0110 CMPN Curncy', 'PX_LAST'], '1Y-10Y Forward Swap Rate')
 srvix = VolatilityIndex(bbg_data['SRVIX Index', 'PX_LAST'], usfs0110, 'SRVIX')
 sx5e = Index(bbg_data['SX5E Index', 'PX_LAST'], 'Euro Stoxx 50')
@@ -105,9 +108,8 @@ make_lineplot([vixig_bp.price(), vixhy_bp.price(), vixie_bp.price(), vixxo_bp.pr
               ylabel='Volatility Index (bps)', title='Basis Point Version of Credit Group')
 
 # Basis Point Version of Rates Group
-# TODO: basis point JGB VIX
-make_lineplot([tyvix_bp.price(), srvix.price()],
-              ['BP TYVIX', 'SRVIX'],
+make_lineplot([tyvix_bp.price(), jgbvix_bp.price(), srvix.price()],
+              ['BP TYVIX', 'BP JGB VIX', 'SRVIX'],
               ylabel='Volatility Index (bps)', title='Basis Point Version of Rates Group')
 
 # VIXIG Daily % Change vs. CDX NAIG Index Daily bps Change

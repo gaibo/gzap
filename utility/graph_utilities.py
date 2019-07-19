@@ -244,7 +244,7 @@ def make_correlation_matrix(data_list, color_list, label_list=None, title=None):
                 # Top triangle - text of mean rolling correlation
                 mean_rolling_corr = six_month_rolling_corr.mean()
                 text_str = "$Mean$ $Correlation$: {}%".format(round(mean_rolling_corr*100))
-                axs[row, col].text(0.1, 0.4, text_str,
+                axs[row, col].text(0.2, 0.4, text_str,
                                    color=color_dict[frozenset({label_list[x_pos], label_list[y_pos]})])
                 axs[row, col].xaxis.set_ticks([])
                 axs[row, col].yaxis.set_ticks([])
