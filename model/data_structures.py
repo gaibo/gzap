@@ -1,50 +1,12 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from pandas.plotting import register_matplotlib_converters
 
-BUS_DAYS_IN_MONTH = 21
-BUS_DAYS_IN_YEAR = 252
-ONE_DAY = pd.Timedelta(days=1)
-ONE_NANOSECOND = pd.Timedelta(nanoseconds=1)
+from utility.universal_tools import construct_timeseries, share_dateindex, \
+    BUS_DAYS_IN_MONTH, BUS_DAYS_IN_YEAR, ONE_DAY, ONE_NANOSECOND
 
-
-def share_dateindex(timeseries_list):
-    """ Align a list of time-series by their shared date-times
-    :param timeseries_list: list of time-series
-    :return: list of aligned/truncated time-series
-    """
-    column_list = range(len(timeseries_list))
-    combined_df = pd.DataFrame(dict(zip(column_list, timeseries_list))).dropna()
-    return [combined_df[column].rename('value') for column in column_list]
-
-
-def construct_timeseries(ts_df, time_col=None, value_col=None):
-    """ Construct pseudo-time-series object, i.e. a pandas Series with 'time' and 'value'
-    :param ts_df: DataFrame or Series object with at least a time column and a value column
-    :param time_col: DataFrame column that represents time
-    :param value_col: DataFrame column that represents value
-    :return: pd.Series object with 'time' as index and 'value' as name
-    """
-    ts = ts_df.copy()   # Avoid modifying original DataFrame
-    if isinstance(ts, pd.Series):
-        # Convert Series to 2-column DataFrame, since we strive to be overly robust
-        ts = ts.reset_index()
-    n_cols = ts.shape[1]
-    if n_cols == 0:
-        print("ERROR construct_timeseries: 0 columns in DataFrame.")
-        return None
-    elif n_cols == 1:
-        # Try restoring index to column
-        ts = ts.reset_index()
-    elif n_cols > 2:
-        # Get columns based on parameters if there are more than 2
-        if time_col is None or value_col is None:
-            print("ERROR construct_timeseries: more than 2 columns in DataFrame, "
-                  "please provide time and value column names.")
-            return None
-        ts = ts[[time_col, value_col]]
-    ts.columns = ['time', 'value']
-    return ts.set_index('time')['value'].sort_index().dropna()
+register_matplotlib_converters()
 
 
 class Instrument(object):

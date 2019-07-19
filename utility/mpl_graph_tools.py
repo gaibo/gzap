@@ -1,26 +1,13 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from itertools import zip_longest, combinations
-from sklearn.linear_model import LinearRegression
 import seaborn as sns
+from pandas.plotting import register_matplotlib_converters
 
 from model.data_structures import ETF, Index, VolatilityIndex
+from utility.universal_tools import share_dateindex, get_best_fit
 
-
-def share_dateindex(timeseries_list):
-    column_list = range(len(timeseries_list))
-    combined_df = pd.DataFrame(dict(zip(column_list, timeseries_list))).dropna()
-    return [combined_df[column].rename('value') for column in column_list]
-
-
-def get_best_fit(x_data, y_data, fit_intercept=True):
-    [joined_x_data, joined_y_data] = share_dateindex([x_data, y_data])
-    x = joined_x_data.values.reshape(-1, 1)
-    y = joined_y_data.values
-    model = LinearRegression(fit_intercept=fit_intercept).fit(x, y)
-    r_sq = model.score(x, y)
-    slope = model.coef_[0]
-    return r_sq, slope, model
+register_matplotlib_converters()
 
 
 def make_basicstatstable(instr_list):
@@ -102,10 +89,12 @@ def make_scatterplot(x_data, y_data, do_center=False, color=None,
         fig = None
     # Create scatter
     [joined_x_data, joined_y_data] = share_dateindex([x_data, y_data])  # Scatter must have matching x-y
-    ax.scatter(joined_x_data, joined_y_data, c=color)
+    ax.scatter(joined_x_data, joined_y_data, c=color, zorder=3)
+    ax.axhline(y=0, color='k', linewidth=1, zorder=2)
+    ax.axvline(x=0, color='k', linewidth=1, zorder=2)
     # Create best fit line
     _, slope, _ = get_best_fit(x_data, y_data, fit_intercept=False)
-    ax.plot(joined_x_data, slope*joined_x_data, 'k')
+    ax.plot(joined_x_data, slope*joined_x_data, 'k', zorder=4)
     # Configure
     ax.grid(True)
     if do_center:

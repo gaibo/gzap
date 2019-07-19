@@ -3,7 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from model.data_structures import ETF, Futures, Index, VolatilityIndex
-from utility.graph_utilities import share_dateindex, make_lineplot, make_histogram, make_fillbetween
+from utility.universal_tools import share_dateindex
+from utility.mpl_graph_tools import make_lineplot, make_histogram, make_fillbetween
 
 # Load raw data
 spx_data = pd.read_csv('data/spxt.csv', index_col='Date', parse_dates=True)
