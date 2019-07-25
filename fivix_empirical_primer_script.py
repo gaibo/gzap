@@ -96,6 +96,26 @@ axright.legend(loc=1)
 axright.set_ylabel('Volatility Index (SRVIX) (bps)')
 axright.set_ylim(20, 115)
 
+# Volatility of Volatility Table for Percent and Basis Point Vol Indexes
+pct_vol_of_vol_list = [vix, tyvix, jgbvix, srvix, vixig, vixhy, vixie, vixxo, vixfs]
+pct_vol_of_vol_names = [v.name for v in pct_vol_of_vol_list]
+aligned_pct_list = share_dateindex([v.price_return(False) for v in pct_vol_of_vol_list])
+pct_vol_of_vol_nums = [(pr.var(ddof=0)*252)**0.5 * 100 for pr in aligned_pct_list]
+pct_vol_of_vol_df = \
+    pd.DataFrame(zip(pct_vol_of_vol_names, pct_vol_of_vol_nums),
+                 columns=['Vol Index', '% Vol of % Vol']) \
+    .set_index('Vol Index').sort_values('% Vol of % Vol', ascending=False)
+pct_vol_of_vol_df.to_csv('Volatility of Volatility Table for Percent Change Indexes.csv')
+bps_vol_of_vol_list = [tyvix_bp, jgbvix_bp, srvix, vixig_bp, vixhy_bp, vixie_bp, vixxo_bp, vixfs_bp]
+bps_vol_of_vol_names = [v.name for v in bps_vol_of_vol_list]
+aligned_bps_list = share_dateindex([v.price().diff() for v in bps_vol_of_vol_list])
+bps_vol_of_vol_nums = [((pr**2).mean()*252)**0.5 for pr in aligned_bps_list]
+bps_vol_of_vol_df = \
+    pd.DataFrame(zip(bps_vol_of_vol_names, bps_vol_of_vol_nums),
+                 columns=['Vol Index', 'bps Vol of bps Vol']) \
+    .set_index('Vol Index').sort_values('bps Vol of bps Vol', ascending=False)
+bps_vol_of_vol_df.to_csv('Volatility of Volatility Table for Basis Point Indexes.csv')
+
 # Basic Statistics Table for Credit VIX Indexes
 make_basicstatstable([vix, vixig, vixhy, vixie, vixxo, vixfs]) \
     .to_csv('Basic Statistics for Credit VIX.csv')
@@ -105,7 +125,7 @@ make_basicstatstable([vix, vixig_bp, vixhy_bp, vixie_bp, vixxo_bp, vixfs_bp]) \
     .to_csv('Basic Statistics for Basis Point Credit VIX.csv')
 
 # Basic Statistics Table for Interest Rate VIX Indexes
-make_basicstatstable([vix, tyvix, jgbvix, srvix, tyvix_bp]) \
+make_basicstatstable([vix, tyvix, jgbvix, srvix, tyvix_bp, jgbvix_bp]) \
     .to_csv('Basic Statistics for Interest Rate VIX.csv')
 
 # Basis Point Version of Credit Group
