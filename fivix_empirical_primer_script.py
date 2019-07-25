@@ -199,7 +199,7 @@ various_names = ['BP VIXIG - LQD', 'BP VIXHY - HYG', 'BP VIXXO - IHYG', 'BP TYVI
 various_slopes = [slope_1, slope_2, slope_3, slope_4, slope_5, slope_6]
 various_change_table = \
     pd.DataFrame({'Various Vol Index - Asset Pairs': various_names,
-                  'Estimated % or bps spread change of underlying from 10% change in implied vol index':
+                  'Estimated % price change of asset from 10% change in implied vol index':
                       list(map(lambda m: 10*m, various_slopes))}) \
     .set_index('Various Vol Index - Asset Pairs')
 various_change_table.to_csv('Change Table for Various Vol Index - Asset Pairs.csv')
