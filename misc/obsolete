@@ -1,3 +1,7 @@
+srvix_undl_rv = (srvix.underlying.price().rolling(252).apply(
+                     lambda p_252: (p_252.diff()**2).mean()**0.5 * 252**0.5, raw=False)) * 100
+srvix_undl_rv = srvix_undl_rv.shift(-252)
+
 full_data = pd.read_csv('../data/price_index_data.csv', index_col='Date', parse_dates=True)
 eurostoxx_data = pd.read_csv('../data/sx5e_data.csv', index_col='Date', parse_dates=True)
 sptr_data = pd.read_csv('../data/sptr_vix_data.csv', index_col='Date', parse_dates=True)

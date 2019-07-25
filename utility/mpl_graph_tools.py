@@ -43,7 +43,7 @@ def make_lineplot(data_list, label_list=None, color_list=None,
         fig = None
     # Create lines
     for data, label, color in zip_longest(data_list, label_list, color_list):
-        ax.plot(data, label=label, color=color, linewidth=1)
+        ax.plot(data, label=label, color=color, linewidth=1.5)
     # Configure
     if label_list != none_list:
         ax.legend()
@@ -177,7 +177,7 @@ def make_scatter_matrix(data_list, color_list, label_list=None, title=None):
                 # NOTE: reverse x-y to match scatter slope
                 r_sq, slope, _ = get_best_fit(data_y, data_x, fit_intercept=False)
                 text_str = "$Slope$: {}\n$R^2$: {}".format(round(slope, 2), round(r_sq, 2))
-                axs[row, col].text(0.3, 0.4, text_str,
+                axs[row, col].text(0.3, 0.4, text_str, fontsize=12,
                                    color=color_dict[frozenset({label_list[x_pos], label_list[y_pos]})])
                 axs[row, col].xaxis.set_ticks([])
                 axs[row, col].yaxis.set_ticks([])
@@ -232,8 +232,8 @@ def make_correlation_matrix(data_list, color_list, label_list=None, title=None):
             elif y_pos > x_pos:
                 # Top triangle - text of mean rolling correlation
                 mean_rolling_corr = six_month_rolling_corr.mean()
-                text_str = "$Mean$ $Correlation$: {}%".format(round(mean_rolling_corr*100))
-                axs[row, col].text(0.2, 0.4, text_str,
+                text_str = "$Mean$ $Corr$: {}%".format(round(mean_rolling_corr*100))
+                axs[row, col].text(0.2, 0.4, text_str, fontsize=12,
                                    color=color_dict[frozenset({label_list[x_pos], label_list[y_pos]})])
                 axs[row, col].xaxis.set_ticks([])
                 axs[row, col].yaxis.set_ticks([])

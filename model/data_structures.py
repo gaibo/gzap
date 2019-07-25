@@ -84,15 +84,22 @@ class Instrument(object):
         else:
             return prices.pct_change().iloc[1:]
 
-    def realized_vol(self, do_shift=False):
+    def realized_vol(self, do_shift=False, window=BUS_DAYS_IN_MONTH, bps=False):
         """ Calculate annualized realized vol from past month
         :param do_shift: set True to shift data back one month, to compare to implied vol
+        :param window: rolling window, also used as days to shift
+        :param bps: set to True if time-series is annual percent yields (as opposed to prices)
         :return: pd.Series with 'time' and 'value', with ~20 NaNs at beginning
         """
-        result = np.sqrt(self.price_return().rolling(BUS_DAYS_IN_MONTH).var(ddof=0)
-                         * BUS_DAYS_IN_YEAR)
+        if not bps:
+            result = np.sqrt(self.price_return().rolling(window).var(ddof=0)
+                             * BUS_DAYS_IN_YEAR)
+        else:
+            result = (self.price().rolling(window).apply(
+                          lambda yields: (np.mean(np.diff(yields)**2) * BUS_DAYS_IN_YEAR)**0.5,
+                          raw=True)) * 100
         if do_shift:
-            return result.shift(-BUS_DAYS_IN_MONTH)
+            return result.shift(-window)
         else:
             return result
 
@@ -124,12 +131,11 @@ class Derivative(Instrument):
         super().__init__(ts_df, name, tradestats)
         self.underlying = underlying
 
-    def undl_realized_vol(self, do_shift=False):
-        """ Calculate annualized realized vol from past month for underlying asset
-        :param do_shift: set True to shift data back one month, to compare to implied vol
+    def undl_realized_vol(self, **kwargs):
+        """ Calculate realized vol for underlying asset (by calling underlying's realized_vol)
         :return: pd.Series with 'time' and 'value', with ~20 NaNs at beginning
         """
-        return self.underlying.realized_vol(do_shift)
+        return self.underlying.realized_vol(**kwargs)
 
 
 class Index(CashInstr):
@@ -204,12 +210,11 @@ class VolatilityIndex(Index):
         super().__init__(ts_df, name, tradestats)
         self.underlying = underlying
 
-    def undl_realized_vol(self, do_shift=False):
-        """ Calculate annualized realized vol from past month for underlying asset
-        :param do_shift: set True to shift data back one month, to compare to implied vol
+    def undl_realized_vol(self, **kwargs):
+        """ Calculate realized vol for underlying asset (by calling underlying's realized_vol)
         :return: pd.Series with 'time' and 'value', with ~20 NaNs at beginning
         """
-        return self.underlying.realized_vol(do_shift)
+        return self.underlying.realized_vol(**kwargs)
 
     def produce_volatility_regime(self, low_threshold=0.1, high_threshold=0.9, window=126,
                                   time_start=None, time_end=None):

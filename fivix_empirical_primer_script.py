@@ -26,7 +26,8 @@ spx = Index(bbg_data['SPX Index', 'PX_LAST'], 'SPX')
 vix = VolatilityIndex(bbg_data['VIX Index', 'PX_LAST'], spx, 'VIX')
 ty1 = Index(bbg_data['TY1 Comdty', 'PX_LAST'], 'TY1')
 tyvix = VolatilityIndex(bbg_data['TYVIX Index', 'PX_LAST'], ty1, 'TYVIX')
-tyvix_bp = VolatilityIndex(tyvix_bp_data['BP TYVIX'], ty1, 'BP TYVIX')
+ty1_yield = Index(bbg_data['TY1 Comdty', 'YLD_CNV_LAST'], 'TY1 Yield')
+tyvix_bp = VolatilityIndex(tyvix_bp_data['BP TYVIX'], ty1_yield, 'BP TYVIX')
 cdx_ig = Index(bbg_data['IBOXUMAE CBBT Curncy', 'PX_LAST'], 'CDX NA IG')
 vixig = VolatilityIndex(creditvix_data['VIXIG Percent'], cdx_ig, 'VIXIG')
 vixig_bp = VolatilityIndex(creditvix_data['VIXIG Basis Point'], cdx_ig, 'BP VIXIG')
@@ -44,7 +45,8 @@ vixfs = VolatilityIndex(creditvix_data['VIXFS Percent'], itraxx_fs, 'VIXFS')
 vixfs_bp = VolatilityIndex(creditvix_data['VIXFS Basis Point'], itraxx_fs, 'BP VIXFS')
 jb1 = Index(bbg_data['JB1 Comdty', 'PX_LAST'], 'JB1')
 jgbvix = VolatilityIndex(bbg_data['SPJGBV Index', 'PX_LAST'], jb1, 'JGB VIX')
-jgbvix_bp = VolatilityIndex(jgbvix_bp_data['BP JGBVIX'], jb1, 'BP JGB VIX')
+jb1_yield = Index(bbg_data['JB1 Comdty', 'YLD_CNV_LAST'], 'JB1 Yield')
+jgbvix_bp = VolatilityIndex(jgbvix_bp_data['BP JGBVIX'], jb1_yield, 'BP JGB VIX')
 usfs0110 = Index(bbg_data['USFS0110 CMPN Curncy', 'PX_LAST'], '1Y-10Y Forward Swap Rate')
 srvix = VolatilityIndex(bbg_data['SRVIX Index', 'PX_LAST'], usfs0110, 'SRVIX')
 sx5e = Index(bbg_data['SX5E Index', 'PX_LAST'], 'Euro Stoxx 50')
@@ -94,15 +96,15 @@ axright.legend(loc=1)
 axright.set_ylabel('Volatility Index (SRVIX) (bps)')
 axright.set_ylim(20, 115)
 
-# Basic Statistics for Credit VIX Indexes
+# Basic Statistics Table for Credit VIX Indexes
 make_basicstatstable([vix, vixig, vixhy, vixie, vixxo, vixfs]) \
     .to_csv('Basic Statistics for Credit VIX.csv')
 
-# Basic Statistics for Basis Point Credit VIX Indexes
+# Basic Statistics Table for Basis Point Credit VIX Indexes
 make_basicstatstable([vix, vixig_bp, vixhy_bp, vixie_bp, vixxo_bp, vixfs_bp]) \
     .to_csv('Basic Statistics for Basis Point Credit VIX.csv')
 
-# Basic Statistics for Interest Rate VIX Indexes
+# Basic Statistics Table for Interest Rate VIX Indexes
 make_basicstatstable([vix, tyvix, jgbvix, srvix, tyvix_bp]) \
     .to_csv('Basic Statistics for Interest Rate VIX.csv')
 
@@ -117,7 +119,7 @@ make_lineplot([tyvix_bp.price(), jgbvix_bp.price(), srvix.price()],
               ylabel='Volatility Index (bps)', title='Basis Point Version of Rates Group')
 
 # VIXIG Daily % Change vs. CDX NAIG Index Daily bps Change
-make_scatterplot(vixig.price_return(False)*100, cdx_ig.price_return(False)*100,
+make_scatterplot(vixig.price_return(False)*100, cdx_ig.price().diff(),
                  xlabel='% Change', ylabel='bps Change',
                  title='VIXIG Daily % Change vs. CDX NAIG Index Daily bps Change')
 
@@ -128,25 +130,25 @@ make_scatterplot(srvix.price_return(False)*100, lqd_tr.price_return(False)*100,
 
 # Credit VIX Change per 10% Change in Implied Vol Index Table
 _, vixig_slope, _ = \
-    get_best_fit(vixig.price_return(False), vixig.underlying.price_return(False), fit_intercept=False)
+    get_best_fit(vixig.price_return(False)*100, vixig.underlying.price().diff(), fit_intercept=False)
 _, vixhy_slope, _ = \
-    get_best_fit(vixhy.price_return(False), vixhy.underlying.price_return(False), fit_intercept=False)
+    get_best_fit(vixhy.price_return(False)*100, vixhy.underlying.price().diff(), fit_intercept=False)
 _, vixie_slope, _ = \
-    get_best_fit(vixie.price_return(False), vixie.underlying.price_return(False), fit_intercept=False)
+    get_best_fit(vixie.price_return(False)*100, vixie.underlying.price().diff(), fit_intercept=False)
 _, vixxo_slope, _ = \
-    get_best_fit(vixxo.price_return(False), vixxo.underlying.price_return(False), fit_intercept=False)
+    get_best_fit(vixxo.price_return(False)*100, vixxo.underlying.price().diff(), fit_intercept=False)
 _, vixfs_slope, _ = \
-    get_best_fit(vixfs.price_return(False), vixfs.underlying.price_return(False), fit_intercept=False)
+    get_best_fit(vixfs.price_return(False)*100, vixfs.underlying.price().diff(), fit_intercept=False)
 _, vixig_bp_slope, _ = \
-    get_best_fit(vixig_bp.price_return(False), vixig_bp.underlying.price_return(False), fit_intercept=False)
+    get_best_fit(vixig_bp.price_return(False)*100, vixig_bp.underlying.price().diff(), fit_intercept=False)
 _, vixhy_bp_slope, _ = \
-    get_best_fit(vixhy_bp.price_return(False), vixhy_bp.underlying.price_return(False), fit_intercept=False)
+    get_best_fit(vixhy_bp.price_return(False)*100, vixhy_bp.underlying.price().diff(), fit_intercept=False)
 _, vixie_bp_slope, _ = \
-    get_best_fit(vixie_bp.price_return(False), vixie_bp.underlying.price_return(False), fit_intercept=False)
+    get_best_fit(vixie_bp.price_return(False)*100, vixie_bp.underlying.price().diff(), fit_intercept=False)
 _, vixxo_bp_slope, _ = \
-    get_best_fit(vixxo_bp.price_return(False), vixxo_bp.underlying.price_return(False), fit_intercept=False)
+    get_best_fit(vixxo_bp.price_return(False)*100, vixxo_bp.underlying.price().diff(), fit_intercept=False)
 _, vixfs_bp_slope, _ = \
-    get_best_fit(vixfs_bp.price_return(False), vixfs_bp.underlying.price_return(False), fit_intercept=False)
+    get_best_fit(vixfs_bp.price_return(False)*100, vixfs_bp.underlying.price().diff(), fit_intercept=False)
 creditvix_names = ['VIXIG', 'VIXHY', 'VIXIE', 'VIXXO', 'VIXFS',
                    'BP VIXIG', 'BP VIXHY', 'BP VIXIE', 'BP VIXXO', 'BP VIXFS']
 creditvix_slopes = [vixig_slope, vixhy_slope, vixie_slope, vixxo_slope, vixfs_slope,
@@ -160,17 +162,17 @@ creditvix_change_table.to_csv('Change Table for Credit VIX.csv')
 
 # Interest Rate VIX Change per 10% Change in Implied Vol Index Table
 _, tyvix_slope, _ = \
-    get_best_fit(tyvix.price_return(False), tyvix.underlying.price_return(False), fit_intercept=False)
+    get_best_fit(tyvix.price_return(False)*100, tyvix.underlying.price_return(False)*100, fit_intercept=False)
 _, jgbvix_slope, _ = \
-    get_best_fit(jgbvix.price_return(False), jgbvix.underlying.price_return(False), fit_intercept=False)
+    get_best_fit(jgbvix.price_return(False)*100, jgbvix.underlying.price_return(False)*100, fit_intercept=False)
 _, tyvix_bp_slope, _ = \
-    get_best_fit(tyvix_bp.price_return(False), tyvix_bp.underlying.price_return(False), fit_intercept=False)
+    get_best_fit(tyvix_bp.price_return(False)*100, tyvix_bp.underlying.price().diff()*100, fit_intercept=False)
 _, jgbvix_bp_slope, _ = \
-    get_best_fit(jgbvix_bp.price_return(False), jgbvix_bp.underlying.price_return(False), fit_intercept=False)
+    get_best_fit(jgbvix_bp.price_return(False)*100, jgbvix_bp.underlying.price().diff()*100, fit_intercept=False)
 _, srvix_slope, _ = \
-    get_best_fit(srvix.price_return(False), srvix.underlying.price_return(False), fit_intercept=False)
+    get_best_fit(srvix.price_return(False)*100, srvix.underlying.price().diff()*100, fit_intercept=False)
 _, vix_slope, _ = \
-    get_best_fit(vix.price_return(False), vix.underlying.price_return(False), fit_intercept=False)
+    get_best_fit(vix.price_return(False)*100, vix.underlying.price_return(False)*100, fit_intercept=False)
 irvix_names = ['TYVIX', 'JGB VIX', 'BP TYVIX', 'BP JGB VIX', 'SRVIX', 'VIX']
 irvix_slopes = [tyvix_slope, jgbvix_slope, tyvix_bp_slope, jgbvix_bp_slope, srvix_slope, vix_slope]
 irvix_change_table = \
@@ -204,19 +206,19 @@ various_change_table.to_csv('Change Table for Various Vol Index - Asset Pairs.cs
 
 # Four Scatter Plots
 _, axs = plt.subplots(2, 2)
-make_scatterplot(vixhy_bp.price_return(False), hyg_tr.price_return(False),
+make_scatterplot(vixhy_bp.price_return(False)*100, hyg_tr.price_return(False)*100,
                  xlabel='% Change', ylabel='% Change',
                  title='BP VIXHY Daily % Change vs. HYG Daily % Change',
                  ax=axs[0, 0])
-make_scatterplot(vixxo_bp.price_return(False), ihyg_tr.price_return(False),
+make_scatterplot(vixxo_bp.price_return(False)*100, ihyg_tr.price_return(False)*100,
                  xlabel='% Change', ylabel='% Change',
                  title='BP VIXXO Daily % Change vs. IHYG Daily % Change',
                  ax=axs[0, 1])
-make_scatterplot(tyvix_bp.price_return(False), ief_tr.price_return(False),
+make_scatterplot(tyvix_bp.price_return(False)*100, ief_tr.price_return(False)*100,
                  xlabel='% Change', ylabel='% Change',
                  title='BP TYVIX Daily % Change vs. IEF Daily % Change',
                  ax=axs[1, 0])
-make_scatterplot(srvix.price_return(False), ief_tr.price_return(False),
+make_scatterplot(srvix.price_return(False)*100, ief_tr.price_return(False)*100,
                  xlabel='% Change', ylabel='% Change',
                  title='SRVIX Daily % Change vs. IEF Daily % Change',
                  ax=axs[1, 1])
@@ -229,9 +231,10 @@ make_lineplot([joined_index, joined_undl_rv], ['VIXIG', 'Realized Volatility'],
               ylabel='Volatility (% Spread bps)',
               title='VIXIG with Realized (21 Days Shifted)', ax=axs[0])
 difference = joined_index - joined_undl_rv
-make_fillbetween(difference.index, joined_index, joined_undl_rv,
-                 label='Difference', color='g', ax=axs[0])
-make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
+# make_fillbetween(difference.index, joined_index, joined_undl_rv,
+#                  label='Difference', color='mediumseagreen', ax=axs[0])
+make_fillbetween(difference.index, difference, label='Difference', color='mediumseagreen', ax=axs[1])
+make_lineplot([difference], color_list=['g'], ax=axs[1])
 
 _, axs = plt.subplots(2, 1, sharex='all')
 [joined_index, joined_undl_rv] = \
@@ -240,9 +243,10 @@ make_lineplot([joined_index, joined_undl_rv], ['VIXHY', 'Realized Volatility'],
               ylabel='Volatility (% Spread bps)',
               title='VIXHY with Realized (21 Days Shifted)', ax=axs[0])
 difference = joined_index - joined_undl_rv
-make_fillbetween(difference.index, joined_index, joined_undl_rv,
-                 label='Difference', color='g', ax=axs[0])
-make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
+# make_fillbetween(difference.index, joined_index, joined_undl_rv,
+#                  label='Difference', color='mediumseagreen', ax=axs[0])
+make_fillbetween(difference.index, difference, label='Difference', color='mediumseagreen', ax=axs[1])
+make_lineplot([difference], color_list=['g'], ax=axs[1])
 
 _, axs = plt.subplots(2, 1, sharex='all')
 [joined_index, joined_undl_rv] = \
@@ -251,9 +255,10 @@ make_lineplot([joined_index, joined_undl_rv], ['VIXIE', 'Realized Volatility'],
               ylabel='Volatility (% Spread bps)',
               title='VIXIE with Realized (21 Days Shifted)', ax=axs[0])
 difference = joined_index - joined_undl_rv
-make_fillbetween(difference.index, joined_index, joined_undl_rv,
-                 label='Difference', color='g', ax=axs[0])
-make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
+# make_fillbetween(difference.index, joined_index, joined_undl_rv,
+#                  label='Difference', color='mediumseagreen', ax=axs[0])
+make_fillbetween(difference.index, difference, label='Difference', color='mediumseagreen', ax=axs[1])
+make_lineplot([difference], color_list=['g'], ax=axs[1])
 
 _, axs = plt.subplots(2, 1, sharex='all')
 [joined_index, joined_undl_rv] = \
@@ -262,9 +267,10 @@ make_lineplot([joined_index, joined_undl_rv], ['VIXXO', 'Realized Volatility'],
               ylabel='Volatility (% Spread bps)',
               title='VIXXO with Realized (21 Days Shifted)', ax=axs[0])
 difference = joined_index - joined_undl_rv
-make_fillbetween(difference.index, joined_index, joined_undl_rv,
-                 label='Difference', color='g', ax=axs[0])
-make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
+# make_fillbetween(difference.index, joined_index, joined_undl_rv,
+#                  label='Difference', color='mediumseagreen', ax=axs[0])
+make_fillbetween(difference.index, difference, label='Difference', color='mediumseagreen', ax=axs[1])
+make_lineplot([difference], color_list=['g'], ax=axs[1])
 
 _, axs = plt.subplots(2, 1, sharex='all')
 [joined_index, joined_undl_rv] = \
@@ -273,65 +279,66 @@ make_lineplot([joined_index, joined_undl_rv], ['VIXFS', 'Realized Volatility'],
               ylabel='Volatility (% Spread bps)',
               title='VIXFS with Realized (21 Days Shifted)', ax=axs[0])
 difference = joined_index - joined_undl_rv
-make_fillbetween(difference.index, joined_index, joined_undl_rv,
-                 label='Difference', color='g', ax=axs[0])
-make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
+# make_fillbetween(difference.index, joined_index, joined_undl_rv,
+#                  label='Difference', color='mediumseagreen', ax=axs[0])
+make_fillbetween(difference.index, difference, label='Difference', color='mediumseagreen', ax=axs[1])
+make_lineplot([difference], color_list=['g'], ax=axs[1])
 
 # Credit VIX Risk Premium Distribution
 [joined_index, joined_undl_rv] = \
     share_dateindex([vix.price(), 100*vix.undl_realized_vol(do_shift=True)])
 vix_diff = joined_index - joined_undl_rv
 _, ax_prem = make_histogram(vix_diff, hist=False,
-                            label='VIX', xlabel='Volatility Premium (%)', ylabel='Probability',
+                            label='VIX', xlabel='Implied Vol Premium (%)', ylabel='Probability',
                             title='Risk Premium Distribution',
                             color_line='C0')
 [joined_index, joined_undl_rv] = \
     share_dateindex([vixig.price(), 100*vixig.undl_realized_vol(do_shift=True)])
 vixig_diff = joined_index - joined_undl_rv
 make_histogram(vixig_diff, hist=False,
-               label='VIXIG', xlabel='Volatility Premium (%)', ylabel='Probability',
+               label='VIXIG', xlabel='Implied Vol Premium (%)', ylabel='Probability',
                title='Risk Premium Distribution',
                color_line='C1', ax=ax_prem)
 [joined_index, joined_undl_rv] = \
     share_dateindex([vixhy.price(), 100*vixhy.undl_realized_vol(do_shift=True)])
 vixhy_diff = joined_index - joined_undl_rv
 make_histogram(vixhy_diff, hist=False,
-               label='VIXHY', xlabel='Volatility Premium (%)', ylabel='Probability',
+               label='VIXHY', xlabel='Implied Vol Premium (%)', ylabel='Probability',
                title='Risk Premium Distribution',
                color_line='C2', ax=ax_prem)
 [joined_index, joined_undl_rv] = \
     share_dateindex([vixie.price(), 100*vixie.undl_realized_vol(do_shift=True)])
 vixie_diff = joined_index - joined_undl_rv
 make_histogram(vixie_diff, hist=False,
-               label='VIXIE', xlabel='Volatility Premium (%)', ylabel='Probability',
+               label='VIXIE', xlabel='Implied Vol Premium (%)', ylabel='Probability',
                title='Risk Premium Distribution',
                color_line='C3', ax=ax_prem)
 [joined_index, joined_undl_rv] = \
     share_dateindex([vixxo.price(), 100*vixxo.undl_realized_vol(do_shift=True)])
 vixxo_diff = joined_index - joined_undl_rv
 make_histogram(vixxo_diff, hist=False,
-               label='VIXXO', xlabel='Volatility Premium (%)', ylabel='Probability',
+               label='VIXXO', xlabel='Implied Vol Premium (%)', ylabel='Probability',
                title='Risk Premium Distribution',
                color_line='C4', ax=ax_prem)
 [joined_index, joined_undl_rv] = \
     share_dateindex([vixfs.price(), 100*vixfs.undl_realized_vol(do_shift=True)])
 vixfs_diff = joined_index - joined_undl_rv
 make_histogram(vixfs_diff, hist=False,
-               label='VIXFS', xlabel='Volatility Premium (%)', ylabel='Probability',
+               label='VIXFS', xlabel='Implied Vol Premium (%)', ylabel='Probability',
                title='Risk Premium Distribution',
                color_line='C5', ax=ax_prem)
 
 # Credit VIX Risk Premium Tails Table
 names_list = ['VIX', 'VIXIG', 'VIXHY', 'VIXIE', 'VIXXO', 'VIXFS']
 diff_list = [vix_diff, vixig_diff, vixhy_diff, vixie_diff, vixxo_diff, vixfs_diff]
-one_percent = list(map(lambda d: d.quantile(0.01), diff_list))
-five_percent = list(map(lambda d: d.quantile(0.05), diff_list))
-ten_percent = list(map(lambda d: d.quantile(0.1), diff_list))
+one_percent_mean = list(map(lambda d: d[d.rank(pct=True) < 0.01].mean(), diff_list))
+five_percent_mean = list(map(lambda d: d[d.rank(pct=True) < 0.05].mean(), diff_list))
+ten_percent_mean = list(map(lambda d: d[d.rank(pct=True) < 0.1].mean(), diff_list))
 creditvix_risk_prem_lefttail_table = \
     pd.DataFrame({'Vol Index': names_list,
-                  '1 Percentile (Left Tail)': one_percent,
-                  '5 Percentile (Left Tail)': five_percent,
-                  '10 Percentile (Left Tail)': ten_percent}).set_index('Vol Index')
+                  'Mean of 1% Left Tail': one_percent_mean,
+                  'Mean of 5% Left Tail': five_percent_mean,
+                  'Mean of 10% Left Tail': ten_percent_mean}).set_index('Vol Index')
 creditvix_risk_prem_lefttail_table.to_csv('Risk Premium Left Tail Table for Credit VIX.csv')
 
 # Interest Rate VIX Difference Charts
@@ -339,87 +346,95 @@ _, axs = plt.subplots(2, 1, sharex='all')
 [joined_index, joined_undl_rv] = \
     share_dateindex([tyvix.price(), 100*tyvix.undl_realized_vol(do_shift=True)])
 make_lineplot([joined_index, joined_undl_rv], ['TYVIX', 'Realized Volatility'],
-              ylabel='Volatility (% Spread bps)',
+              ylabel='Volatility (% Price)',
               title='TYVIX with Realized (21 Days Shifted)', ax=axs[0])
 difference = joined_index - joined_undl_rv
-make_fillbetween(difference.index, joined_index, joined_undl_rv,
-                 label='Difference', color='g', ax=axs[0])
-make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
+# make_fillbetween(difference.index, joined_index, joined_undl_rv,
+#                  label='Difference', color='mediumseagreen', ax=axs[0])
+make_fillbetween(difference.index, difference, label='Difference', color='mediumseagreen', ax=axs[1])
+make_lineplot([difference], color_list=['g'], ax=axs[1])
 
 _, axs = plt.subplots(2, 1, sharex='all')
 [joined_index, joined_undl_rv] = \
     share_dateindex([jgbvix.price(), 100*jgbvix.undl_realized_vol(do_shift=True)])
 make_lineplot([joined_index, joined_undl_rv], ['JGB VIX', 'Realized Volatility'],
-              ylabel='Volatility (% Spread bps)',
+              ylabel='Volatility (% Price)',
               title='JGB VIX with Realized (21 Days Shifted)', ax=axs[0])
 difference = joined_index - joined_undl_rv
-make_fillbetween(difference.index, joined_index, joined_undl_rv,
-                 label='Difference', color='g', ax=axs[0])
-make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
+# make_fillbetween(difference.index, joined_index, joined_undl_rv,
+#                  label='Difference', color='mediumseagreen', ax=axs[0])
+make_fillbetween(difference.index, difference, label='Difference', color='mediumseagreen', ax=axs[1])
+make_lineplot([difference], color_list=['g'], ax=axs[1])
 
 _, axs = plt.subplots(2, 1, sharex='all')
 [joined_index, joined_undl_rv] = \
-    share_dateindex([srvix.price(), 100*srvix.undl_realized_vol(do_shift=True)])
+    share_dateindex([srvix.price(), srvix.undl_realized_vol(do_shift=True, window=252, bps=True)])
 make_lineplot([joined_index, joined_undl_rv], ['SRVIX', 'Realized Volatility'],
-              ylabel='Volatility (% Spread bps)',
-              title='SRVIX with Realized (21 Days Shifted)', ax=axs[0])
+              ylabel='Volatility (bps)',
+              title='SRVIX with Realized (252 Days Shifted)', ax=axs[0])
 difference = joined_index - joined_undl_rv
-make_fillbetween(difference.index, joined_index, joined_undl_rv,
-                 label='Difference', color='g', ax=axs[0])
-make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
+# make_fillbetween(difference.index, joined_index, joined_undl_rv,
+#                  label='Difference', color='mediumseagreen', ax=axs[0])
+make_fillbetween(difference.index, difference, label='Difference', color='mediumseagreen', ax=axs[1])
+make_lineplot([difference], color_list=['g'], ax=axs[1])
 
 _, axs = plt.subplots(2, 1, sharex='all')
 [joined_index, joined_undl_rv] = \
     share_dateindex([vix.price(), 100*vix.undl_realized_vol(do_shift=True)])
 make_lineplot([joined_index, joined_undl_rv], ['S&P500 VIX', 'Realized Volatility'],
-              ylabel='Volatility (% Spread bps)',
+              ylabel='Volatility (% Price)',
               title='S&P500 VIX with Realized (21 Days Shifted)', ax=axs[0])
 difference = joined_index - joined_undl_rv
-make_fillbetween(difference.index, joined_index, joined_undl_rv,
-                 label='Difference', color='g', ax=axs[0])
-make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
+# make_fillbetween(difference.index, joined_index, joined_undl_rv,
+#                  label='Difference', color='mediumseagreen', ax=axs[0])
+make_fillbetween(difference.index, difference, label='Difference', color='mediumseagreen', ax=axs[1])
+make_lineplot([difference], color_list=['g'], ax=axs[1])
 
 # Interest Rate VIX Risk Premium Distribution
 [joined_index, joined_undl_rv] = \
     share_dateindex([vix.price(), 100*vix.undl_realized_vol(do_shift=True)])
 vix_diff = joined_index - joined_undl_rv
 _, ax_prem = make_histogram(joined_index - joined_undl_rv, hist=False,
-                            label='S&P500 VIX', xlabel='Volatility Premium (%)', ylabel='Probability',
+                            label='S&P500 VIX',
+                            xlabel='Implied Vol Premium (bps for SRVIX, % for other)', ylabel='Probability',
                             title='Risk Premium Distribution',
                             color_line='C0')
 [joined_index, joined_undl_rv] = \
     share_dateindex([tyvix.price(), 100*tyvix.undl_realized_vol(do_shift=True)])
 tyvix_diff = joined_index - joined_undl_rv
 make_histogram(joined_index - joined_undl_rv, hist=False,
-               label='TYVIX', xlabel='Volatility Premium (%)', ylabel='Probability',
+               label='TYVIX', xlabel='Implied Vol Premium (bps for SRVIX, % for other)', ylabel='Probability',
                title='Risk Premium Distribution',
                color_line='C1', ax=ax_prem)
 [joined_index, joined_undl_rv] = \
     share_dateindex([jgbvix.price(), 100*jgbvix.undl_realized_vol(do_shift=True)])
 jgbvix_diff = joined_index - joined_undl_rv
 make_histogram(joined_index - joined_undl_rv, hist=False,
-               label='JGB VIX', xlabel='Volatility Premium (%)', ylabel='Probability',
+               label='JGB VIX', xlabel='Implied Vol Premium (bps for SRVIX, % for other)', ylabel='Probability',
                title='Risk Premium Distribution',
                color_line='C2', ax=ax_prem)
 [joined_index, joined_undl_rv] = \
-    share_dateindex([srvix.price(), 100*srvix.undl_realized_vol(do_shift=True)])
+    share_dateindex([srvix.price(), srvix.undl_realized_vol(do_shift=True, window=252, bps=True)])
 srvix_diff = joined_index - joined_undl_rv
 make_histogram(joined_index - joined_undl_rv, hist=False,
-               label='SRVIX', xlabel='Volatility Premium (%)', ylabel='Probability',
+               label='SRVIX', xlabel='Implied Vol Premium (bps for SRVIX, % for other)', ylabel='Probability',
                title='Risk Premium Distribution',
                color_line='C3', ax=ax_prem)
 
 # Interest Rate VIX Risk Premium Tails Table
 names_list = ['VIX', 'TYVIX', 'JGB VIX', 'SRVIX']
 diff_list = [vix_diff, tyvix_diff, jgbvix_diff, srvix_diff]
-one_percent = list(map(lambda d: d.quantile(0.01), diff_list))
-five_percent = list(map(lambda d: d.quantile(0.05), diff_list))
-ten_percent = list(map(lambda d: d.quantile(0.1), diff_list))
+# one_percent = list(map(lambda d: d.quantile(0.01), diff_list))
+# five_percent = list(map(lambda d: d.quantile(0.05), diff_list))
+# ten_percent = list(map(lambda d: d.quantile(0.1), diff_list))
+one_percent_mean = list(map(lambda d: d[d.rank(pct=True) < 0.01].mean(), diff_list))
+five_percent_mean = list(map(lambda d: d[d.rank(pct=True) < 0.05].mean(), diff_list))
+ten_percent_mean = list(map(lambda d: d[d.rank(pct=True) < 0.1].mean(), diff_list))
 irvix_risk_prem_lefttail_table = \
     pd.DataFrame({'Vol Index': names_list,
-                  '1 Percentile (Left Tail)': one_percent,
-                  '5 Percentile (Left Tail)': five_percent,
-                  '10 Percentile (Left Tail)': ten_percent}).set_index('Vol Index')
+                  'Mean of 1% Left Tail': one_percent_mean,
+                  'Mean of 5% Left Tail': five_percent_mean,
+                  'Mean of 10% Left Tail': ten_percent_mean}).set_index('Vol Index')
 irvix_risk_prem_lefttail_table.to_csv('Risk Premium Left Tail Table for Interest Rate VIX.csv')
 
 # Credit VIX Scatter Matrix
