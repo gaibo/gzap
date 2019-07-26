@@ -215,7 +215,8 @@ _, slope_5, _ = \
     get_best_fit(srvix.price_return(False), ief_tr.price_return(False), fit_intercept=False)
 _, slope_6, _ = \
     get_best_fit(srvix.price_return(False), lqd_tr.price_return(False), fit_intercept=False)
-various_names = ['BP VIXIG - LQD', 'BP VIXHY - HYG', 'BP VIXXO - IHYG', 'BP TYVIX - IEF', 'SRVIX - IEF', 'SRVIX - LQD']
+various_names = ['BP VIXIG - LQD', 'BP VIXHY - HYG', 'BP VIXXO - IHYG', 'BP TYVIX - IEF',
+                 'SRVIX - IEF', 'SRVIX - LQD']
 various_slopes = [slope_1, slope_2, slope_3, slope_4, slope_5, slope_6]
 various_change_table = \
     pd.DataFrame({'Various Vol Index - Asset Pairs': various_names,
@@ -475,4 +476,5 @@ label_list = list(map(lambda instr: instr.name, instr_list))
 make_scatter_matrix(data_list, color_list, label_list=label_list, title='Interest Rate VIX Scatter Matrix')
 
 # Interest Rate VIX Correlation Matrix
-make_correlation_matrix(data_list, color_list, label_list=label_list, title='Interest Rate VIX Correlation Matrix')
+make_correlation_matrix(data_list, color_list, label_list=label_list,
+                        title='Interest Rate VIX Correlation Matrix')
