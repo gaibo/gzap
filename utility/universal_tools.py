@@ -3,6 +3,7 @@ from sklearn.linear_model import LinearRegression
 
 BUS_DAYS_IN_MONTH = 21
 BUS_DAYS_IN_YEAR = 252
+BUS_DAYS_IN_SIX_MONTHS = 126
 ONE_DAY = pd.Timedelta(days=1)
 ONE_NANOSECOND = pd.Timedelta(nanoseconds=1)
 

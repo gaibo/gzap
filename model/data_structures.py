@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from pandas.plotting import register_matplotlib_converters
 
 from utility.universal_tools import construct_timeseries, share_dateindex, \
-    BUS_DAYS_IN_MONTH, BUS_DAYS_IN_YEAR, ONE_DAY, ONE_NANOSECOND
+    BUS_DAYS_IN_MONTH, BUS_DAYS_IN_YEAR, BUS_DAYS_IN_SIX_MONTHS, ONE_DAY, ONE_NANOSECOND
 
 register_matplotlib_converters()
 
@@ -216,8 +216,8 @@ class VolatilityIndex(Index):
         """
         return self.underlying.realized_vol(**kwargs)
 
-    def produce_volatility_regime(self, low_threshold=0.1, high_threshold=0.9, window=126,
-                                  time_start=None, time_end=None):
+    def vol_regime(self, low_threshold=0.1, high_threshold=0.9, window=BUS_DAYS_IN_SIX_MONTHS,
+                   time_start=None, time_end=None):
         """ Produce a label of 'high' or 'low' volatility regime for each day
         :param low_threshold: low quantile - a break would switch high regime to low
         :param high_threshold: high quantile - a break would switch low regime to high
@@ -225,6 +225,8 @@ class VolatilityIndex(Index):
         :param time_start: start of time-series to use
         :param time_end: end of time-series to use
         :return: pd.Series with 'time' and 'value', with 'high' and 'low' labels as value
+                 list of tuples of start and end dates of low regimes
+                 list of tuples of start and end dates of high regimes
         """
         # Get prices, find corresponding rolling high and low thresholds
         prices = self.price('daily', time_start, time_end)  # Currently only daily vol regimes
@@ -236,15 +238,29 @@ class VolatilityIndex(Index):
         high_breakthrough = joined_prices[joined_prices > joined_rolling_high].index
         low_breakthrough = joined_prices[joined_prices < joined_rolling_low].index
         # Track chronologically to identify regime changes
-        curr_state = 'low'
         regime = joined_prices.copy()   # Copy joined_prices as template with dates
+        curr_state = 'low'
+        low_start = regime.index[0]
+        high_start = None   # Not needed to begin with
+        low_intervals_list = []
+        high_intervals_list = []
         for day in regime.index:
             if curr_state == 'low' and day in high_breakthrough:
-                curr_state = 'high'     # Change low to high
+                # Regime change: low to high
+                low_intervals_list.append((low_start, day))     # Record completed low interval
+                high_start = day    # Set start of high interval
+                curr_state = 'high'     # Change state low to high
             elif curr_state == 'high' and day in low_breakthrough:
-                curr_state = 'low'      # Change high to low
-            regime[day] = curr_state
-        return regime
+                # Regime change: high to low
+                high_intervals_list.append((high_start, day))  # Record completed high interval
+                low_start = day     # Set start of low interval
+                curr_state = 'low'      # Change state high to low
+            regime[day] = curr_state    # Record state regardless of state change
+        if curr_state == 'low':
+            low_intervals_list.append((low_start, day))     # Complete last interval
+        else:
+            high_intervals_list.append((high_start, day))
+        return regime, low_intervals_list, high_intervals_list
 
 
 def main():

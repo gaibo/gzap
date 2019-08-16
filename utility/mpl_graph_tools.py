@@ -30,6 +30,13 @@ def make_basicstatstable(instr_list):
 
 def make_lineplot(data_list, label_list=None, color_list=None,
                   xlabel=None, ylabel=None, title=None, ax=None):
+    # If non-list single elements are passed in, convert
+    if not isinstance(data_list, list):
+        data_list = [data_list]
+    if not isinstance(label_list, list) and label_list is not None:
+        label_list = [label_list]
+    if not isinstance(color_list, list) and color_list is not None:
+        color_list = [color_list]
     # Prepare labels and colors
     none_list = len(data_list) * [None]
     if label_list is None:
@@ -67,7 +74,34 @@ def make_fillbetween(x, y1, y2=0, label=None, color=None,
         fig = None
     # Create filled line plot
     ax.fill_between(x, y1, y2, color=color, label=label)
+    # Configure
     if label:
+        ax.legend()
+    ax.grid(True)
+    # Set labels
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    if title:
+        ax.set_title(title)
+    return fig, ax
+
+
+def make_regime(interval_list, label=None, color=None,
+                xlabel=None, ylabel=None, title=None, ax=None):
+    # Prepare Figure and Axes
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = None
+    # Create regimes from list of intervals
+    span_handle = None
+    for interval in interval_list:
+        span_handle = ax.axvspan(*interval, color=color, alpha=0.5)
+    # Configure
+    if label:
+        span_handle.set_label(label)    # Set label using last span's handle to avoid duplicates
         ax.legend()
     ax.grid(True)
     # Set labels
@@ -306,6 +340,12 @@ def main():
     difference = joined_vix - joined_realvol
     make_fillbetween(difference.index, joined_vix, joined_realvol, label='Difference', color='g', ax=axs[0])
     make_fillbetween(difference.index, difference, label='Difference', color='g', ax=axs[1])
+
+    # Vol Regimes
+    fig, ax = plt.subplots()
+    make_lineplot(vix.price(), 'VIX', ax=ax)
+    make_regime(vix.vol_regime()[2], 'High Vol Regime', 'r', 'Date', 'Index Level', 'VIX Vol Regimes', ax=ax)
+    make_regime(vix.vol_regime()[1], 'Low Vol Regime', 'g', 'Date', 'Index Level', 'VIX Vol Regimes', ax=ax)
 
     # Histograms
     [joined_jgbvix, joined_jb1_rv] = \
