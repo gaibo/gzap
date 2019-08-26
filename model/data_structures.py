@@ -241,7 +241,8 @@ class VolatilityIndex(Index):
         regime = joined_prices.copy()   # Copy joined_prices as template with dates
         curr_state = 'low'
         low_start = regime.index[0]
-        high_start = None   # Not needed to begin with
+        high_start = None   # Not needed to begin with since we start on "low"
+        final_day = regime.index[-1]
         low_intervals_list = []
         high_intervals_list = []
         for day in regime.index:
@@ -257,9 +258,9 @@ class VolatilityIndex(Index):
                 curr_state = 'low'      # Change state high to low
             regime[day] = curr_state    # Record state regardless of state change
         if curr_state == 'low':
-            low_intervals_list.append((low_start, day))     # Complete last interval
+            low_intervals_list.append((low_start, final_day))     # Complete last interval
         else:
-            high_intervals_list.append((high_start, day))
+            high_intervals_list.append((high_start, final_day))
         return regime, low_intervals_list, high_intervals_list
 
 
