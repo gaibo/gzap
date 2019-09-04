@@ -16,6 +16,8 @@ bbg_data = pd.read_csv('data/bbg_automated_pull.csv',
                        index_col=0, parse_dates=True, header=[0, 1])
 creditvix_data = pd.read_csv('data/creditvix_pc_bp_missing_4_months.csv',
                              index_col='Date', parse_dates=True)
+scaled_cds_index_data = pd.read_csv('data/scaled_cds_indexes.csv',
+                                    index_col='date', parse_dates=True)
 tyvix_bp_data = pd.read_csv('data/tyvix_bp.csv',
                             index_col='Trade Date', parse_dates=True)
 jgbvix_bp_data = pd.read_csv('data/jgbvix_bp.csv',
@@ -28,19 +30,19 @@ ty1 = Index(bbg_data['TY1 Comdty', 'PX_LAST'], 'TY1')
 tyvix = VolatilityIndex(bbg_data['TYVIX Index', 'PX_LAST'], ty1, 'TYVIX')
 ty1_yield = Index(bbg_data['TY1 Comdty', 'YLD_CNV_LAST'], 'TY1 Yield')
 tyvix_bp = VolatilityIndex(tyvix_bp_data['BP TYVIX'], ty1_yield, 'BP TYVIX')
-cdx_ig = Index(bbg_data['IBOXUMAE CBBT Curncy', 'PX_LAST'], 'CDX NA IG')
+cdx_ig = Index(scaled_cds_index_data['CDX NA IG'], 'CDX NA IG')
 vixig = VolatilityIndex(creditvix_data['VIXIG Percent'], cdx_ig, 'VIXIG')
 vixig_bp = VolatilityIndex(creditvix_data['VIXIG Basis Point'], cdx_ig, 'BP VIXIG')
-cdx_hy = Index(bbg_data['IBOXHYSE CBBT Curncy', 'PX_LAST'], 'CDX NA HY')
+cdx_hy = Index(bbg_data['IBOXHYSE CBBT Curncy', 'PX_LAST'], 'CDX NA HY')    # Not scaled; need historical spreads
 vixhy = VolatilityIndex(creditvix_data['VIXHY Percent'], cdx_hy, 'VIXHY')
 vixhy_bp = VolatilityIndex(creditvix_data['VIXHY Basis Point'], cdx_hy, 'BP VIXHY')
-itraxx_ie = Index(bbg_data['ITRXEBE CBBT Curncy', 'PX_LAST'], 'iTraxx EU Main')
+itraxx_ie = Index(scaled_cds_index_data['iTraxx EU Main'], 'iTraxx EU Main')
 vixie = VolatilityIndex(creditvix_data['VIXIE Percent'], itraxx_ie, 'VIXIE')
 vixie_bp = VolatilityIndex(creditvix_data['VIXIE Basis Point'], itraxx_ie, 'BP VIXIE')
-itraxx_xo = Index(bbg_data['ITRXEXE CBBT Curncy', 'PX_LAST'], 'iTraxx EU Xover')
+itraxx_xo = Index(scaled_cds_index_data['iTraxx EU Xover'], 'iTraxx EU Xover')
 vixxo = VolatilityIndex(creditvix_data['VIXXO Percent'], itraxx_xo, 'VIXXO')
 vixxo_bp = VolatilityIndex(creditvix_data['VIXXO Basis Point'], itraxx_xo, 'BP VIXXO')
-itraxx_fs = Index(bbg_data['ITRXESE CBBT Curncy', 'PX_LAST'], 'iTraxx EU SenFin')
+itraxx_fs = Index(scaled_cds_index_data['iTraxx EU SenFin'], 'iTraxx EU SenFin')
 vixfs = VolatilityIndex(creditvix_data['VIXFS Percent'], itraxx_fs, 'VIXFS')
 vixfs_bp = VolatilityIndex(creditvix_data['VIXFS Basis Point'], itraxx_fs, 'BP VIXFS')
 jb1 = Index(bbg_data['JB1 Comdty', 'PX_LAST'], 'JB1')

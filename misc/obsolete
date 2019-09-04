@@ -1,3 +1,10 @@
+cdx_ig = Index(bbg_data['IBOXUMAE CBBT Curncy', 'PX_LAST'], 'CDX NA IG')
+itraxx_ie = Index(bbg_data['ITRXEBE CBBT Curncy', 'PX_LAST'], 'iTraxx EU Main')
+itraxx_xo = Index(bbg_data['ITRXEXE CBBT Curncy', 'PX_LAST'], 'iTraxx EU Xover')
+itraxx_fs = Index(bbg_data['ITRXESE CBBT Curncy', 'PX_LAST'], 'iTraxx EU SenFin')
+
+scaled_cdx_ig = cdx_ig.loc[roll_dates_df['CDX IG'].iloc[-1]:]   # Start with just the current series
+
 srvix_undl_rv = (srvix.underlying.price().rolling(252).apply(
                      lambda p_252: (p_252.diff()**2).mean()**0.5 * 252**0.5, raw=False)) * 100
 srvix_undl_rv = srvix_undl_rv.shift(-252)
