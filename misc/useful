@@ -1,3 +1,53 @@
+##############################################################################
+
+cds_index_dict = {'CDX NA IG': bbg_data['IBOXUMAE CBBT Curncy', 'PX_LAST'].dropna(),
+                  'CDX NA HY': bbg_data['IBOXHYSE CBBT Curncy', 'PX_LAST'].dropna(),
+                  'iTraxx EU Main': bbg_data['ITRXEBE CBBT Curncy', 'PX_LAST'].dropna(),
+                  'iTraxx EU Xover': bbg_data['ITRXEXE CBBT Curncy', 'PX_LAST'].dropna(),
+                  'iTraxx EU SenFin': bbg_data['ITRXESE CBBT Curncy', 'PX_LAST'].dropna()}
+
+roll_dates_loc = 'P:/PrdDevSharedDB/BBG Pull Scripts/credit_roll_dates.csv'
+roll_vals_loc = 'P:/PrdDevSharedDB/BBG Pull Scripts/credit_roll_prev_vals.csv'
+roll_dates_df = pd.read_csv(roll_dates_loc, index_col='Unnamed: 0')
+roll_vals_df = pd.read_csv(roll_vals_loc, index_col='Unnamed: 0')
+
+names_list = ['CDX NA IG', 'CDX NA HY', 'iTraxx EU Main', 'iTraxx EU Xover', 'iTraxx EU SenFin']
+
+scaled_cds_index_dict = {}
+for name in names_list:
+    cds_index = cds_index_dict[name]
+    roll_dates_ser = roll_dates_df[name].dropna()   # Make sure no NaNs are involved
+    current_roll_date = roll_dates_ser.iloc[-1]
+    scaled_cds_index = cds_index.loc[current_roll_date:]  # Start with just the current series
+    roll_vals_ser = roll_vals_df[name].dropna()
+    series_countdown = roll_vals_ser.index[::-1]   # Start with recent series and go backwards
+    for series in series_countdown:
+        # If series is 32, then we scale 31 to 32's magnitude
+        roll_date = roll_dates_ser.loc[series]
+        prev_roll_date = roll_dates_ser.loc[series-1]
+        try:
+            new_val = scaled_cds_index.loc[roll_date]   # Get newly scaled roll date value
+        except KeyError:
+            continue
+        old_val = roll_vals_ser.loc[series]
+        new_old_ratio = new_val / old_val
+        last_series = cds_index.loc[prev_roll_date:roll_date].iloc[:-1]     # Exclude day of roll
+        scaled_last_series = last_series * new_old_ratio
+        scaled_cds_index = pd.concat([scaled_last_series, scaled_cds_index])
+    scaled_cds_index_dict[name] = scaled_cds_index
+
+cds_index_df = pd.DataFrame.from_dict(cds_index_dict)
+scaled_cds_index_df = pd.DataFrame.from_dict(scaled_cds_index_dict)
+
+cds_index_df.plot()
+scaled_cds_index_df.plot()
+
+no_cdx_na_hy = scaled_cds_index_df.drop('CDX NA HY', axis=1)
+no_cdx_na_hy.plot(color=['C0','C2','C3','C4'])
+no_cdx_na_hy.to_csv('scaled_cds_indexes.csv')
+
+##############################################################################
+
 pd.set_option('display.max_rows', 30)
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 1000)
