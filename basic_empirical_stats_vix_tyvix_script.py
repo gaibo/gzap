@@ -2,28 +2,26 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from model.data_structures import ETF, Futures, Index, VolatilityIndex
+from model.data_structures import ETF, Index, VolatilityIndex
 from utility.universal_tools import share_dateindex
 from utility.mpl_graph_tools import make_lineplot, make_histogram, make_fillbetween
 
 # Load raw data
-spx_data = pd.read_csv('data/spxt.csv', index_col='Date', parse_dates=True)
-vix_data = pd.read_csv('data/vix_ohlc.csv', index_col='Date', parse_dates=True)
-ty1_futures_data = pd.read_csv('data/ty1.csv', index_col='Date', parse_dates=True)
-tyvix_data = pd.read_csv('data/tyvix_ohlc.csv', index_col='Date', parse_dates=True)
-tyvix_bp_data = pd.read_csv('data/tyvix_bp.csv', index_col='Trade Date', parse_dates=True)
-ief_data = pd.read_csv('data/bbg_ief.csv', index_col='Date', parse_dates=True)
+bbg_data = pd.read_csv('data/bbg_automated_pull.csv',
+                       index_col=0, parse_dates=True, header=[0, 1])
+tyvix_bp_data = pd.read_csv('data/tyvix_bp.csv',
+                            index_col='Trade Date', parse_dates=True)
 three_month_t_bill = pd.read_csv('data/three_month_t_bill.csv', index_col='Date', parse_dates=True)
 
 # Create data structures
-spx = Index(spx_data['PX_LAST'], 'SPX')
-vix = VolatilityIndex(vix_data['VIX Close'], spx, 'VIX',
-                      vix_data.drop('VIX Close', axis=1))
-ty1 = Futures(ty1_futures_data['PX_LAST'], None, 'TY1')
-tyvix = VolatilityIndex(tyvix_data['Close'], ty1, 'TYVIX',
-                        tyvix_data.drop('Close', axis=1).drop(pd.to_datetime('2015-12-11')))    # Weird High on date
-tyvix_bp = VolatilityIndex(tyvix_bp_data['BP TYVIX'], ty1, 'TYVIX BP')
-ief = ETF(ief_data['TOT_RETURN_INDEX_GROSS_DVDS'], 'IEF')
+spx = Index(bbg_data['SPX Index', 'PX_LAST'], 'SPX')
+vix = VolatilityIndex(bbg_data['VIX Index', 'PX_LAST'], spx, 'VIX')
+ty1 = Index(bbg_data['TY1 Comdty', 'PX_LAST'], 'TY1')
+tyvix = VolatilityIndex(bbg_data['TYVIX Index', 'PX_LAST'], ty1, 'TYVIX')
+ty1_yield = Index(bbg_data['TY1 Comdty', 'YLD_CNV_LAST'], 'TY1 Yield')
+tyvix_bp = VolatilityIndex(tyvix_bp_data['BP TYVIX'], ty1_yield, 'BP TYVIX')
+spx_tr = Index(bbg_data['SPX Index', 'TOT_RETURN_INDEX_GROSS_DVDS'], 'SPX')
+ief_tr = ETF(bbg_data['IEF Equity', 'TOT_RETURN_INDEX_GROSS_DVDS'], 'IEF')
 risk_free_rate = three_month_t_bill['DTB3'].replace('.', np.NaN).dropna().astype(float) / 100
 
 # Design colors
@@ -32,7 +30,7 @@ color_dict = {'vix': 'C0', 'vix_alt': 'C1', 'tyvix': 'C2', 'tyvix_alt': 'C4', 'i
 ################################################################################
 
 # Line plot comparing cumulative returns of SPX to IEF
-[truncd_spx, truncd_ief] = share_dateindex([spx.price(), ief.price()])
+[truncd_spx, truncd_ief] = share_dateindex([spx_tr.price(), ief_tr.price()])
 make_lineplot([truncd_spx/truncd_spx[0], truncd_ief/truncd_ief[0]],
               ['SPX cumulative return', 'IEF cumulative return'],
               [color_dict['vix'], color_dict['ief']])
@@ -42,7 +40,7 @@ make_lineplot([truncd_spx/truncd_spx[0], truncd_ief/truncd_ief[0]],
 # Sharpe ratios of SPX and IEF
 daily_risk_free_rate = np.exp(risk_free_rate*1/252) - 1
 [truncd_spx_ret, truncd_ief_ret, truncd_rfr] = \
-    share_dateindex([spx.price_return(), ief.price_return(), daily_risk_free_rate])
+    share_dateindex([spx_tr.price_return(), ief_tr.price_return(), daily_risk_free_rate])
 spx_excess_ret = truncd_spx_ret - truncd_rfr
 ief_excess_ret = truncd_ief_ret - truncd_rfr
 spx_sharpe = spx_excess_ret.mean() / spx_excess_ret.std() * np.sqrt(252)

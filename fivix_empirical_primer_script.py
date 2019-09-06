@@ -60,6 +60,8 @@ ihyg_tr = ETF(bbg_data['IHYG EU Equity', 'TOT_RETURN_INDEX_GROSS_DVDS'], 'IHYG')
 ief_tr = ETF(bbg_data['IEF Equity', 'TOT_RETURN_INDEX_GROSS_DVDS'], 'IEF')
 lqd_tr = ETF(bbg_data['LQD Equity', 'TOT_RETURN_INDEX_GROSS_DVDS'], 'LQD')
 
+##############################################################################
+
 # FI VIX Empirical Primer Document Reproduction
 
 # [Figure 1] S&P500 Index and AGG Total Return

@@ -1,3 +1,27 @@
+tuvix = pd.read_csv('data/tuvix_cme.csv', index_col='Date', parse_dates=True)
+fvvix = pd.read_csv('data/fvvix_cme.csv', index_col='Date', parse_dates=True)
+tyvix_cme = pd.read_csv('data/tyvix_cme.csv', index_col='Date', parse_dates=True)
+usvix = pd.read_csv('data/usvix_cme.csv', index_col='Date', parse_dates=True)
+
+ten_two_list_low = get_regime_data_list(tyvix_lows, test['10YR - 2YR Yield'])
+combined_ten_two_low = combine_data_list(map(lambda df: df.pct_change(), ten_two_list_low))
+ten_two_list_high = get_regime_data_list(tyvix_highs, test['10YR - 2YR Yield'])
+combined_ten_two_high = combine_data_list(map(lambda df: df.pct_change(), ten_two_list_high))
+
+# regime_10_2 = pd.DataFrame({'regime': tyvix_hl, '10-2': test['10YR - 2YR Yield']}).dropna()
+# # Lows
+# low_acc = pd.Series()
+# for interval in tyvix_lows:
+#     changes = regime_10_2['10-2'].loc[interval[0]:interval[1]].diff().dropna()
+#     low_acc = low_acc.append(changes)
+# low_acc.mean()
+# # Highs
+# high_acc = pd.Series()
+# for interval in tyvix_highs:
+#     changes = regime_10_2['10-2'].loc[interval[0]:interval[1]].diff().dropna()
+#     high_acc = high_acc.append(changes)
+# high_acc.mean()
+
 cdx_ig = Index(bbg_data['IBOXUMAE CBBT Curncy', 'PX_LAST'], 'CDX NA IG')
 itraxx_ie = Index(bbg_data['ITRXEBE CBBT Curncy', 'PX_LAST'], 'iTraxx EU Main')
 itraxx_xo = Index(bbg_data['ITRXEXE CBBT Curncy', 'PX_LAST'], 'iTraxx EU Xover')
