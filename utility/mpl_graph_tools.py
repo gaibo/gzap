@@ -346,6 +346,7 @@ def main():
     make_lineplot(vix.price(), 'VIX', ax=ax)
     make_regime(vix.vol_regime()[2], 'High Vol Regime', 'r', 'Date', 'Index Level', 'VIX Vol Regimes', ax=ax)
     make_regime(vix.vol_regime()[1], 'Low Vol Regime', 'g', 'Date', 'Index Level', 'VIX Vol Regimes', ax=ax)
+    ax.autoscale(enable=True, axis='x', tight=True)
 
     # Histograms
     [joined_jgbvix, joined_jb1_rv] = \

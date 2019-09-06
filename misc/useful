@@ -1,3 +1,5 @@
+ax.autoscale(enable=True, axis='x', tight=True)
+
 ##############################################################################
 
 cds_index_dict = {'CDX NA IG': bbg_data['IBOXUMAE CBBT Curncy', 'PX_LAST'].dropna(),

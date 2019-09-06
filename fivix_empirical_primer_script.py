@@ -62,26 +62,26 @@ lqd_tr = ETF(bbg_data['LQD Equity', 'TOT_RETURN_INDEX_GROSS_DVDS'], 'LQD')
 
 # FI VIX Empirical Primer Document Reproduction
 
-# S&P500 Index and AGG Total Return
+# [Figure 1] S&P500 Index and AGG Total Return
 [truncd_spx, truncd_agg] = share_dateindex([spx_tr.price(), agg_tr.price()])
 make_lineplot([truncd_spx/truncd_spx[0], truncd_agg/truncd_agg[0]],
               ['SPX total return', 'AGG total return'],
               ylabel='Normalized Level', title='S&P500 Index and AGG Total Return')
 
-# North American Credit VIXs with VIX Index
+# [Figure 2] North American Credit VIXs with VIX Index
 [truncd_vix, truncd_vixig, truncd_vixhy] = share_dateindex([vix.price(), vixig.price(), vixhy.price()])
 make_lineplot([truncd_vix, truncd_vixig, truncd_vixhy],
               ['S&P500 VIX', 'VIXIG', 'VIXHY'],
               ylabel='Volatility Index', title='North American Credit VIXs with VIX Index')
 
-# European Credit VIXs with VIX Index
+# [Figure 3] European Credit VIXs with VIX Index
 [truncd_vix, truncd_vixie, truncd_vixxo, truncd_vixfs] = \
     share_dateindex([vix.price(), vixie.price(), vixxo.price(), vixfs.price()])
 make_lineplot([truncd_vix, truncd_vixie, truncd_vixxo, truncd_vixfs],
               ['S&P500 VIX', 'VIXIE', 'VIXXO', 'VIXFS'],
               ylabel='Volatility Index', title='European Credit VIXs with VIX Index')
 
-# VIXs in Rates Group with VIX Index
+# [Figure 4] VIXs in Rates Group with VIX Index
 start_date = tyvix.price().index[0]
 [truncd_vix, truncd_tyvix, truncd_jgbvix, truncd_srvix] = \
     map(lambda p: p.truncate(start_date), [vix.price(), tyvix.price(), jgbvix.price(), srvix.price()])
@@ -98,7 +98,7 @@ axright.legend(loc=1)
 axright.set_ylabel('Volatility Index (SRVIX) (bps)')
 axright.set_ylim(20, 115)
 
-# Volatility of Volatility Table for Percent and Basis Point Vol Indexes
+# [Table] Volatility of Volatility Table for Percent and Basis Point Vol Indexes
 pct_vol_of_vol_list = [vix, tyvix, jgbvix, srvix, vixig, vixhy, vixie, vixxo, vixfs]
 pct_vol_of_vol_names = [v.name for v in pct_vol_of_vol_list]
 aligned_pct_list = share_dateindex([v.price_return(False) for v in pct_vol_of_vol_list])
@@ -118,39 +118,39 @@ bps_vol_of_vol_df = \
     .set_index('Vol Index').sort_values('bps Vol of bps Vol', ascending=False)
 bps_vol_of_vol_df.to_csv('Volatility of Volatility Table for Basis Point Indexes.csv')
 
-# Basic Statistics Table for Credit VIX Indexes
+# [Table] Basic Statistics Table for Credit VIX Indexes
 make_basicstatstable([vix, vixig, vixhy, vixie, vixxo, vixfs]) \
     .to_csv('Basic Statistics for Credit VIX.csv')
 
-# Basic Statistics Table for Basis Point Credit VIX Indexes
+# [Table] Basic Statistics Table for Basis Point Credit VIX Indexes
 make_basicstatstable([vix, vixig_bp, vixhy_bp, vixie_bp, vixxo_bp, vixfs_bp]) \
     .to_csv('Basic Statistics for Basis Point Credit VIX.csv')
 
-# Basic Statistics Table for Interest Rate VIX Indexes
+# [Table] Basic Statistics Table for Interest Rate VIX Indexes
 make_basicstatstable([vix, tyvix, jgbvix, srvix, tyvix_bp, jgbvix_bp]) \
     .to_csv('Basic Statistics for Interest Rate VIX.csv')
 
-# Basis Point Version of Credit Group
+# [Figure 5] Basis Point Version of Credit Group
 make_lineplot([vixig_bp.price(), vixhy_bp.price(), vixie_bp.price(), vixxo_bp.price(), vixfs_bp.price()],
               ['BP VIXIG', 'BP VIXHY', 'BP VIXIE', 'BP VIXXO', 'BP VIXFS'],
               ylabel='Volatility Index (bps)', title='Basis Point Version of Credit Group')
 
-# Basis Point Version of Rates Group
+# [Figure 6] Basis Point Version of Rates Group
 make_lineplot([tyvix_bp.price(), jgbvix_bp.price(), srvix.price()],
               ['BP TYVIX', 'BP JGB VIX', 'SRVIX'],
               ylabel='Volatility Index (bps)', title='Basis Point Version of Rates Group')
 
-# VIXIG Daily % Change vs. CDX NAIG Index Daily bps Change
+# [Figure 7] VIXIG Daily % Change vs. CDX NAIG Index Daily bps Change
 make_scatterplot(vixig.price_return(False)*100, cdx_ig.price().diff(),
                  xlabel='% Change', ylabel='bps Change',
                  title='VIXIG Daily % Change vs. CDX NAIG Index Daily bps Change')
 
-# SRVIX Daily Change vs. LQD Daily Change
+# [Figure 8] SRVIX Daily Change vs. LQD Daily Change
 make_scatterplot(srvix.price_return(False)*100, lqd_tr.price_return(False)*100,
                  xlabel='% Change', ylabel='% Change',
                  title='SRVIX Daily % Change vs. LQD Daily % Change')
 
-# Credit VIX Change per 10% Change in Implied Vol Index Table
+# [Table] Credit VIX Change per 10% Change in Implied Vol Index Table
 _, vixig_slope, _ = \
     get_best_fit(vixig.price_return(False)*100, vixig.underlying.price().diff(), fit_intercept=False)
 _, vixhy_slope, _ = \
@@ -182,7 +182,7 @@ creditvix_change_table = \
     .set_index('Credit VIX Index')
 creditvix_change_table.to_csv('Change Table for Credit VIX.csv')
 
-# Interest Rate VIX Change per 10% Change in Implied Vol Index Table
+# [Table] Interest Rate VIX Change per 10% Change in Implied Vol Index Table
 _, tyvix_slope, _ = \
     get_best_fit(tyvix.price_return(False)*100, tyvix.underlying.price_return(False)*100, fit_intercept=False)
 _, jgbvix_slope, _ = \
@@ -204,7 +204,7 @@ irvix_change_table = \
     .set_index('Interest Rate VIX Index')
 irvix_change_table.to_csv('Change Table for Interest Rate VIX.csv')
 
-# Various Assets Change per 10% Change in Implied Vol Index Table
+# [Table] Various Assets Change per 10% Change in Implied Vol Index Table
 _, slope_1, _ = \
     get_best_fit(vixig_bp.price_return(False), lqd_tr.price_return(False), fit_intercept=False)
 _, slope_2, _ = \
@@ -227,7 +227,7 @@ various_change_table = \
     .set_index('Various Vol Index - Asset Pairs')
 various_change_table.to_csv('Change Table for Various Vol Index - Asset Pairs.csv')
 
-# Four Scatter Plots
+# [Figure 9] Four Scatter Plots
 _, axs = plt.subplots(2, 2)
 make_scatterplot(vixhy_bp.price_return(False)*100, hyg_tr.price_return(False)*100,
                  xlabel='% Change', ylabel='% Change',
@@ -246,7 +246,7 @@ make_scatterplot(srvix.price_return(False)*100, ief_tr.price_return(False)*100,
                  title='SRVIX Daily % Change vs. IEF Daily % Change',
                  ax=axs[1, 1])
 
-# Credit VIX Difference Charts
+# [Figure 10, 11, 12, 13, 14] Credit VIX Difference Charts
 _, axs = plt.subplots(2, 1, sharex='all')
 [joined_index, joined_undl_rv] = \
     share_dateindex([vixig.price(), 100*vixig.undl_realized_vol(do_shift=True)])
@@ -307,7 +307,7 @@ difference = joined_index - joined_undl_rv
 make_fillbetween(difference.index, difference, label='Difference', color='mediumseagreen', ax=axs[1])
 make_lineplot([difference], color_list=['g'], ax=axs[1])
 
-# Credit VIX Risk Premium Distribution
+# [Figure 15] Credit VIX Risk Premium Distribution
 [joined_index, joined_undl_rv] = \
     share_dateindex([vix.price(), 100*vix.undl_realized_vol(do_shift=True)])
 vix_diff = joined_index - joined_undl_rv
@@ -351,7 +351,7 @@ make_histogram(vixfs_diff, hist=False,
                title='Risk Premium Distribution',
                color_line='C5', ax=ax_prem)
 
-# Credit VIX Risk Premium Tails Table
+# [Table] Credit VIX Risk Premium Tails Table
 names_list = ['VIX', 'VIXIG', 'VIXHY', 'VIXIE', 'VIXXO', 'VIXFS']
 diff_list = [vix_diff, vixig_diff, vixhy_diff, vixie_diff, vixxo_diff, vixfs_diff]
 one_percent_mean = list(map(lambda d: d[d.rank(pct=True) < 0.01].mean(), diff_list))
@@ -364,7 +364,7 @@ creditvix_risk_prem_lefttail_table = \
                   'Mean of 10% Left Tail': ten_percent_mean}).set_index('Vol Index')
 creditvix_risk_prem_lefttail_table.to_csv('Risk Premium Left Tail Table for Credit VIX.csv')
 
-# Interest Rate VIX Difference Charts
+# [Figure 16, 17, 18, 19] Interest Rate VIX Difference Charts
 _, axs = plt.subplots(2, 1, sharex='all')
 [joined_index, joined_undl_rv] = \
     share_dateindex([tyvix.price(), 100*tyvix.undl_realized_vol(do_shift=True)])
@@ -413,7 +413,7 @@ difference = joined_index - joined_undl_rv
 make_fillbetween(difference.index, difference, label='Difference', color='mediumseagreen', ax=axs[1])
 make_lineplot([difference], color_list=['g'], ax=axs[1])
 
-# Interest Rate VIX Risk Premium Distribution
+# [Figure 20] Interest Rate VIX Risk Premium Distribution
 [joined_index, joined_undl_rv] = \
     share_dateindex([vix.price(), 100*vix.undl_realized_vol(do_shift=True)])
 vix_diff = joined_index - joined_undl_rv
@@ -444,7 +444,7 @@ make_histogram(joined_index - joined_undl_rv, hist=False,
                title='Risk Premium Distribution',
                color_line='C3', ax=ax_prem)
 
-# Interest Rate VIX Risk Premium Tails Table
+# [Table] Interest Rate VIX Risk Premium Tails Table
 names_list = ['VIX', 'TYVIX', 'JGB VIX', 'SRVIX']
 diff_list = [vix_diff, tyvix_diff, jgbvix_diff, srvix_diff]
 # one_percent = list(map(lambda d: d.quantile(0.01), diff_list))
@@ -460,23 +460,23 @@ irvix_risk_prem_lefttail_table = \
                   'Mean of 10% Left Tail': ten_percent_mean}).set_index('Vol Index')
 irvix_risk_prem_lefttail_table.to_csv('Risk Premium Left Tail Table for Interest Rate VIX.csv')
 
-# Credit VIX Scatter Matrix
+# [Figure 21] Credit VIX Scatter Matrix
 instr_list = [vix, vstoxx, vixig, vixhy, vixie, vixxo, vixfs]
 data_list = list(map(lambda instr: instr.price_return(), instr_list))
 color_list = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']
 label_list = list(map(lambda instr: instr.name, instr_list))
 make_scatter_matrix(data_list, color_list, label_list=label_list, title='Credit VIX Scatter Matrix')
 
-# Credit VIX Correlation Matrix
+# [Figure 22] Credit VIX Correlation Matrix
 make_correlation_matrix(data_list, color_list, label_list=label_list, title='Credit VIX Correlation Matrix')
 
-# Interest Rate VIX Scatter Matrix
+# [Figure 23] Interest Rate VIX Scatter Matrix
 instr_list = [vix, tyvix, jgbvix, srvix]
 data_list = list(map(lambda instr: instr.price_return(), instr_list))
 color_list = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']
 label_list = list(map(lambda instr: instr.name, instr_list))
 make_scatter_matrix(data_list, color_list, label_list=label_list, title='Interest Rate VIX Scatter Matrix')
 
-# Interest Rate VIX Correlation Matrix
+# [Figure 24] Interest Rate VIX Correlation Matrix
 make_correlation_matrix(data_list, color_list, label_list=label_list,
                         title='Interest Rate VIX Correlation Matrix')
