@@ -206,24 +206,32 @@ def make_scatter_matrix(data_list, color_list, label_list=None, title=None):
                 make_scatterplot(data_x, data_y, ax=axs[row, col],
                                  color=color_dict[frozenset({label_list[x_pos], label_list[y_pos]})],
                                  xlabel=xlabel, ylabel=ylabel)
+                if xlabel:
+                    axs[row, col].set_xlabel(xlabel, fontsize=16)
+                if ylabel:
+                    axs[row, col].set_ylabel(ylabel, fontsize=16)
             elif y_pos > x_pos:
                 # Top triangle - text of best fit line slope and R^2
                 # NOTE: reverse x-y to match scatter slope
                 r_sq, slope, _ = get_best_fit(data_y, data_x, fit_intercept=False)
                 text_str = "$Slope$: {}\n$R^2$: {}".format(round(slope, 2), round(r_sq, 2))
-                axs[row, col].text(0.3, 0.4, text_str, fontsize=12,
+                axs[row, col].text(0.2, 0.35, text_str, fontsize=22,
                                    color=color_dict[frozenset({label_list[x_pos], label_list[y_pos]})])
                 axs[row, col].xaxis.set_ticks([])
                 axs[row, col].yaxis.set_ticks([])
                 if xlabel:
-                    axs[row, col].set_xlabel(xlabel)
+                    axs[row, col].set_xlabel(xlabel, fontsize=16)
                 if ylabel:
-                    axs[row, col].set_ylabel(ylabel)
+                    axs[row, col].set_ylabel(ylabel, fontsize=16)
             else:
                 # Diagonal - distribution
                 make_histogram(data_x, hist=True, n_bins=100, line=False,
                                ax=axs[row, col], xlabel=xlabel, ylabel=ylabel)
-    fig.suptitle(title)
+                if xlabel:
+                    axs[row, col].set_xlabel(xlabel, fontsize=16)
+                if ylabel:
+                    axs[row, col].set_ylabel(ylabel, fontsize=16)
+    fig.suptitle(title, fontsize=16)
     return fig, axs
 
 
