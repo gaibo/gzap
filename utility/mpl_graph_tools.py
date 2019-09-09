@@ -215,7 +215,7 @@ def make_scatter_matrix(data_list, color_list, label_list=None, title=None):
                 # NOTE: reverse x-y to match scatter slope
                 r_sq, slope, _ = get_best_fit(data_y, data_x, fit_intercept=False)
                 text_str = "$Slope$: {}\n$R^2$: {}".format(round(slope, 2), round(r_sq, 2))
-                axs[row, col].text(0.2, 0.35, text_str, fontsize=22,
+                axs[row, col].text(0.15, 0.25, text_str, fontsize=17,
                                    color=color_dict[frozenset({label_list[x_pos], label_list[y_pos]})])
                 axs[row, col].xaxis.set_ticks([])
                 axs[row, col].yaxis.set_ticks([])
