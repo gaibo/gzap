@@ -1,3 +1,6 @@
+creditvix_data = pd.read_csv('data/creditvix_pc_bp_missing_4_months.csv',
+                             index_col='Date', parse_dates=True)
+
 tuvix = pd.read_csv('data/tuvix_cme.csv', index_col='Date', parse_dates=True)
 fvvix = pd.read_csv('data/fvvix_cme.csv', index_col='Date', parse_dates=True)
 tyvix_cme = pd.read_csv('data/tyvix_cme.csv', index_col='Date', parse_dates=True)
