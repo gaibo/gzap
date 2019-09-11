@@ -84,20 +84,29 @@ class Instrument(object):
         else:
             return prices.pct_change().iloc[1:]
 
-    def realized_vol(self, do_shift=False, window=BUS_DAYS_IN_MONTH, bps=False):
+    def realized_vol(self, do_shift=False, window=BUS_DAYS_IN_MONTH, bps=False, price_in_bps=False):
         """ Calculate annualized realized vol from past month
         :param do_shift: set True to shift data back one month, to compare to implied vol
         :param window: rolling window, also used as days to shift
-        :param bps: set to True if time-series is annual percent yields (as opposed to prices)
+        :param bps: set True to calculate basis point return vol instead of percent return vol
+                    (e.g. if calculating on time-series of annual percent yields, as opposed to prices)
+                    NOTE: by default, this mode assumes price time-series holds percent yields
+        :param price_in_bps: set True when bps=True and price time-series is in basis point (spreads)
+                             instead of percent (yields) (e.g. if calculating on time-series of
+                             spreads over Treasury rates, as opposed to the rates themselves)
         :return: pd.Series with 'time' and 'value', with ~20 NaNs at beginning
         """
         if not bps:
             result = np.sqrt(self.price_return().rolling(window).var(ddof=0)
                              * BUS_DAYS_IN_YEAR)
         else:
+            if price_in_bps:
+                to_bps_multiplier = 1
+            else:
+                to_bps_multiplier = 100
             result = (self.price().rolling(window).apply(
                           lambda yields: (np.mean(np.diff(yields)**2) * BUS_DAYS_IN_YEAR)**0.5,
-                          raw=True)) * 100
+                          raw=True)) * to_bps_multiplier
         if do_shift:
             return result.shift(-window)
         else:
