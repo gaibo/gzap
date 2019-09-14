@@ -1,3 +1,22 @@
+# # TYVIX Vol Regimes
+# test = pd.read_csv('Y:/Research/Research1/Gaibo/S&P Webinar Figures/3 - predictive signaling raw data.csv', index_col='Date', parse_dates=True)
+# _, axleft = plt.subplots()
+# make_lineplot(tyvix.price(), 'TYVIX', ax=axleft)
+# make_regime(tyvix.vol_regime()[2], 'High Vol Regime', 'grey', 'Date', 'Index Level', 'TYVIX Vol Regimes', ax=axleft)
+# make_regime(tyvix.vol_regime()[1], 'Low Vol Regime', 'white', 'Date', 'Index Level', 'TYVIX Vol Regimes', ax=axleft)
+# # axleft.autoscale(enable=True, axis='x', tight=True)
+# axleft.legend(loc=2, fontsize=13)
+# axleft.set_ylabel('Volatility Index (%)', fontsize=16)
+# axright = axleft.twinx()
+# axright.plot(test['10YR - 2YR Yield'], label='10yr - 2yr Yield', color='C1')
+# axright.legend(loc=1, fontsize=13)
+# axright.set_ylabel('% (Annualized)', fontsize=16)
+# axright.set_xlim('2016-01-01', '2019-09-03')
+# # axleft.autoscale(enable=True, axis='x', tight=True)
+# # axright.set_ylim(20, 115)
+# axleft.set_title('TYVIX Vol Regimes', fontsize=16)
+# axleft.set_xlabel('Date', fontsize=16)
+
 creditvix_data = pd.read_csv('data/creditvix_pc_bp_missing_4_months.csv',
                              index_col='Date', parse_dates=True)
 

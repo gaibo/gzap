@@ -303,25 +303,46 @@ ten_two_list_high = get_regime_data_list(tyvix_highs, tenyr)
 combined_ten_two_high = combine_data_list(map(lambda df: df.diff(), ten_two_list_high))
 ttest_ind(combined_ten_two_low.loc['2014':], combined_ten_two_high.loc['2014':])
 
-####
+#### TYVIX regimes stats attempt
 
-test = pd.read_csv('Y:/Research/Research1/Gaibo/S&P Webinar Figures/3 - predictive signaling raw data.csv', index_col='Date', parse_dates=True)
+from scipy.stats import ttest_ind
+
+# Recession-predictors
+ten_minus_two = pd.read_csv('Y:/Research/Research1/Gaibo/S&P Webinar Figures/T10Y2Y.csv', index_col='DATE', parse_dates=True)['T10Y2Y'].dropna()
+ten_minus_threemonth = pd.read_csv('Y:/Research/Research1/Gaibo/S&P Webinar Figures/T10Y3M.csv', index_col='DATE', parse_dates=True)['T10Y3M'].dropna()
+
+# t-tests on in-regime daily differences
+tyvix_hl, tyvix_lows, tyvix_highs = tyvix.vol_regime()
+high_days = tyvix_hl[tyvix_hl == 'high'].index
+low_days = tyvix_hl[tyvix_hl == 'low'].index
+diffs_high_10_2 = ten_minus_two.diff().loc[high_days].dropna()
+diffs_low_10_2 = ten_minus_two.diff().loc[low_days].dropna()
+diffs_high_10_3m = ten_minus_threemonth.diff().loc[high_days].dropna()
+diffs_low_10_3m = ten_minus_threemonth.diff().loc[low_days].dropna()
+ttest_ind(diffs_high_10_2.loc['2018':], diffs_low_10_2.loc['2018':])
+ttest_ind(diffs_high_10_3m.loc['2018':], diffs_low_10_3m.loc['2018':])
+
+# Plot
+# TYVIX with regimes
 _, axleft = plt.subplots()
 make_lineplot(tyvix.price(), 'TYVIX', ax=axleft)
 make_regime(tyvix.vol_regime()[2], 'High Vol Regime', 'grey', 'Date', 'Index Level', 'TYVIX Vol Regimes', ax=axleft)
 make_regime(tyvix.vol_regime()[1], 'Low Vol Regime', 'white', 'Date', 'Index Level', 'TYVIX Vol Regimes', ax=axleft)
-# axleft.autoscale(enable=True, axis='x', tight=True)
-axleft.legend(loc=2, fontsize=13)
-axleft.set_ylabel('Volatility Index (%)', fontsize=16)
-axright = axleft.twinx()
-axright.plot(test['10YR - 2YR Yield'], label='10yr - 2yr Yield', color='C1')
-axright.legend(loc=1, fontsize=13)
-axright.set_ylabel('% (Annualized)', fontsize=16)
-axright.set_xlim('2016-01-01', '2019-09-03')
-# axleft.autoscale(enable=True, axis='x', tight=True)
-# axright.set_ylim(20, 115)
-axleft.set_title('TYVIX Vol Regimes', fontsize=16)
 axleft.set_xlabel('Date', fontsize=16)
+axleft.set_ylabel('Volatility Index (%)', fontsize=16)
+axleft.set_title('TYVIX Vol Regimes', fontsize=16)
+# 10-2 and 10-3m
+axright = axleft.twinx()
+axright.plot(ten_minus_two, label='10yr - 2yr Yield', color='C1')
+axright.plot(ten_minus_threemonth, label='10yr - 3month Yield', color='C2')
+axright.set_ylabel('% (Annualized)', fontsize=16)
+# Adjustments (zoom, framing, etc.)
+axleft.set_xlim('2018-01-01', '2019-09-03')
+axleft.set_ylim(3, 6.5)
+axright.set_ylim(-0.75, 1.5)
+axright.axhline(0, color='k', linestyle='--', label='Yield Curve Inversion')
+axleft.legend(loc=2, fontsize=13)
+axright.legend(loc=1, fontsize=13)
 
 ####
 
