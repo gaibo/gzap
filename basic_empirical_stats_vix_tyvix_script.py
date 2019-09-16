@@ -1,27 +1,15 @@
+from load_data_script import *
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from model.data_structures import ETF, Index, VolatilityIndex
 from utility.universal_tools import share_dateindex
 from utility.mpl_graph_tools import make_lineplot, make_histogram, make_fillbetween
 
-# Load raw data
-bbg_data = pd.read_csv('data/bbg_automated_pull.csv',
-                       index_col=0, parse_dates=True, header=[0, 1])
-tyvix_bp_data = pd.read_csv('data/tyvix_bp.csv',
-                            index_col='Trade Date', parse_dates=True)
-three_month_t_bill = pd.read_csv('data/three_month_t_bill.csv', index_col='Date', parse_dates=True)
 
-# Create data structures
-spx = Index(bbg_data['SPX Index', 'PX_LAST'], 'SPX')
-vix = VolatilityIndex(bbg_data['VIX Index', 'PX_LAST'], spx, 'VIX')
-ty1 = Index(bbg_data['TY1 Comdty', 'PX_LAST'], 'TY1')
-tyvix = VolatilityIndex(bbg_data['TYVIX Index', 'PX_LAST'], ty1, 'TYVIX')
-ty1_yield = Index(bbg_data['TY1 Comdty', 'YLD_CNV_LAST'], 'TY1 Yield')
-tyvix_bp = VolatilityIndex(tyvix_bp_data['BP TYVIX'], ty1_yield, 'BP TYVIX')
-spx_tr = Index(bbg_data['SPX Index', 'TOT_RETURN_INDEX_GROSS_DVDS'], 'SPX')
-ief_tr = ETF(bbg_data['IEF Equity', 'TOT_RETURN_INDEX_GROSS_DVDS'], 'IEF')
+# Load risk-free rate
+three_month_t_bill = pd.read_csv('data/three_month_t_bill.csv', index_col='Date', parse_dates=True)
 risk_free_rate = three_month_t_bill['DTB3'].replace('.', np.NaN).dropna().astype(float) / 100
 
 # Design colors
