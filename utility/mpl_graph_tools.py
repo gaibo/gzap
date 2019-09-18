@@ -3,11 +3,26 @@ import matplotlib.pyplot as plt
 from itertools import zip_longest, combinations
 import seaborn as sns
 from pandas.plotting import register_matplotlib_converters
+import os
 
 from model.data_structures import ETF, Index, VolatilityIndex
 from utility.universal_tools import share_dateindex, get_best_fit
 
 register_matplotlib_converters()
+BIG_FIGSIZE = (19.2, 10.8)
+
+
+# Export the specified figure to specified directory
+def save_fig(figure, save_name, save_dir='.'):
+    if save_dir == '' or save_dir[-1] != '/':
+        save_dir += '/'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        print('Made directory {}'.format(save_dir))
+    # Write figure
+    save_loc = save_dir + save_name
+    figure.savefig(save_loc, bbox_inches='tight')
+    print('Wrote {}'.format(save_loc))
 
 
 def make_basicstatstable(instr_list):
