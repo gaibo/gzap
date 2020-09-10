@@ -8,37 +8,65 @@ ONE_DAY = pd.Timedelta(days=1)
 ONE_NANOSECOND = pd.Timedelta(nanoseconds=1)
 
 
-def construct_timeseries(ts_df, time_col=None, value_col=None):
-    """ Construct pseudo-time-series object, i.e. a pandas Series with 'time' and 'value'
-    :param ts_df: DataFrame or Series object with at least a time column and a value column
-    :param time_col: DataFrame column that represents time
-    :param value_col: DataFrame column that represents value
-    :return: pd.Series object with 'time' as index and 'value' as name
+def construct_timeseries(ts_data, time_col=None, value_col=None, index_is_time=False, ensure_dates=True):
+    """ Construct uniform time-series object, i.e. a pandas Series with 'time' and 'value'
+    :param ts_data: DataFrame or Series object with at least a time column and a value column
+    :param time_col: name of DataFrame column that represents time
+    :param value_col: name of DataFrame column that represents value
+    :param index_is_time: set True if index of ts_data is the desired time column
+    :param ensure_dates: set True to ensure 'time' index is DatetimeIndex
+    :return: pd.Series object with 'time' as index name and 'value' as name
     """
-    ts = ts_df.copy()   # Avoid modifying original DataFrame
-    if isinstance(ts, pd.Series):
-        # Convert Series to 2-column DataFrame, since we strive to be overly robust
-        ts = ts.reset_index()
-    n_cols = ts.shape[1]
-    if n_cols == 0:
-        print("ERROR construct_timeseries: 0 columns in DataFrame.")
-        return None
-    elif n_cols == 1:
-        # Try restoring index to column
-        ts = ts.reset_index()
-    elif n_cols > 2:
-        # Get columns based on parameters if there are more than 2
-        if time_col is None or value_col is None:
-            print("ERROR construct_timeseries: more than 2 columns in DataFrame, "
-                  "please provide time and value column names.")
-            return None
-        ts = ts[[time_col, value_col]]
-    ts.columns = ['time', 'value']
-    return ts.set_index('time')['value'].sort_index().dropna()
+    ts = ts_data.copy()     # Avoid modifying original data
+    if isinstance(ts, pd.DataFrame):
+        # Find the 2 relevant columns
+        n_cols = ts.shape[1]
+        if n_cols == 0:
+            raise ValueError("empty DataFrame (0 columns)")
+        if n_cols == 1:
+            ts = ts.squeeze()   # Essentially a glorified Series
+        else:
+            # Extract 'time' from columns/index
+            if index_is_time:
+                time_extract = ts.index
+            else:
+                if time_col is not None:
+                    if time_col in ts.columns:
+                        time_extract = ts[time_col]
+                    elif ts.index.name == time_col:
+                        time_extract = ts.index     # User did not flag index_is_time, but okay
+                    else:
+                        raise ValueError(f"'{time_col}' column for 'time' not found in data")
+                else:
+                    time_extract = ts.iloc[:, 0]    # Arbitrarily take first column as 'time'
+            # Extract 'value' from columns/index
+            if value_col is not None:
+                if value_col in ts.columns:
+                    value_extract = ts[value_col]
+                elif ts.index.name == value_col:
+                    value_extract = ts.index    # Indexed by value is weird, but okay
+                else:
+                    raise ValueError(f"'{value_col}' column for 'value' not found in data")
+            else:
+                value_extract = ts.iloc[:, 1]  # Arbitrarily take second column as 'value'
+            # Stitch together into Series
+            ts = pd.Series(value_extract.values, index=time_extract)
+    elif not isinstance(ts, pd.Series):
+        raise ValueError(f"expected pd.Series or pd.DataFrame, not '{type(ts)}'")
+    # Rename
+    ts.index.name, ts.name = 'time', 'value'    # ts is at this point a Series
+    # Check 'time'
+    if not isinstance(ts.index, pd.DatetimeIndex):
+        if ensure_dates:
+            ts.index = pd.to_datetime(ts.index)
+        else:
+            print(f"WARNING: time-series index type '{ts.index.inferred_type}', not 'datetime64'")
+    # Sort and drop NaNs
+    return ts.sort_index().dropna()
 
 
 def share_dateindex(timeseries_list):
-    """Align a list of time-series by their shared date-times
+    """ Align a list of time-series by their shared date-times
     :param timeseries_list: list of time-series
     :return: list of aligned/truncated time-series
     """
@@ -48,12 +76,11 @@ def share_dateindex(timeseries_list):
 
 
 def get_best_fit(x_data, y_data, fit_intercept=True):
-    """Find line of best fit for x and y data using linear regression
+    """ Find line of best fit for x and y data using linear regression
     :param x_data: first set of data (does not need to match y_data in date index)
     :param y_data: second set of data
-    :param fit_intercept: whether to fit an intercept (False to force 0)
-    :return: tuple of R^2, slope of line, and the best fit model (from which
-             prior two items and more can be obtained)
+    :param fit_intercept: whether to fit an intercept (set False to force 0)
+    :return: tuple - (R^2, slope of line, best fit model)
     """
     [joined_x_data, joined_y_data] = share_dateindex([x_data, y_data])
     x = joined_x_data.values.reshape(-1, 1)
