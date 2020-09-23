@@ -61,8 +61,8 @@ def construct_timeseries(ts_data, time_col=None, value_col=None, index_is_time=F
             ts.index = pd.to_datetime(ts.index)
         else:
             print(f"WARNING: time-series index type '{ts.index.inferred_type}', not 'datetime64'")
-    # Sort and drop NaNs
-    return ts.sort_index().dropna()
+    # Drop NaNs and sort
+    return ts.dropna().sort_index()
 
 
 def share_dateindex(timeseries_list):

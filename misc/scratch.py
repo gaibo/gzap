@@ -1,3 +1,7 @@
+git submodule update --remote --merge   # If you make changes to submodules I think
+git submodule update    # Updates to superproject's version I think
+git submodule update --remote   # Updates to absolute latest from web I think
+
 # Basis Point Index vs. Realized and Difference
 bp_list = [tyvix_bp, jgbvix_bp, srvix, vixig_bp, vixhy_bp, vixie_bp, vixxo_bp, vixfs_bp]
 for obj, color in zip(bp_list, color_list):
