@@ -13,24 +13,51 @@ register_matplotlib_converters()
 class Instrument(object):
     """
     Financial instrument base class
+    Defined by: 1) a raw DataFrame/Series including all relevant stats (e.g. dates and times, prices)
+                2) a name
     """
-    def __init__(self, ts_df, name='', tradestats=None):
+    def __init__(self, raw_data_df, name=None):
         """
-        :param ts_df: time-series DataFrame/Series with time and value
-        :param name: name of the data
-        :param tradestats: (optional) relevant trade statistics, etc. to be included; default empty DataFrame
+        :param raw_data_df: DataFrame/Series containing reasonably formatted financial data
+        :param name: name of the financial instrument
         """
-        self.levels = construct_timeseries(ts_df)   # Drops NaNs and sorts
-        self.loc = self.levels.loc  # Allow for native use of DataFrame/Series .loc[] indexing
-        self.name = name
-        if isinstance(tradestats, pd.DataFrame) or isinstance(tradestats, pd.Series):
-            self.tradestats = tradestats.copy()
+        if isinstance(raw_data_df, pd.DataFrame) or isinstance(raw_data_df, pd.Series):
+            self.raw_data_df = raw_data_df.copy()   # Prevent DataFrame state confusion by cloning new one
         else:
-            self.tradestats = tradestats    # Including default of None
+            self.raw_data_df = raw_data_df  # raw_data_df should never be None, but it would go through here
+        try:
+            self.loc = self.raw_data_df.loc     # Allow for native use of DataFrame/Series .loc[] indexing
+        except AttributeError:
+            self.loc = None     # In case raw_data_df is not DataFrame/Series; again, shouldn't really happen
+        self.name = name
 
     def __getitem__(self, index):
         """ Allow for native use of DataFrame/Series indexing
             e.g. vix_instrument[4:] works instead of vix_instrument.price()[4:]
+        """
+        return self.raw_data_df[index]
+
+    def __str__(self):
+        """ Print a small peek at the raw data wrapped by this class
+        """
+        return (f"\t'{self.name}' raw data:\n"
+                f"{self.raw_data_df.head()}\n"
+                f"...")
+
+
+class CashInstr(Instrument):
+    """
+    Cash instrument, derived from financial instrument
+    Defined by: 1) extracting a price time-series from Instrument through column names
+    """
+    def __init__(self, raw_data_df, time_col=None, price_col=None, index_is_time=False, **super_kwargs):
+        super().__init__(raw_data_df, **super_kwargs)
+        self.levels = construct_timeseries(self.raw_data_df, time_col, price_col, index_is_time)    # Drop NaNs and sort
+
+    def __getitem__(self, index):
+        """ Allow for native use of DataFrame/Series indexing
+            e.g. vix_instrument[4:] works instead of vix_instrument.price()[4:]
+            NOTE: more refined than base Instrument's __getitem__() - uses levels, not raw_data_df
         """
         return self.levels[index]
 
@@ -121,29 +148,18 @@ class Instrument(object):
             return result
 
 
-class CashInstr(Instrument):
-    """
-    Cash instrument, derived from financial instrument
-    """
-    def __init__(self, ts_df, **super_kwargs):
-        """
-        :param ts_df: time-series DataFrame with time and value
-        :param super_kwargs: kwargs for passing to superclass
-        """
-        super().__init__(ts_df, **super_kwargs)
-
-
 class Derivative(Instrument):
     """
     Derivative instrument, derived from financial instrument
+    Defined by: 1) an underlying instrument
     """
-    def __init__(self, ts_df, underlying, **super_kwargs):
+    def __init__(self, raw_data_df, underlying, **super_kwargs):
         """
-        :param ts_df: time-series DataFrame with time and value
+        :param raw_data_df: time-series DataFrame with time and value
         :param underlying: underlying Instrument
         :param super_kwargs: kwargs for passing to superclass init()
         """
-        super().__init__(ts_df, **super_kwargs)
+        super().__init__(raw_data_df, **super_kwargs)
         self.underlying = underlying
 
     def undl_realized_vol(self, **realized_vol_kwargs):
@@ -155,30 +171,30 @@ class Derivative(Instrument):
 
 
 class Index(CashInstr):
-    def __init__(self, ts_df, **super_kwargs):
-        """
-        :param ts_df: time-series DataFrame with time and value
+    def __init__(self, raw_data_df, **super_kwargs):
+        """ NOTE: Index, Stock, and ETF don't have distinguishing features yet!
+        :param raw_data_df: time-series DataFrame with time and value
         :param super_kwargs: kwargs for passing to superclass
         """
-        super().__init__(ts_df, **super_kwargs)
+        super().__init__(raw_data_df, **super_kwargs)
 
 
 class Stock(CashInstr):
-    def __init__(self, ts_df, **super_kwargs):
-        """
-        :param ts_df: time-series DataFrame with time and value
+    def __init__(self, raw_data_df, **super_kwargs):
+        """ NOTE: Index, Stock, and ETF don't have distinguishing features yet!
+        :param raw_data_df: time-series DataFrame with time and value
         :param super_kwargs: kwargs for passing to superclass
         """
-        super().__init__(ts_df, **super_kwargs)
+        super().__init__(raw_data_df, **super_kwargs)
 
 
 class ETF(CashInstr):
-    def __init__(self, ts_df, **super_kwargs):
-        """
-        :param ts_df: time-series DataFrame with time and value
+    def __init__(self, raw_data_df, **super_kwargs):
+        """ NOTE: Index, Stock, and ETF don't have distinguishing features yet!
+        :param raw_data_df: time-series DataFrame with time and value
         :param super_kwargs: kwargs for passing to superclass
         """
-        super().__init__(ts_df, **super_kwargs)
+        super().__init__(raw_data_df, **super_kwargs)
 
 
 class Futures(Derivative):
@@ -195,7 +211,12 @@ class Futures(Derivative):
 
 class Options(Derivative):
     def __init__(self, ts_df, underlying, expiry_date, pc, strike, **super_kwargs):
-        """
+        """ Explanation on organization:
+            Options data is always given as prices associated with a tuple of characteristics
+            (expiry, put or call, strike price). Therefore, the underlying "data model"
+            for the Options class will be a DataFrame, and the class will simply track
+            the names of the columns containing these labels.
+            Yes, some columns such as expiry will contain the same value hundreds of times.
         :param ts_df: time-series DataFrame with time and value
         :param underlying: underlying Instrument
         :param expiry_date: expiration date of options contract
@@ -204,7 +225,7 @@ class Options(Derivative):
         :param super_kwargs: kwargs for passing to superclass
         """
         super().__init__(ts_df, underlying, **super_kwargs)
-        self.expiry_date = expiry_date
+        self.expiry_date = datelike_to_timestamp(expiry_date)
         self.pc = pc
         self.strike = strike
         # TODO: need more efficient way to store options in bulk... after 1 year, solution: DataFrame with named cols

@@ -1,3 +1,17 @@
+class CashInstr(Instrument):
+    """
+    Cash instrument, derived from financial instrument
+    Defined by: 1) extracting a price time-series from Instrument through column names
+    """
+    def __init__(self, ts_df, **super_kwargs):
+        """
+        :param ts_df: time-series DataFrame with time and value
+        :param super_kwargs: kwargs for passing to superclass
+        """
+        super().__init__(ts_df, **super_kwargs)
+
+:param tradestats: (optional) relevant trade statistics, etc. to be included; default empty DataFrame
+
 # # TYVIX Vol Regimes
 # test = pd.read_csv('Y:/Research/Research1/Gaibo/S&P Webinar Figures/3 - predictive signaling raw data.csv', index_col='Date', parse_dates=True)
 # _, axleft = plt.subplots()
