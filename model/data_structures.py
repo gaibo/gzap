@@ -51,6 +51,13 @@ class CashInstr(Instrument):
     Defined by: 1) extracting a price time-series from Instrument through column names
     """
     def __init__(self, raw_data_df, time_col=None, price_col=None, index_is_time=False, **super_kwargs):
+        """
+        :param raw_data_df: DataFrame/Series containing reasonably formatted financial data
+        :param time_col: name of DataFrame column that represents time (in a time-series)
+        :param price_col: name of DataFrame column that represents price (value in a time-series)
+        :param index_is_time: set True if index of raw_data_df is time
+        :param super_kwargs: kwargs for passing to superclass init()
+        """
         super().__init__(raw_data_df, **super_kwargs)
         self.levels = construct_timeseries(self.raw_data_df, time_col, price_col, index_is_time)    # Drop NaNs and sort
 
@@ -155,7 +162,7 @@ class Derivative(Instrument):
     """
     def __init__(self, raw_data_df, underlying, **super_kwargs):
         """
-        :param raw_data_df: time-series DataFrame with time and value
+        :param raw_data_df: DataFrame/Series containing reasonably formatted financial data
         :param underlying: underlying Instrument
         :param super_kwargs: kwargs for passing to superclass init()
         """
@@ -173,7 +180,7 @@ class Derivative(Instrument):
 class Index(CashInstr):
     def __init__(self, raw_data_df, **super_kwargs):
         """ NOTE: Index, Stock, and ETF don't have distinguishing features yet!
-        :param raw_data_df: time-series DataFrame with time and value
+        :param raw_data_df: DataFrame/Series containing reasonably formatted financial data
         :param super_kwargs: kwargs for passing to superclass
         """
         super().__init__(raw_data_df, **super_kwargs)
@@ -182,7 +189,7 @@ class Index(CashInstr):
 class Stock(CashInstr):
     def __init__(self, raw_data_df, **super_kwargs):
         """ NOTE: Index, Stock, and ETF don't have distinguishing features yet!
-        :param raw_data_df: time-series DataFrame with time and value
+        :param raw_data_df: DataFrame/Series containing reasonably formatted financial data
         :param super_kwargs: kwargs for passing to superclass
         """
         super().__init__(raw_data_df, **super_kwargs)
@@ -191,44 +198,131 @@ class Stock(CashInstr):
 class ETF(CashInstr):
     def __init__(self, raw_data_df, **super_kwargs):
         """ NOTE: Index, Stock, and ETF don't have distinguishing features yet!
-        :param raw_data_df: time-series DataFrame with time and value
+        :param raw_data_df: DataFrame/Series containing reasonably formatted financial data
         :param super_kwargs: kwargs for passing to superclass
         """
         super().__init__(raw_data_df, **super_kwargs)
 
 
 class Futures(Derivative):
-    def __init__(self, ts_df, underlying, maturity_date, **super_kwargs):
-        """
-        :param ts_df: time-series DataFrame with time and value
+    def __init__(self, raw_data_df, underlying, maturity_date_col=None, price_col=None,
+                 trade_date_col=None, single_trade_date=None,
+                 volume_col=None, open_interest_col=None,
+                 t_to_mat_col=None, rate_col=None, **super_kwargs):
+        """ Explanation on organization:
+            Futures data is always given as prices associated with a maturity (either date or month/year).
+            Therefore, the underlying "data model" for the Futures class will be a DataFrame,
+            and the class will simply track the names of the columns containing these labels.
+            Yes, some columns such as maturity will contain the same value hundreds of times.
+        :param raw_data_df: DataFrame/Series containing reasonably formatted financial data
         :param underlying: underlying Instrument
-        :param maturity_date: maturity date of futures contract
+        :param maturity_date_col: name of DataFrame column that represents futures maturity date
+        :param price_col: name of DataFrame column that represents price
+        :param trade_date_col: name of DataFrame column that represents time (in a time-series);
+                               set None and use single_trade_date if no such column, i.e. data is only for single day
+        :param single_trade_date: datelike representing trade date of data; only used if trade_date_col is None
+        :param volume_col: name of DataFrame column that represents trading volume
+        :param open_interest_col: name of DataFrame column that represents trading open interest
+        :param t_to_mat_col: name of DataFrame column that represents time to maturity (if it already exists)
+        :param rate_col: name of DataFrame column that represents risk-free rate (if it already exists)
         :param super_kwargs: kwargs for passing to superclass
         """
-        super().__init__(ts_df, underlying, **super_kwargs)
-        self.maturity_date = datelike_to_timestamp(maturity_date)
+        super().__init__(raw_data_df, underlying, **super_kwargs)
+        self.data_df = self.raw_data_df.copy()  # Make a point to never modify raw original
+        self.maturity_date = maturity_date_col
+        self.price = price_col
+        if trade_date_col is None and single_trade_date is not None:
+            if 'trade_date' in self.raw_data_df.columns:
+                print("WARNING: 'trade_date' column exists in raw_data_df but has not been set as trade_date_col;\n"
+                      "         object init() will overwrite this column, so please ensure that's intentional.")
+            self.data_df['trade_date'] = datelike_to_timestamp(single_trade_date)
+            self.trade_date = 'trade_date'
+        else:
+            self.trade_date = trade_date_col    # Includes dangerous case of None
+        self.volume = volume_col
+        self.open_interest = open_interest_col
+        self.t_to_mat = t_to_mat_col
+        self.rate = rate_col
+        # Drop NaNs, index, and sort raw_data_df
+        self.data_df = self.data_df.dropna(how='all').set_index([self.trade_date, self.maturity_date]).sort_index()
+
+    def merge(self, objs):
+        """ Merge other class instance(s) into this one
+        :param objs: single class object or iterable of class objects
+        :return: merged data_df
+        """
+        pass    # Remember to map names via .rename() with dictionary
 
 
 class Options(Derivative):
-    def __init__(self, ts_df, underlying, expiry_date, pc, strike, **super_kwargs):
+    def __init__(self, raw_data_df, underlying, expiry_date_col=None, call_put_col=None, strike_col=None,
+                 price_col=None, trade_date_col=None, single_trade_date=None,
+                 volume_col=None, open_interest_col=None,
+                 t_to_exp_col=None, rate_col=None, forward_col=None,
+                 implied_vol_col=None, iv_price_col=None, delta_col=None, vega_col=None, **super_kwargs):
         """ Explanation on organization:
             Options data is always given as prices associated with a tuple of characteristics
             (expiry, put or call, strike price). Therefore, the underlying "data model"
             for the Options class will be a DataFrame, and the class will simply track
             the names of the columns containing these labels.
             Yes, some columns such as expiry will contain the same value hundreds of times.
-        :param ts_df: time-series DataFrame with time and value
+        :param raw_data_df: DataFrame/Series containing reasonably formatted financial data
         :param underlying: underlying Instrument
-        :param expiry_date: expiration date of options contract
-        :param pc: whether options contract is put or call
-        :param strike: strike price of options contract
+        :param expiry_date_col: name of DataFrame column that represents options expiry date
+        :param call_put_col: name of DataFrame column that represents options call/put identification
+        :param strike_col: name of DataFrame column that represents options strike (exercise) price
+        :param price_col: name of DataFrame column that represents price
+        :param trade_date_col: name of DataFrame column that represents time (in a time-series);
+                               set None and use single_trade_date if no such column, i.e. data is only for single day
+        :param single_trade_date: datelike representing trade date of data; only used if trade_date_col is None
+        :param volume_col: name of DataFrame column that represents trading volume
+        :param open_interest_col: name of DataFrame column that represents trading open interest
+        :param t_to_exp_col: name of DataFrame column that represents time to expiry (if it already exists)
+        :param rate_col: name of DataFrame column that represents risk-free rate (if it already exists)
+        :param forward_col: name of DataFrame column that represents options-implied forward price
+                            (if it already exists)
+        :param implied_vol_col: name of DataFrame column that represents Black-Scholes/Black-76 implied volatility
+                                (if it already exists)
+        :param iv_price_col: name of DataFrame column that represents Black-Scholes/Black-76 implied volatility-implied
+                             premium (if it already exists)
+        :param delta_col: name of DataFrame column that represents Black-Scholes/Black-76 delta (if it already exists)
+        :param vega_col: name of DataFrame column that represents Black-Scholes/Black-76 vega (if it already exists)
         :param super_kwargs: kwargs for passing to superclass
         """
-        super().__init__(ts_df, underlying, **super_kwargs)
-        self.expiry_date = datelike_to_timestamp(expiry_date)
-        self.pc = pc
-        self.strike = strike
-        # TODO: need more efficient way to store options in bulk... after 1 year, solution: DataFrame with named cols
+        super().__init__(raw_data_df, underlying, **super_kwargs)
+        self.data_df = self.raw_data_df.copy()  # Make a point to never modify raw original
+        self.expiry_date = expiry_date_col
+        self.call_put = call_put_col
+        self.strike = strike_col
+        self.price = price_col
+        if trade_date_col is None and single_trade_date is not None:
+            if 'trade_date' in self.raw_data_df.columns:
+                print("WARNING: 'trade_date' column exists in raw_data_df but has not been set as trade_date_col;\n"
+                      "         object init() will overwrite this column, so please ensure that's intentional.")
+            self.data_df['trade_date'] = datelike_to_timestamp(single_trade_date)
+            self.trade_date = 'trade_date'
+        else:
+            self.trade_date = trade_date_col  # Includes dangerous case of None
+        self.volume = volume_col
+        self.open_interest = open_interest_col
+        self.t_to_exp = t_to_exp_col
+        self.rate = rate_col
+        self.forward = forward_col
+        self.implied_vol = implied_vol_col
+        self.iv_price = iv_price_col
+        self.delta = delta_col
+        self.vega = vega_col
+        # Drop NaNs, index, and sort raw_data_df
+        self.data_df = (self.data_df.dropna(how='all')
+                        .set_index([self.trade_date, self.expiry_date, self.call_put, self.strike])
+                        .sort_index())
+
+    def merge(self, objs):
+        """ Merge other class instance(s) into this one
+        :param objs: single class object or iterable of class objects
+        :return: merged data_df
+        """
+        pass
 
 
 class VolatilityIndex(Index):
