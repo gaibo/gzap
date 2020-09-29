@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from pandas.plotting import register_matplotlib_converters
+from collections.abc import Iterable
 
 from utility.universal_tools import construct_timeseries, share_dateindex, \
     BUS_DAYS_IN_MONTH, BUS_DAYS_IN_YEAR, BUS_DAYS_IN_SIX_MONTHS, ONE_DAY, ONE_NANOSECOND
@@ -168,6 +169,8 @@ class Derivative(Instrument):
         """
         super().__init__(raw_data_df, **super_kwargs)
         self.underlying = underlying
+        self.data_df = None     # Declare for subclasses
+        self.data_cols = None   # Declare for subclasses
 
     def undl_realized_vol(self, **realized_vol_kwargs):
         """ Calculate realized vol for underlying asset (by calling underlying's realized_vol)
@@ -175,6 +178,27 @@ class Derivative(Instrument):
         :return: pd.Series with 'time' and 'value', with ~20 NaNs at beginning
         """
         return self.underlying.realized_vol(**realized_vol_kwargs)
+
+    def merge(self, objs):
+        """ Merge other class instance(s) into this one
+        :param objs: single class object or iterable of class objects
+        :return: merged data_df
+        """
+        def _single_merge(other):
+            # Rename the object's relevant columns to match those of self
+            obj_to_self_rename_map = {other.data_cols[k]: self.data_cols[k]
+                                      for k in (self.data_cols.keys() & other.data_cols.keys())}
+            obj_renamed_data_df = other.data_df.rename(obj_to_self_rename_map, axis=1)
+            # Merge object's relevant columns into self's, but don't overwrite anything non-NaN
+            self.data_df = self.data_df.combine_first(obj_renamed_data_df).sort_index()
+            # Replace self's None cols if merged object had them filled
+            self.data_cols = {**other.data_cols, **self.data_cols}  # Covering other with self
+        if isinstance(objs, Iterable):
+            for obj in objs:
+                _single_merge(obj)
+        else:
+            _single_merge(objs)
+        return self.data_df
 
 
 class Index(CashInstr):
@@ -204,6 +228,11 @@ class ETF(CashInstr):
         super().__init__(raw_data_df, **super_kwargs)
 
 
+FUTURES_COLS = {'maturity_date', 'price',
+                'trade_date', 'volume', 'open_interest',
+                't_to_mat', 'rate'}
+
+
 class Futures(Derivative):
     def __init__(self, raw_data_df, underlying, maturity_date_col=None, price_col=None,
                  trade_date_col=None, single_trade_date=None,
@@ -229,29 +258,34 @@ class Futures(Derivative):
         """
         super().__init__(raw_data_df, underlying, **super_kwargs)
         self.data_df = self.raw_data_df.copy()  # Make a point to never modify raw original
-        self.maturity_date = maturity_date_col
-        self.price = price_col
+        # Create dictionary mapping data_df column names to standard set
+        self.data_cols = {
+            'maturity_date': maturity_date_col,
+            'price': price_col,
+            'volume': volume_col,
+            'open_interest': open_interest_col,
+            't_to_mat': t_to_mat_col,
+            'rate': rate_col
+        }
         if trade_date_col is None and single_trade_date is not None:
             if 'trade_date' in self.raw_data_df.columns:
                 print("WARNING: 'trade_date' column exists in raw_data_df but has not been set as trade_date_col;\n"
                       "         object init() will overwrite this column, so please ensure that's intentional.")
             self.data_df['trade_date'] = datelike_to_timestamp(single_trade_date)
-            self.trade_date = 'trade_date'
+            self.data_cols['trade_date'] = 'trade_date'
         else:
-            self.trade_date = trade_date_col    # Includes dangerous case of None
-        self.volume = volume_col
-        self.open_interest = open_interest_col
-        self.t_to_mat = t_to_mat_col
-        self.rate = rate_col
+            self.data_cols['trade_date'] = trade_date_col   # Includes dangerous case of None
+        self.data_cols = {k: v for k, v in self.data_cols.items() if v is not None}     # Filter out None
         # Drop NaNs, index, and sort raw_data_df
-        self.data_df = self.data_df.dropna(how='all').set_index([self.trade_date, self.maturity_date]).sort_index()
+        self.data_df = (self.data_df.dropna(how='all')
+                        .set_index([self.data_cols['trade_date'], self.data_cols['maturity_date']])
+                        .sort_index())
 
-    def merge(self, objs):
-        """ Merge other class instance(s) into this one
-        :param objs: single class object or iterable of class objects
-        :return: merged data_df
-        """
-        pass    # Remember to map names via .rename() with dictionary
+
+OPTIONS_COLS = {'expiry_date', 'call_put', 'strike', 'price',
+                'trade_date', 'volume', 'open_interest',
+                't_to_exp', 'rate', 'forward', 'implied_vol', 'iv_price',
+                'delta', 'vega'}
 
 
 class Options(Derivative):
@@ -291,38 +325,42 @@ class Options(Derivative):
         """
         super().__init__(raw_data_df, underlying, **super_kwargs)
         self.data_df = self.raw_data_df.copy()  # Make a point to never modify raw original
-        self.expiry_date = expiry_date_col
-        self.call_put = call_put_col
-        self.strike = strike_col
-        self.price = price_col
+        # Create dictionary mapping data_df column names to standard set
+        self.data_cols = {
+            'expiry_date': expiry_date_col,
+            'call_put': call_put_col,
+            'strike': strike_col,
+            'price': price_col,
+            'volume': volume_col,
+            'open_interest': open_interest_col,
+            't_to_exp': t_to_exp_col,
+            'rate': rate_col,
+            'forward': forward_col,
+            'implied_vol': implied_vol_col,
+            'iv_price': iv_price_col,
+            'delta': delta_col,
+            'vega': vega_col
+        }
         if trade_date_col is None and single_trade_date is not None:
             if 'trade_date' in self.raw_data_df.columns:
                 print("WARNING: 'trade_date' column exists in raw_data_df but has not been set as trade_date_col;\n"
                       "         object init() will overwrite this column, so please ensure that's intentional.")
             self.data_df['trade_date'] = datelike_to_timestamp(single_trade_date)
-            self.trade_date = 'trade_date'
+            self.data_cols['trade_date'] = 'trade_date'
         else:
-            self.trade_date = trade_date_col  # Includes dangerous case of None
-        self.volume = volume_col
-        self.open_interest = open_interest_col
-        self.t_to_exp = t_to_exp_col
-        self.rate = rate_col
-        self.forward = forward_col
-        self.implied_vol = implied_vol_col
-        self.iv_price = iv_price_col
-        self.delta = delta_col
-        self.vega = vega_col
+            self.data_cols['trade_date'] = trade_date_col   # Includes dangerous case of None
+        self.data_cols = {k: v for k, v in self.data_cols.items() if v is not None}     # Filter out None
+        # Format call-put indicator column
+        cp_ser = self.data_df[self.data_cols['call_put']].copy()
+        if cp_ser.dtypes == bool:
+            # Convert True to 'C' and False to 'P' for clarity
+            self.data_df.loc[cp_ser, self.data_cols['call_put']] = 'C'
+            self.data_df.loc[~cp_ser, self.data_cols['call_put']] = 'P'
         # Drop NaNs, index, and sort raw_data_df
         self.data_df = (self.data_df.dropna(how='all')
-                        .set_index([self.trade_date, self.expiry_date, self.call_put, self.strike])
+                        .set_index([self.data_cols['trade_date'], self.data_cols['expiry_date'],
+                                    self.data_cols['call_put'], self.data_cols['strike']])
                         .sort_index())
-
-    def merge(self, objs):
-        """ Merge other class instance(s) into this one
-        :param objs: single class object or iterable of class objects
-        :return: merged data_df
-        """
-        pass
 
 
 class VolatilityIndex(Index):

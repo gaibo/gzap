@@ -1,3 +1,11 @@
+{obj.maturity_date: self.maturity_date,
+                                              obj.price: self.price,
+                                              obj.trade_date: self.trade_date,
+                                              obj.volume: self.volume,
+                                              obj.open_interest: self.open_interest,
+                                              obj.t_to_mat: self.t_to_mat,
+                                              obj.rate: self.rate}
+
 class CashInstr(Instrument):
     """
     Cash instrument, derived from financial instrument
