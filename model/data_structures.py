@@ -61,6 +61,7 @@ class CashInstr(Instrument):
         """
         super().__init__(raw_data_df, **super_kwargs)
         self.levels = construct_timeseries(self.raw_data_df, time_col, price_col, index_is_time)    # Drop NaNs and sort
+        self.loc = self.levels.loc  # Allow for native use of DataFrame/Series .loc[] indexing
 
     def __getitem__(self, index):
         """ Allow for native use of DataFrame/Series indexing
@@ -171,6 +172,14 @@ class Derivative(Instrument):
         self.underlying = underlying
         self.data_df = None     # Declare for subclasses
         self.data_cols = None   # Declare for subclasses
+        self.loc = self.data_df.loc     # Allow for native use of DataFrame/Series .loc[] indexing
+
+    def __getitem__(self, index):
+        """ Allow for native use of DataFrame/Series indexing
+            e.g. vix_instrument[4:] works instead of vix_instrument.price()[4:]
+            NOTE: more refined than base Instrument's __getitem__() - uses levels, not raw_data_df
+        """
+        return self.data_df[index]
 
     def undl_realized_vol(self, **realized_vol_kwargs):
         """ Calculate realized vol for underlying asset (by calling underlying's realized_vol)
