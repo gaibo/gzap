@@ -18,3 +18,11 @@ pulled via script from Bloomberg
 * *utility* - useful functions for cleaning data, visualization, etc.
 
 * */* - example scripts
+
+---
+
+Usage notes:
+
+1. You probably want to set your environment variables $MPLCONFIGDIR and
+   $MATPLOTLIBRC to "C:\path\to\where\you\installed\gzap\.matplotlib\" so you
+   can access custom matplotlib graphical defaults and styles.

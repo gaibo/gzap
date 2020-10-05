@@ -1,0 +1,10 @@
+# Cboe charting color palette
+axes.prop_cycle: cycler('color', ['0057b8', '00a82c', 'e25130', '56c5ce', 'e68f32', '00a1df'])
+
+# Seaborn Colorblind, for reference
+# axes.prop_cycle: cycler('color', ['0072B2', '009E73', 'D55E00', 'CC79A7', 'F0E442', '56B4E9'])
+# patch.facecolor: 0072B2
+
+# Tableau Colorblind with 10 Colors, for reference
+# axes.prop_cycle: cycler('color', ['006BA4', 'FF800E', 'ABABAB', '595959', '5F9ED1', 'C85200', '898989', 'A2C8EC', 'FFBC79', 'CFCFCF'])
+# patch.facecolor: 006BA4
