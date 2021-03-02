@@ -1,3 +1,79 @@
+# IBIG
+# 1) Load
+ibig = (pd.read_csv(DOWNLOADS_DIR + f'IBIG_Daily_Volume_data_{USE_DATE}.csv',
+                    parse_dates=['Month, Day, Year of Trading Dt'])
+        .rename({'Month, Day, Year of Trading Dt': 'Trade Date'}, axis=1))
+# 2) Run function
+ibig_new_accounts = evaluate_new_accounts(vxm)
+vxm_new_accounts.to_csv(DOWNLOADS_DIR + f'vxm_new_accounts_{USE_DATE}.csv')     # Export!
+# 3) Aggregate for Python visuals (step 2 already makes Excel-pivot-ready sheet)
+vxm_new_accounts_CTI = vxm_new_accounts.groupby(['Trade Date', 'CTI'])['New Account'].sum().unstack()
+vxm_new_accounts_cumsum = vxm_new_accounts_CTI.cumsum()
+
+# IBIG
+# 1) Load
+ibig = (pd.read_csv(DOWNLOADS_DIR + 'IBIG_Daily_Volume_data_2021-03-02.csv',
+                    parse_dates=['Month, Day, Year of Trading Dt'])
+        .rename({'Month, Day, Year of Trading Dt': 'Trade Date'}, axis=1))
+# 2) Run function
+ibig_new_accounts = evaluate_new_accounts(ibig)
+# 3) Aggregate for Python visuals (step 2 already makes Excel-pivot-ready sheet)
+ibig_new_accounts_CTI = ibig_new_accounts.groupby(['Trade Date', 'CTI'])['New Account'].sum().unstack()
+ibig_new_accounts_cumsum = ibig_new_accounts_CTI.cumsum()
+# 4) Export
+ibig_new_accounts.to_csv(DOWNLOADS_DIR + 'ibig_new_accounts_2021-03-02.csv')
+
+# Try it on IBHY
+# 1) Load
+ibhy = (pd.read_csv(DOWNLOADS_DIR + 'IBHY_Daily_Volume_data_2021-03-02.csv',
+                    parse_dates=['Month, Day, Year of Trading Dt'])
+        .rename({'Month, Day, Year of Trading Dt': 'Trade Date'}, axis=1))
+# 2) Run function
+ibhy_new_accounts = evaluate_new_accounts(ibhy)
+# 3) Aggregate for Python visuals (step 2 already makes Excel-pivot-ready sheet)
+ibhy_new_accounts_CTI = ibhy_new_accounts.groupby(['Trade Date', 'CTI'])['New Account'].sum().unstack()
+ibhy_new_accounts_cumsum = ibhy_new_accounts_CTI.cumsum()
+# 4) Export
+ibhy_new_accounts.to_csv(DOWNLOADS_DIR + 'ibhy_new_accounts_2021-03-02.csv')
+
+# Try it on big VIX
+# 1) Load
+vx = (pd.read_csv(DOWNLOADS_DIR + 'VX_Daily_Volume_data_2021-01-29.csv',
+                  parse_dates=['Month, Day, Year of Trading Dt'])
+      .rename({'Month, Day, Year of Trading Dt': 'Trade Date'}, axis=1))
+# 2) Run function
+vx_new_accounts = evaluate_new_accounts(vx)
+# 3) Aggregate for Python visuals (step 2 already makes Excel-pivot-ready sheet)
+vx_new_accounts_CTI = vx_new_accounts.groupby(['Trade Date', 'CTI'])['New Account'].sum().unstack()
+vx_new_accounts_cumsum = vx_new_accounts_CTI.cumsum()
+
+
+# def evaluate_volumes(data):
+#     # Step 0: Check if any accounts switch CTI
+#     ctiswitch_set = set(data[data['CTI'] == 4]['Account ']) & set(data[data['CTI'] != 4]['Account '])
+#     if len(ctiswitch_set) != 0:
+#         print(f"Accounts that switch CTI: {ctiswitch_set}")
+#
+#     # Step 1: Aggregate size by date, CTI, firm, account; each row will be unique
+#     data_agg = data.groupby(['Trade Date', 'CTI', 'Name', 'Account '])['Size'].sum()
+#
+#     # Step 2: Generate "known" set of accounts for each day
+#     data_days = data_agg.index.get_level_values('Trade Date').unique()
+#     known_set_dict = {data_days[0]: set()}  # No known accounts on first day
+#     for day, prev_day in zip(data_days[1:], data_days[:-1]):
+#         known_set_dict[day] = \
+#             (known_set_dict[prev_day]
+#              | set(data_agg.loc[prev_day].index.get_level_values('Account ')))
+#
+#     # Step 3: Mark accounts each day that were not known at the beginning of the day
+#     data_agg_reset = data_agg.reset_index('Account ')
+#     for day in data_days:
+#         # .values is great for doing stuff with no unique indexes
+#         data_agg_reset.loc[day, 'New Account'] = \
+#             (~data_agg_reset.loc[day]['Account '].isin(known_set_dict[day])).values
+#     return data_agg_reset
+
+
 # for col in ['Trade Time', 'Trade Date', 'Expire Date']:
 #     modern_data[col] = pd.to_datetime(modern_data[col])     # Parse dates after concat to save time
 # modern_data = modern_data.set_index('Trade Time').sort_index()

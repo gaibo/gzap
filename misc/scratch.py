@@ -1,3 +1,30 @@
+# Unique new accounts each day for IBHY
+# Step 1: Aggregate size by date, CTI, firm, account; each row will be unique
+ibhy_new = ibhy.groupby(['Trade Date', 'CTI', 'Name', 'Account '])['Size'].sum()
+
+# Step 2: Generate "known" set of accounts for each day
+ibhy_days = ibhy_new.index.get_level_values('Trade Date').unique()
+known_set_dict = {ibhy_days[0]: set()}  # No known accounts on first day
+for day, prev_day in zip(ibhy_days[1:], ibhy_days[:-1]):
+    known_set_dict[day] = \
+        (known_set_dict[prev_day]
+         | set(ibhy_new.loc[prev_day].index.get_level_values('Account ')))
+
+# Step 3: Mark accounts each day that were not known at the beginning of the day
+ibhy_new_reset = ibhy_new.reset_index('Account ')
+for day in ibhy_days:
+    # .values is great for doing stuff with no unique indexes
+    ibhy_new_reset.loc[day, 'New Account'] = \
+        (~ibhy_new_reset.loc[day]['Account '].isin(known_set_dict[day])).values
+
+# Step 4: Aggregate for final results
+ibhy_new_accounts = ibhy_new_reset.groupby(['Trade Date', 'CTI'])['New Account'].sum().unstack()
+# Use .fillna(method='ffill') on cumsum to fill NaNs, but NaNs actually give you info on what days the CTI had volume
+ibhy_new_accounts_cumsum = ibhy_new_accounts.cumsum()
+# Exportable
+ibhy_new_accounts_export = ibhy_new_reset
+
+
 git submodule update --remote --merge   # If you make changes to submodules I think
 git submodule update    # Updates to superproject's version I think
 git submodule update --remote   # Updates to absolute latest from web I think
