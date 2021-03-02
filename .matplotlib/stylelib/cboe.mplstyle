@@ -1,5 +1,11 @@
 # Cboe charting color palette
 axes.prop_cycle: cycler('color', ['0057b8', '00a82c', 'e25130', '56c5ce', 'e68f32', '00a1df'])
+                   # 0057b8 : Cboe dark blue
+                   # 00a82c : Cboe green
+                   # e25130 : Cboe red
+                   # 56c5ce : Cboe turquoise
+                   # e68f32 : Cboe orange
+                   # 00a1df : Cboe light blue
 
 # Seaborn Colorblind, for reference
 # axes.prop_cycle: cycler('color', ['0072B2', '009E73', 'D55E00', 'CC79A7', 'F0E442', '56B4E9'])

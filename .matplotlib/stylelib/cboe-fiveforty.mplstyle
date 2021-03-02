@@ -1,0 +1,57 @@
+#Author: Cameron Davidson-Pilon, replicated styles from FiveThirtyEight.com
+# See https://www.dataorigami.net/blogs/fivethirtyeight-mpl
+
+lines.linewidth: 4
+lines.solid_capstyle: butt
+
+legend.fancybox: true
+
+# axes.prop_cycle: cycler('color', ['008fd5', 'fc4f30', 'e5ae38', '6d904f', '8b8b8b', '810f7c'])
+                   # 008fd5 : blue
+                   # fc4f30 : red
+                   # e5ae38 : yellow
+                   # 6d904f : vomit green
+                   # 8b8b8b : grey
+                   # 810f7c : purple
+axes.prop_cycle: cycler('color', ['29479e', '00b2db', '20b14a', 'b3b4b7', '0057b8', '00a82c', 'e25130', '56c5ce', 'e68f32', '00a1df'])
+                   # 29479e : Credit VIX HY
+                   # 00b2db : Credit VIX IG
+                   # 20b14a : Credit VIX IE
+                   # b3b4b7 : Credit VIX XO
+                   # 0057b8 : Cboe dark blue
+                   # 00a82c : Cboe green
+                   # e25130 : Cboe red
+                   # 56c5ce : Cboe turquoise
+                   # e68f32 : Cboe orange
+                   # 00a1df : Cboe light blue
+axes.facecolor: f0f0f0
+axes.labelsize: large
+axes.axisbelow: true
+axes.grid: true
+axes.edgecolor: f0f0f0
+axes.linewidth: 3.0
+axes.titlesize: x-large
+
+patch.edgecolor: f0f0f0
+patch.linewidth: 0.5
+
+svg.fonttype: path
+
+grid.linestyle: -
+grid.linewidth: 1.0
+grid.color: cbcbcb
+
+xtick.major.size: 0
+xtick.minor.size: 0
+ytick.major.size: 0
+ytick.minor.size: 0
+
+font.size:14.0
+
+savefig.edgecolor: f0f0f0
+savefig.facecolor: f0f0f0
+
+figure.subplot.left: 0.08
+figure.subplot.right: 0.95
+figure.subplot.bottom: 0.07
+figure.facecolor: f0f0f0

@@ -1,3 +1,16 @@
+# Git go back to state just before commit, i.e. previous commit but with changes in staging
+git reset --soft HEAD^  # HEAD^ is the previous commit
+
+# Reload after editing matplotlib style sheet!
+plt.style.reload_library()
+plt.style.use('cboe-fivethirtyeight')
+
+# iboxx_oi_file_name = 'Current_Open_Interest_and_Volume_by_Futures_Root_F_data.csv'  # [CONFIGURE]
+# ibhy_oi_data = pd.read_csv(DOWNLOADS_DIR+iboxx_oi_file_name, index_col='Trading Date', parse_dates=True).sort_index()
+# ibhy_oi = ibhy_oi_data.groupby('Trading Date')['Current Open Interest'].sum()
+# ibhy_volume_breakdown['Open Interest'] = ibhy_oi
+
+
 ax.autoscale(enable=True, axis='x', tight=True)
 
 ##############################################################################

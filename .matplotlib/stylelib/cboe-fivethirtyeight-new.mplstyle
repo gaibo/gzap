@@ -1,0 +1,86 @@
+#Author: Cameron Davidson-Pilon, replicated styles from FiveThirtyEight.com
+# See https://www.dataorigami.net/blogs/fivethirtyeight-mpl
+
+lines.linewidth: 4
+lines.solid_capstyle: butt
+
+legend.fancybox: true
+
+# axes.prop_cycle: cycler('color', ['008fd5', 'fc4f30', 'e5ae38', '6d904f', '8b8b8b', '810f7c'])
+                   # 008fd5 : blue
+                   # fc4f30 : red
+                   # e5ae38 : yellow
+                   # 6d904f : vomit green
+                   # 8b8b8b : grey
+                   # 810f7c : purple
+axes.prop_cycle: cycler('color', ['2B47BD', '42B933', 'E09042', '7C7C7C', '2BB9BD', '8A2BBD', '2B64BD', '3AB971', '2B91BD', '532BBD'])
+# axes.prop_cycle: cycler('color', ['112CA3', '269D1A', 'A85C0F', '4B4B4B', '119DA3', '7311A3', '114AA3', '1A9D54', '1178A3', '3C11A3'])
+# axes.prop_cycle: cycler('color', ['001987', '108006', '874600', '333333', '008087', '5C0087', '003487', '06803B', '006187', '2B0087'])
+                   # Source: https://cboe.sharepoint.com/sites/intranet/PublishingImages/Pages/Brand-Guidelines-Unified/Cboe_charting_colors.pdf
+
+                   # Level 7
+                   # 2B47BD : Cboe navy
+                   # 42B933 : Cboe green
+                   # E09042 : Cboe carrot
+                   # 7C7C7C : Cboe gray
+                   # 2BB9BD : Cboe cyan
+                   # 8A2BBD : Cboe purple
+                   # 2B64BD : Cboe blue
+                   # 3AB971 : Cboe lime
+                   # 2B91BD : Cboe sea
+                   # 532BBD : Cboe violet
+
+                   # Level 8
+                   # 112CA3 : Cboe navy
+                   # 269D1A : Cboe green
+                   # A85C0F : Cboe carrot
+                   # 4B4B4B : Cboe gray
+                   # 119DA3 : Cboe cyan
+                   # 7311A3 : Cboe purple
+                   # 114AA3 : Cboe blue
+                   # 1A9D54 : Cboe lime
+                   # 1178A3 : Cboe sea
+                   # 3C11A3 : Cboe violet
+
+                   # Level 9
+                   # 001987 : Cboe navy
+                   # 108006 : Cboe green
+                   # 874600 : Cboe carrot
+                   # 333333 : Cboe gray
+                   # 008087 : Cboe cyan
+                   # 5C0087 : Cboe purple
+                   # 003487 : Cboe blue
+                   # 06803B : Cboe lime
+                   # 006187 : Cboe sea
+                   # 2B0087 : Cboe violet
+axes.facecolor: f0f0f0
+axes.labelsize: large
+axes.axisbelow: true
+axes.grid: true
+axes.edgecolor: f0f0f0
+axes.linewidth: 3.0
+axes.titlesize: x-large
+
+patch.edgecolor: f0f0f0
+patch.linewidth: 0.5
+
+svg.fonttype: path
+
+grid.linestyle: -
+grid.linewidth: 1.0
+grid.color: cbcbcb
+
+xtick.major.size: 0
+xtick.minor.size: 0
+ytick.major.size: 0
+ytick.minor.size: 0
+
+font.size:14.0
+
+savefig.edgecolor: f0f0f0
+savefig.facecolor: f0f0f0
+
+figure.subplot.left: 0.08
+figure.subplot.right: 0.95
+figure.subplot.bottom: 0.07
+figure.facecolor: f0f0f0

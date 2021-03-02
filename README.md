@@ -23,6 +23,7 @@ pulled via script from Bloomberg
 
 Usage notes:
 
-1. You probably want to set your environment variables $MPLCONFIGDIR and
+1. You'll want to set your Windows environment variables $MPLCONFIGDIR and
    $MATPLOTLIBRC to "C:\path\to\where\you\installed\gzap\.matplotlib\" so you
-   can access custom matplotlib graphical defaults and styles.
+   can access custom matplotlib graphical defaults and styles. You'll need to
+   restart PyCharm (or other IDE) for the new variables to kick in.

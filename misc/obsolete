@@ -1,3 +1,43 @@
+# for col in ['Trade Time', 'Trade Date', 'Expire Date']:
+#     modern_data[col] = pd.to_datetime(modern_data[col])     # Parse dates after concat to save time
+# modern_data = modern_data.set_index('Trade Time').sort_index()
+
+# axr.plot(trade_date_expiry_data['Size'], color='C1', label='Size')
+
+# nine_three = vx_315.loc['2020-09-03']
+# nine_three_exp1 = nine_three[nine_three['Expire Date'] == pd.Timestamp('2020-10-21')]
+
+# Column sets
+legacy_vwap_cols =
+
+# Settlement for all of legacy is 3:15pm, so 30-second VWAP would be 3:14:30pm to 3:15:00pm
+vwap_legacy = legacy_vix.between_time('15:14:30', '15:15')
+
+# Settlement for modern requires incorporating mini-VIX on 2020-08-10 and switching to 2:59:30pm-3:00:00pm on 2020-10-26
+vwap_modern_pre_mini = modern_vix.between_time('15:14:30', '15:15')
+
+
+vwap_modern_mini =
+
+
+# modern_data = pd.concat(modern_data_list).sort_values(['Trade Date', 'Trade Time', 'Expire Date'])[modern_volume_cols]
+# legacy_data = pd.concat(legacy_data_list).sort_values(['Date', 'Entry Time', 'Expiry Date'])[legacy_volume_cols]
+
+test = pd.read_csv(modern_data_dir+'20180320 VX Contra Trade Data.csv',
+                   parse_dates=['Trade Date', 'Trade Time', 'Expire Date'])
+
+# Fix Virtu switch
+old_virtu = adv_change_data_indexed.loc['Virtu Financial BD LLC']
+new_virtu = adv_change_data_indexed.loc['Virtu Americas LLC']
+virtu_adv = old_virtu['ADV'].replace(np.NaN, 0) + new_virtu['ADV'].replace(np.NaN, 0)
+virtu_diff = virtu_adv.diff()
+adv_change_data_indexed.loc['Virtu Financial BD + Americas LLC', 'ADV'] = virtu_adv
+adv_change_data_indexed.loc['Virtu Financial BD + Americas LLC', 'Difference in ADV'] = virtu_diff
+adv_change_data_indexed = adv_change_data_indexed.drop(['Virtu Financial BD LLC', 'Virtu Americas LLC'])
+
+adv_change_data_indexed.loc['Virtu Financial BD + Americas LLC', 'ADV'] = virtu_adv
+adv_change_data_indexed.loc['Virtu Financial BD + Americas LLC', 'Difference in ADV'] = virtu_diff
+
 {obj.maturity_date: self.maturity_date,
                                               obj.price: self.price,
                                               obj.trade_date: self.trade_date,
