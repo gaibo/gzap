@@ -1,5 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+from options_futures_expirations_v3 import days_between
 plt.style.use('cboe-fivethirtyeight')
 
 DOWNLOADS_DIR = 'C:/Users/gzhang/Downloads/'
@@ -35,12 +36,19 @@ def evaluate_new_accounts(data):
     data_agg = data.groupby(['Trade Date', 'CTI', 'Name', 'Account '])['Size'].sum()
 
     # Step 2: Generate "known" set of accounts for each day
+    # Step 2+: Track join date for each account
     data_days = data_agg.index.get_level_values('Trade Date').unique()
     known_set_dict = {data_days[0]: set()}  # No known accounts on first day
+    account_join_dict = {}
     for day, prev_day in zip(data_days[1:], data_days[:-1]):
-        known_set_dict[day] = \
-            (known_set_dict[prev_day]
-             | set(data_agg.loc[prev_day].index.get_level_values('Account ')))
+        prev_day_account_set = set(data_agg.loc[prev_day].index.get_level_values('Account '))
+        known_set_dict[day] = known_set_dict[prev_day] | prev_day_account_set
+        prev_day_account_join_dict = dict.fromkeys(prev_day_account_set, prev_day)
+        account_join_dict = {**prev_day_account_join_dict, **account_join_dict}  # Order matters - main dict overwrites
+    # Need an extra iteration for final day
+    final_day_account_set = set(data_agg.loc[data_days[-1]].index.get_level_values('Account '))
+    final_day_account_join_dict = dict.fromkeys(final_day_account_set, data_days[-1])
+    account_join_dict = {**final_day_account_join_dict, **account_join_dict}
 
     # Step 3: Mark accounts each day that were not known at the beginning of the day
     data_agg_reset = data_agg.reset_index('Account ')
@@ -48,7 +56,23 @@ def evaluate_new_accounts(data):
         # .values is great for doing stuff with no unique indexes
         data_agg_reset.loc[day, 'New Account'] = \
             (~data_agg_reset.loc[day]['Account '].isin(known_set_dict[day])).values
-    return data_agg_reset
+
+    # Step 4: Add account join date and trade-days-since-join context
+    data_agg_full_reset = data_agg_reset.reset_index()
+    def account_join_apply_helper(row):
+        join_date = account_join_dict[row['Account ']]
+        if row['Trade Date'] < join_date:
+            days_since_join = None
+        else:
+            days_since_join = days_between(row['Trade Date'], join_date, use_busdays=True)
+        return join_date, days_since_join
+    tuple_result = data_agg_full_reset.apply(account_join_apply_helper, axis=1)
+    concat_df = pd.DataFrame(tuple_result.to_list(),
+                             columns=['Account Join Date', 'Trade Days Since Join'])
+    data_agg_reindexed = (pd.concat([data_agg_full_reset, concat_df], axis=1)
+                          .set_index(['Trade Date', 'CTI', 'Name']))
+
+    return data_agg_reindexed
 
 
 # -----------------------------------------------------------------------------
