@@ -78,7 +78,7 @@ def evaluate_new_accounts(data):
 # -----------------------------------------------------------------------------
 
 # [CONFIGURE] Setup
-USE_DATE = '2021-02-26'
+USE_DATE = '2021-03-29'
 PRODUCTS = ['VXM', 'IBHY', 'IBIG']  # Default ['VXM', 'IBHY', 'IBIG']
 # Initialize storage
 data_dict = {}
@@ -90,13 +90,13 @@ new_accounts_cumsum_dict = {}
 for product in PRODUCTS:
     # 1) Load
     data_dict[product] = \
-        (pd.read_csv(DOWNLOADS_DIR + f'{product}_Daily_Volume_data_{USE_DATE}.csv',
+        (pd.read_csv(DOWNLOADS_DIR + f'{product}_Historical_Daily_Volume_data_{USE_DATE}.csv',
                      parse_dates=['Month, Day, Year of Trading Dt'])
          .rename({'Month, Day, Year of Trading Dt': 'Trade Date'}, axis=1))
     print(f"{product} loaded.")
     # 2) Run function
     new_accounts_dict[product] = evaluate_new_accounts(data_dict[product])
-    new_accounts_dict[product].to_csv(DOWNLOADS_DIR + f'{product}_new_accounts_{USE_DATE}.csv')  # Export!
+    new_accounts_dict[product].to_csv(DOWNLOADS_DIR + f'{USE_DATE}_{product}_new_accounts.csv')  # Export!
     # 3) Aggregate for Python visuals (step 2 already makes Excel-pivot-ready sheet)
     new_accounts_CTI_dict[product] = \
         new_accounts_dict[product].groupby(['Trade Date', 'CTI'])['New Account'].sum().unstack()
