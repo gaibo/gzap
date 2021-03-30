@@ -4,40 +4,130 @@ from futures_reader import create_bloomberg_connection
 plt.style.use('cboe-fivethirtyeight')
 
 DOWNLOADS_DIR = 'C:/Users/gzhang/Downloads/'
+DATA_DIR = 'C:/Users/gzhang/Downloads/iBoxx Bloomberg Pulls/'
 START_DATE = pd.Timestamp('2000-01-01')
 END_DATE = pd.Timestamp('2021-03-26')
 con = create_bloomberg_connection()
-VIX_FUTURES = ['UX1 Index', 'UX2 Index', 'UX3 Index']
-TEMP_TICKERS = ['SPVXSTR Index', 'SPVXSP Index']
-TEMP_FIELDS = ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'EQY_SH_OUT', 'FUND_NET_ASSET_VAL', 'FUND_TOTAL_ASSETS']
-data_raw = con.bdh(VIX_ETPS + VIX_FUTURES + TEMP_TICKERS,
-                   TEMP_FIELDS,
-                   f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}",
-                   elms=[('currency','USD')])
-data_raw = data_raw[VIX_ETPS + VIX_FUTURES + TEMP_TICKERS].copy()    # Enforce column order
 
-# IBY1 futures, IBXXIBHY, HYG, IBOXHY, CWY1 futures
+# High Yield: IBY1 futures, IBXXIBHY, HYG, IBOXHY, CWY1 futures
+# NOTE: futures daily percent return requires stitching together near and next terms
+# NOTE: HYG Total Return (field 'TOT_RETURN_INDEX_GROSS_DVDS') is needed for correlations
+# NOTE: for some reason, Bloomberg provides aggregate futures info through CWY1, but not literal price
+# NOTE: for CDX index Total Return, need my fancy scaling stitching code
 iby1 = con.bdh('IBY1 Index', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
-               f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}")
-iby1 = pd.read_csv(DOWNLOADS_DIR + 'IBY1_bbg_2021-01-26.csv',
-                   parse_dates=['Date'], index_col='Date')
-hyg = pd.read_csv(DOWNLOADS_DIR + 'HYG_bbg_2021-01-26.csv',
-                  parse_dates=['Date'], index_col='Date')
-ibxxibhy = pd.read_csv(DOWNLOADS_DIR + 'IBXXIBHY_bbg_2021-01-26.csv',
-                       parse_dates=['Date'], index_col='Date')
+               f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+iby1.to_csv(DATA_DIR + f"IBY1_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+iby2 = con.bdh('IBY2 Index', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
+               f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+iby2.to_csv(DATA_DIR + f"IBY2_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+ibxxibhy = con.bdh('IBXXIBHY Index', ['PX_LAST'],
+                   f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+ibxxibhy.to_csv(DATA_DIR + f"IBXXIBHY_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+hyg = con.bdh('HYG US Equity', ['PX_LAST', 'PX_VOLUME', 'TOT_RETURN_INDEX_GROSS_DVDS'],
+              f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+hyg.to_csv(DATA_DIR + f"HYG_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+iboxhy = con.bdh('IBOXHY Index', ['PX_LAST'],
+                 f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+iboxhy.to_csv(DATA_DIR + f"IBOXHY_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+cwy1 = con.bdh('CWY1 Index', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
+               f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+cwy1.to_csv(DATA_DIR + f"CWY1_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+scaled_cds = pd.read_csv('P:/PrdDevSharedDB/BBG Pull Scripts/scaled_cds_indexes.csv',
+                         index_col='date', parse_dates=True)
+scaled_cdx_na_hy = scaled_cds['CDX NA HY'].dropna()
+
+# Investment Grade: IHB1 futures, IBXXIBIG, LQD, IBOXIG, CWI1 futures
+ihb1 = con.bdh('IHB1 Index', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
+               f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+ihb1.to_csv(DATA_DIR + f"IHB1_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+ibxxibig = con.bdh('IBXXIBIG Index', ['PX_LAST'],
+                   f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+ibxxibig.to_csv(DATA_DIR + f"IBXXIBIG_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+lqd = con.bdh('LQD US Equity', ['PX_LAST', 'PX_VOLUME', 'TOT_RETURN_INDEX_GROSS_DVDS'],
+              f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+lqd.to_csv(DATA_DIR + f"LQD_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+iboxig = con.bdh('IBOXIG Index', ['PX_LAST'],
+                 f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+iboxig.to_csv(DATA_DIR + f"IBOXIG_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+cwi1 = con.bdh('CWI1 Index', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
+               f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+cwi1.to_csv(DATA_DIR + f"CWI1_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+scaled_cdx_na_ig = scaled_cds['CDX NA IG'].dropna()
+
+# Market Standards: SPX, VIX, Treasuries, EUR/USD rate
+spx = con.bdh('SPX Index', ['PX_LAST', 'TOT_RETURN_INDEX_GROSS_DVDS'],
+              f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+spx.to_csv(DATA_DIR + f"SPX_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+vix = con.bdh('VIX Index', ['PX_LAST'],
+              f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+vix.to_csv(DATA_DIR + f"VIX_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+tu1 = con.bdh('TU1 Comdty', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
+              f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+tu1.to_csv(DATA_DIR + f"TU1_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+tu2 = con.bdh('TU2 Comdty', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
+              f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+tu2.to_csv(DATA_DIR + f"TU2_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+fv1 = con.bdh('FV1 Comdty', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
+              f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+fv1.to_csv(DATA_DIR + f"FV1_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+fv2 = con.bdh('FV2 Comdty', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
+              f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+fv2.to_csv(DATA_DIR + f"FV2_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+ty1 = con.bdh('TY1 Comdty', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
+              f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+ty1.to_csv(DATA_DIR + f"TY1_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+ty2 = con.bdh('TY2 Comdty', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
+              f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+ty2.to_csv(DATA_DIR + f"TY2_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+us1 = con.bdh('US1 Comdty', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
+              f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+us1.to_csv(DATA_DIR + f"US1_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+us2 = con.bdh('US2 Comdty', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
+              f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+us2.to_csv(DATA_DIR + f"US2_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+eurusd = con.bdh('EURUSD BGN Curncy', ['PX_LAST'],
+                 f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+eurusd.to_csv(DATA_DIR + f"EURUSD_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+
+###############################################################################
 
 # Correlation
-# hyg_ibxxibhy = (hyg.join(ibxxibhy, how='inner', rsuffix='_IBXXIBHY')
-#                 .rename({'PX_LAST': 'HYG', 'PX_LAST_IBXXIBHY': 'IBXXIBHY'}, axis=1)
-#                 .drop('PX_VOLUME', axis=1)
-#                 .sort_index())
-# hyg_ibxxibhy_change = hyg_ibxxibhy.pct_change()
-# hyg_ibxxibhy_change = hyg_ibxxibhy_change.loc['2018-09-10':]
-hyg_iby1 = (hyg.join(iby1, how='inner', rsuffix='_IBY1')
-            .rename({'PX_LAST': 'HYG', 'PX_LAST_IBY1': 'IBY1'}, axis=1)
-            .drop(['PX_VOLUME', 'PX_VOLUME_IBY1'], axis=1)
-            .sort_index())
-hyg_iby1_change = hyg_iby1.pct_change()
+n = 3
+
+iby1_ibxxibhy = pd.DataFrame({'IBY1': iby1['PX_LAST'], 'IBXXIBHY': ibxxibhy['PX_LAST']}).sort_index()
+iby1_ibxxibhy_change = iby1_ibxxibhy.pct_change()
+iby1_ibxxibhy_corr = \
+    iby1_ibxxibhy_change.iloc[:, 0].rolling(n*21, center=False).corr(iby1_ibxxibhy_change.iloc[:, 1]).dropna()
+
+iby1_hyg = pd.DataFrame({'IBY1': iby1['PX_LAST'], 'HYG': hyg['TOT_RETURN_INDEX_GROSS_DVDS']}).sort_index()
+iby1_hyg_change = iby1_hyg.pct_change()
+iby1_hyg_corr = \
+    iby1_hyg_change.iloc[:, 0].rolling(n*21, center=False).corr(iby1_hyg_change.iloc[:, 1]).dropna()
+
+iby1_iboxhy = pd.DataFrame({'IBY1': iby1['PX_LAST'], 'IBOXHY': iboxhy['PX_LAST']}).sort_index()
+iby1_iboxhy_change = iby1_iboxhy.pct_change()
+iby1_iboxhy_corr = \
+    iby1_iboxhy_change.iloc[:, 0].rolling(n*21, center=False).corr(iby1_iboxhy_change.iloc[:, 1]).dropna()
+
+iby1_cdx_na_hy = pd.DataFrame({'IBY1': iby1['PX_LAST'], 'CDX NA HY': scaled_cdx_na_hy}).sort_index()
+iby1_cdx_na_hy_change = iby1_cdx_na_hy.pct_change()
+iby1_cdx_na_hy_corr = \
+    iby1_cdx_na_hy_change.iloc[:, 0].rolling(n*21, center=False).corr(iby1_cdx_na_hy_change.iloc[:, 1]).dropna()
+
+iby1_spx = pd.DataFrame({'IBY1': iby1['PX_LAST'], 'SPX': spx['TOT_RETURN_INDEX_GROSS_DVDS']}).sort_index()
+iby1_spx_change = iby1_spx.pct_change()
+iby1_spx_corr = \
+    iby1_spx_change.iloc[:, 0].rolling(n*21, center=False).corr(iby1_spx_change.iloc[:, 1]).dropna()
+
+iby1_vix = pd.DataFrame({'IBY1': iby1['PX_LAST'], 'VIX': vix['PX_LAST']}).sort_index()
+iby1_vix_change = iby1_vix.pct_change()
+iby1_vix_corr = \
+    iby1_vix_change.iloc[:, 0].rolling(n*21, center=False).corr(iby1_vix_change.iloc[:, 1]).dropna()
+
+iby1_fv1 = pd.DataFrame({'IBY1': iby1['PX_LAST'], 'FV1': fv1['PX_LAST']}).sort_index()
+iby1_fv1_change = iby1_fv1.pct_change()
+iby1_fv1_corr = \
+    iby1_fv1_change.iloc[:, 0].rolling(n*21, center=False).corr(iby1_fv1_change.iloc[:, 1]).dropna()
 
 # Plot
 fig, ax = plt.subplots(figsize=(19.2, 10.8))
