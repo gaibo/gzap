@@ -18,8 +18,10 @@ settle_data_trim = settle_data.drop(['Block and Standard', 'Block and TAS',
                                      'ECRP and Standard', 'ECRP and TAS'], axis=1)
 # settle_data_df = settle_data_trim.pivot(index=['Product', 'Date', 'Expiry', 'Symbol', 'Term', 'DTE'],
 #                                         columns='Measure Names', values='Measure Values')
-settle_data_df = (settle_data_trim.set_index(['Product', 'Date', 'Expiry', 'Symbol', 'Term', 'DTE', 'Measure Names'])
-                  .squeeze().unstack())
+settle_data_df = settle_data_trim.pivot_table(index=['Product', 'Date', 'Expiry', 'Symbol', 'Term', 'DTE'],
+                                              columns='Measure Names', values='Measure Values')
+# settle_data_df = (settle_data_trim.set_index(['Product', 'Date', 'Expiry', 'Symbol', 'Term', 'DTE', 'Measure Names'])
+#                   .squeeze().unstack())
 SETTLE_COLUMN_ORDER = ['Settle', 'Volume', 'Standard', 'TAS',
                        'Block', 'ECRP', 'Spreads',
                        'OI', 'Open', 'High', 'Low', 'Close']
@@ -27,9 +29,17 @@ settle_data_df = settle_data_df[SETTLE_COLUMN_ORDER]    # Enforce column order
 settle_data_dict = {product: settle_data_df.xs(product) for product in PRODUCTS}
 
 # Select product
+# NOTE: the 6 Order Fill fields - Volume, Standard, TAS, Block, ECRP, Spreads - only go back to 2018-03-20;
+#       the 6 Settlement+OI fields - Settle, OI, Open, High, Low, Close - go all the way back to 2013-05-20
 product = 'VX'
-daily_volume = settle_data_dict[product].groupby(['Date'])['Volume'].sum()
-daily_volume = daily_volume.loc['2018-03-20':]  # 0s from NaNs from legacy data clash before that
+product_data = settle_data_dict[product]
+product_orderfill = product_data[['Volume', 'Standard', 'TAS', 'Block', 'ECRP', 'Spreads']]
+product_settleoi = product_data[['Settle', 'OI', 'Open', 'High', 'Low', 'Close']]
+# Crop NaNs from legacy data clash
+modern_start = product_orderfill['Volume'].first_valid_index()[0]
+product_orderfill = product_orderfill.loc[modern_start:]
+# Extract daily volumes
+daily_volume = product_orderfill.groupby(['Date'])['Volume'].sum()
 
 # Allow daily volumes to be groupable with additional columns
 yearmonth_col = pd.to_datetime(daily_volume.index.strftime('%Y-%m'))
