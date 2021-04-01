@@ -5,16 +5,31 @@ plt.style.use('cboe-fivethirtyeight')
 
 DOWNLOADS_DIR = 'C:/Users/gzhang/Downloads/'
 
-USE_DATE = '2021-03-29'
-PRODUCTS = ['VXM', 'IBHY', 'IBIG', 'VX']  # Default ['VXM', 'IBHY', 'IBIG']
+USE_DATE = '2021-03-30'
+PRODUCTS = ['IBHY', 'IBIG', 'VX', 'VXM']  # Default ['VXM', 'IBHY', 'IBIG']
 
 # Quick scratch
+
 # Load
+DASHBOARD_DOWNLOAD_FILE = f'Unified_Data_Table_data_{USE_DATE}.csv'
+settle_data = pd.read_csv(DOWNLOADS_DIR + DASHBOARD_DOWNLOAD_FILE,
+                          parse_dates=['Date', 'Expiry'], thousands=',')
+settle_data_trim = settle_data.drop(['Block and Standard', 'Block and TAS',
+                                     'ECRP and Standard', 'ECRP and TAS'], axis=1)
+# settle_data_df = settle_data_trim.pivot(index=['Product', 'Date', 'Expiry', 'Symbol', 'Term', 'DTE'],
+#                                         columns='Measure Names', values='Measure Values')
+settle_data_df = (settle_data_trim.set_index(['Product', 'Date', 'Expiry', 'Symbol', 'Term', 'DTE', 'Measure Names'])
+                  .squeeze().unstack())
+SETTLE_COLUMN_ORDER = ['Settle', 'Volume', 'Standard', 'TAS',
+                       'Block', 'ECRP', 'Spreads',
+                       'OI', 'Open', 'High', 'Low', 'Close']
+settle_data_df = settle_data_df[SETTLE_COLUMN_ORDER]    # Enforce column order
+settle_data_dict = {product: settle_data_df.xs(product) for product in PRODUCTS}
+
+# Select product
 product = 'VX'
-new_accounts_data = pd.read_csv(DOWNLOADS_DIR + f'{USE_DATE}_{product}_new_accounts.csv',
-                                parse_dates=['Trade Date'])
-daily_volume = new_accounts_data.groupby('Trade Date')['Size'].sum()/2
-daily_volume.name = 'Volume'
+daily_volume = settle_data_dict[product].groupby(['Date'])['Volume'].sum()
+daily_volume = daily_volume.loc['2018-03-20':]  # 0s from NaNs from legacy data clash before that
 
 # Allow daily volumes to be groupable with additional columns
 yearmonth_col = pd.to_datetime(daily_volume.index.strftime('%Y-%m'))
@@ -26,8 +41,16 @@ daily_volume_df = pd.DataFrame({'Volume': daily_volume,
 # No aggregation - daily
 # NOTE: at daily level, "volume" and "ADV" is the same
 daily_percentile = daily_volume.rank(pct=True)    # Percentile over full history
+
+
 def lookback_rank(ser):
-    return ser.rank(pct=True)[-1]   # Take in limited series and return percentile rank of last element
+    """ Apply Helper: Take in limited series and return percentile rank of last (target) element
+    :param ser: pd.Series framed by .rolling() framework
+    :return: rank (in percent) of last element of series within the series
+    """
+    return ser.rank(pct=True)[-1]
+
+
 daily_percentile_1_year = daily_volume.rolling(256).apply(lookback_rank, raw=False)    # Percentile rolling 1-year
 # Aggregate to monthly
 # NOTE: ADV is what should be ranked - different months have different numbers of days, so sum is not good

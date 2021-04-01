@@ -1,3 +1,9 @@
+product = 'VX'
+new_accounts_data = pd.read_csv(DOWNLOADS_DIR + f'{USE_DATE}_{product}_new_accounts.csv',
+                                parse_dates=['Trade Date'])
+daily_volume = new_accounts_data.groupby('Trade Date')['Size'].sum()/2
+daily_volume.name = 'Volume'
+
 # Aggregate to monthly ADV
 yearmonth_strs = daily_volumes.index.strftime('%Y-%m')  # String form needed for .loc[]
 monthly_adv = pd.Series()
