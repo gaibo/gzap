@@ -1,3 +1,14 @@
+# Aggregate to monthly ADV
+yearmonth_strs = daily_volumes.index.strftime('%Y-%m')  # String form needed for .loc[]
+monthly_adv = pd.Series()
+for yearmonth_str in yearmonth_strs:
+    monthly_adv.loc[pd.Timestamp(yearmonth_str)] = daily_volumes.loc[yearmonth_str].mean()
+monthly_adv_percentiles = monthly_adv.rank(pct=True)    # Percentile over full history
+monthly_adv_rolling_percentiles = \
+    monthly_adv.rolling(12).apply(lambda x_ser: x_ser.rank(pct=True)[-1], raw=False)    # Percentile rolling 1-year
+monthly_adv_df = pd.DataFrame({'ADV': monthly_adv, 'Percentile (Since 2018-03)': monthly_adv_percentiles,
+                               'Percentile (1 Year)': monthly_adv_rolling_percentiles})
+
 # IBIG
 # 1) Load
 ibig = (pd.read_csv(DOWNLOADS_DIR + f'IBIG_Daily_Volume_data_{USE_DATE}.csv',
