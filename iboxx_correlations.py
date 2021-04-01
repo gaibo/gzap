@@ -6,7 +6,7 @@ plt.style.use('cboe-fivethirtyeight')
 DOWNLOADS_DIR = 'C:/Users/gzhang/Downloads/'
 DATA_DIR = 'C:/Users/gzhang/Downloads/iBoxx Bloomberg Pulls/'
 START_DATE = pd.Timestamp('2000-01-01')
-END_DATE = pd.Timestamp('2021-03-26')
+END_DATE = pd.Timestamp('2021-03-31')
 con = create_bloomberg_connection()
 
 # High Yield: IBY1 futures, IBXXIBHY, HYG, IBOXHY, CWY1 futures
@@ -92,7 +92,7 @@ eurusd.to_csv(DATA_DIR + f"EURUSD_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
 ###############################################################################
 
 # Correlation
-n = 3
+n = 6   # Months for rolling correlation
 
 iby1_ibxxibhy = pd.DataFrame({'IBY1': iby1['PX_LAST'], 'IBXXIBHY': ibxxibhy['PX_LAST']}).sort_index()
 iby1_ibxxibhy_change = iby1_ibxxibhy.pct_change()
@@ -129,45 +129,27 @@ iby1_fv1_change = iby1_fv1.pct_change()
 iby1_fv1_corr = \
     iby1_fv1_change.iloc[:, 0].rolling(n*21, center=False).corr(iby1_fv1_change.iloc[:, 1]).dropna()
 
-# Plot
+iby1_eurusd = pd.DataFrame({'IBY1': iby1['PX_LAST'], 'EUR/USD': eurusd['PX_LAST']}).sort_index()
+iby1_eurusd_change = iby1_eurusd.pct_change()
+iby1_eurusd_corr = \
+    iby1_eurusd_change.iloc[:, 0].rolling(n*21, center=False).corr(iby1_eurusd_change.iloc[:, 1]).dropna()
+
+# Plot 1 - Various Window Rolls
 fig, ax = plt.subplots(figsize=(19.2, 10.8))
-ax.set_title('Correlation: HYG vs. Front Month IBHY Futures')
-for n in range(1, 4):
-    ax.plot(hyg_iby1_change['HYG'].rolling(n*21, center=False).corr(hyg_iby1_change['IBY1']),
+ax.set_title('Correlation: Front Month IBHY Futures vs. HYG Total Return')
+for n in [1, 3, 6]:
+    ax.plot(iby1_hyg_change.iloc[:, 0].rolling(n*21, center=False).corr(iby1_hyg_change.iloc[:, 1]).dropna(),
             label=f'{n}-Month Rolling Correlation')
-overall_corr = hyg_iby1_change.corr().iloc[1,0]
+overall_corr = iby1_hyg_change.corr().iloc[1, 0]
 ax.axhline(overall_corr, label=f'Overall Correlation ({overall_corr*100:.1f}%)',
            color='k', linestyle='--')
 ax.legend()
 
-####
-
-# LQD, IHB1 (1st term futures prices)
-lqd = pd.read_csv(DOWNLOADS_DIR + 'LQD_bbg_2021-01-26.csv',
-                  parse_dates=['Date'], index_col='Date')
-ihb1 = pd.read_csv(DOWNLOADS_DIR + 'IHB1_bbg_2021-01-26.csv',
-                   parse_dates=['Date'], index_col='Date')
-
-# Correlation
-# hyg_ibxxibhy = (hyg.join(ibxxibhy, how='inner', rsuffix='_IBXXIBHY')
-#                 .rename({'PX_LAST': 'HYG', 'PX_LAST_IBXXIBHY': 'IBXXIBHY'}, axis=1)
-#                 .drop('PX_VOLUME', axis=1)
-#                 .sort_index())
-# hyg_ibxxibhy_change = hyg_ibxxibhy.pct_change()
-# hyg_ibxxibhy_change = hyg_ibxxibhy_change.loc['2018-09-10':]
-lqd_ihb1 = (lqd.join(ihb1, how='inner', rsuffix='_IHB1')
-            .rename({'PX_LAST': 'LQD', 'PX_LAST_IHB1': 'IHB1'}, axis=1)
-            .drop(['PX_VOLUME', 'PX_VOLUME_IHB1'], axis=1)
-            .sort_index())
-lqd_ihb1_change = lqd_ihb1.pct_change()
-
-# Plot
-fig, ax = plt.subplots(figsize=(19.2, 10.8))
-ax.set_title('Correlation: LQD vs. Front Month IBIG Futures')
-for n in range(1, 4):
-    ax.plot(lqd_ihb1_change['LQD'].rolling(n*21, center=False).corr(lqd_ihb1_change['IHB1']),
-            label=f'{n}-Month Rolling Correlation')
-overall_corr = lqd_ihb1_change.corr().iloc[1,0]
-ax.axhline(overall_corr, label=f'Overall Correlation ({overall_corr*100:.1f}%)',
-           color='k', linestyle='--')
+# Plot 2 - Various Assets
+_, ax = plt.subplots(figsize=(19.2, 10.8))
+ax.set_title('6-Month Rolling Correlation: Front Month IBHY Futures vs. Various Assets')
+for asset_name, asset_corr in [('IBXXIBHY', iby1_ibxxibhy_corr), ('HYG', iby1_hyg_corr), ('IBOXHY', iby1_iboxhy_corr),
+                               ('CDX NA HY', iby1_cdx_na_hy_corr), ('SPX', iby1_spx_corr), ('VIX', iby1_vix_corr),
+                               ('5y Tsy Futures', iby1_fv1_corr), ('EUR/USD', iby1_eurusd_corr)]:
+    ax.plot(asset_corr, label=f'{asset_name}')
 ax.legend()

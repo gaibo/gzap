@@ -1,3 +1,36 @@
+####
+
+# LQD, IHB1 (1st term futures prices)
+lqd = pd.read_csv(DOWNLOADS_DIR + 'LQD_bbg_2021-01-26.csv',
+                  parse_dates=['Date'], index_col='Date')
+ihb1 = pd.read_csv(DOWNLOADS_DIR + 'IHB1_bbg_2021-01-26.csv',
+                   parse_dates=['Date'], index_col='Date')
+
+# Correlation
+# hyg_ibxxibhy = (hyg.join(ibxxibhy, how='inner', rsuffix='_IBXXIBHY')
+#                 .rename({'PX_LAST': 'HYG', 'PX_LAST_IBXXIBHY': 'IBXXIBHY'}, axis=1)
+#                 .drop('PX_VOLUME', axis=1)
+#                 .sort_index())
+# hyg_ibxxibhy_change = hyg_ibxxibhy.pct_change()
+# hyg_ibxxibhy_change = hyg_ibxxibhy_change.loc['2018-09-10':]
+lqd_ihb1 = (lqd.join(ihb1, how='inner', rsuffix='_IHB1')
+            .rename({'PX_LAST': 'LQD', 'PX_LAST_IHB1': 'IHB1'}, axis=1)
+            .drop(['PX_VOLUME', 'PX_VOLUME_IHB1'], axis=1)
+            .sort_index())
+lqd_ihb1_change = lqd_ihb1.pct_change()
+
+# Plot
+fig, ax = plt.subplots(figsize=(19.2, 10.8))
+ax.set_title('Correlation: LQD vs. Front Month IBIG Futures')
+for n in range(1, 4):
+    ax.plot(lqd_ihb1_change['LQD'].rolling(n*21, center=False).corr(lqd_ihb1_change['IHB1']),
+            label=f'{n}-Month Rolling Correlation')
+overall_corr = lqd_ihb1_change.corr().iloc[1,0]
+ax.axhline(overall_corr, label=f'Overall Correlation ({overall_corr*100:.1f}%)',
+           color='k', linestyle='--')
+ax.legend()
+
+
 product = 'VX'
 new_accounts_data = pd.read_csv(DOWNLOADS_DIR + f'{USE_DATE}_{product}_new_accounts.csv',
                                 parse_dates=['Trade Date'])
