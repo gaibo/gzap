@@ -12,6 +12,7 @@ plt.style.use('cboe-fivethirtyeight')
 DOWNLOADS_DIR = 'C:/Users/gzhang/Downloads/'
 USE_DATE = '2021-03-30'
 PRODUCTS = ['IBHY', 'IBIG', 'VX', 'VXM']  # Default ['IBHY', 'IBIG', 'VX', 'VXM']
+MULTIPLIER_DICT = {'IBHY': 1000, 'IBIG': 1000, 'VX': 1000, 'VXM': 100}
 
 ###############################################################################
 
@@ -31,7 +32,13 @@ settle_data_df = settle_data_trim.pivot_table(index=['Product', 'Date', 'Expiry'
 SETTLE_COLUMN_ORDER = ['Settle', 'Volume', 'Standard', 'TAS',
                        'Block', 'ECRP', 'Spreads',
                        'OI', 'Open', 'High', 'Low', 'Close']
-settle_data_df = settle_data_df[SETTLE_COLUMN_ORDER]    # Enforce column order
+settle_data_df = settle_data_df[SETTLE_COLUMN_ORDER].copy()     # Enforce column order
+# Create 'Notional' column by combining settle and volume
+for product in PRODUCTS:
+    settle_data_df.loc[product, 'Notional'] = \
+        (settle_data_df.loc[product, 'Settle'] * settle_data_df.loc[product, 'Volume']
+         * MULTIPLIER_DICT[product]).values
+# Split DataFrame by product
 settle_data_dict = {product: settle_data_df.xs(product) for product in PRODUCTS}
 
 
@@ -43,28 +50,9 @@ def lookback_rank(ser):
     return ser.rank(pct=True)[-1]
 
 
-###############################################################################
-
-# Select product
-# NOTE: the 6 Order Fill fields - Volume, Standard, TAS, Block, ECRP, Spreads - only go back to 2018-03-20;
-#       the 6 Settlement+OI fields - Settle, OI, Open, High, Low, Close - go all the way back to 2013-05-20
-product = 'VX'
-product_data = settle_data_dict[product]
-ORDERFILL_FIELDS = ['Volume', 'Standard', 'TAS', 'Block', 'ECRP', 'Spreads']
-SETTLEOI_FIELDS = ['Settle', 'OI', 'Open', 'High', 'Low', 'Close']
-product_orderfill = product_data[ORDERFILL_FIELDS]
-product_settleoi = product_data[SETTLEOI_FIELDS]
-# Crop NaNs from legacy data clash
-modern_start = product_orderfill['Volume'].first_valid_index()[0]   # Volume field used as representative
-product_orderfill = product_orderfill.loc[modern_start:]
-
-# Initialize storage dictionary
-field_percentile_dict = {}
-
-# Run percentiles on each volume-based field from Order Fill
-for field in ORDERFILL_FIELDS:
+def generate_volume_percentiles(data, field):
     # Extract volume-based field up to daily level - aggregate volume by summing
-    daily_field = product_orderfill.groupby(['Date'])[field].sum()
+    daily_field = data.groupby(['Date'])[field].sum()
     # Attach month, quarter, and year to each row to allow groupby()
     yearmonth_col = pd.to_datetime(daily_field.index.strftime('%Y-%m'))
     yearquarter_col = \
@@ -73,109 +61,91 @@ for field in ORDERFILL_FIELDS:
     year_col = pd.to_datetime(daily_field.index.strftime('%Y'))
     daily_field_df = pd.DataFrame({field: daily_field, 'Month': yearmonth_col,
                                    'Quarter': yearquarter_col, 'Year': year_col})
+
     # No aggregation - daily
     # NOTE: at daily level, "volume" and "ADV" are conceptually the same
-    daily_percentile = daily_field.rank(pct=True)    # Percentile over full history
-    daily_percentile_1_year = daily_field.rolling(256).apply(lookback_rank, raw=False)    # Percentile rolling 1-year
-    # Aggregate to monthly
-    # NOTE: this was originally written with field='Volume', and I've generalized it to work
-    #       with any field. "average daily volume" (ADV) is therefore too specific, but I won't
-    #       change that for fear of confusion. so think of it as "average daily value" instead.
-    # NOTE: ADV is what should be ranked - different months have different numbers of days, so sum doesn't work
-    monthly_field = daily_field_df.groupby('Month')[field].sum()
-    monthly_adv = daily_field_df.groupby('Month')[field].mean()
-    monthly_percentile = monthly_adv.rank(pct=True)
-    monthly_percentile_1_year = monthly_adv.rolling(12).apply(lookback_rank, raw=False)    # Percentile rolling 1-year
-    # Aggregate to quarterly
-    quarterly_field = daily_field_df.groupby('Quarter')[field].sum()
-    quarterly_adv = daily_field_df.groupby('Quarter')[field].mean()
-    quarterly_percentile = quarterly_adv.rank(pct=True)
-    quarterly_percentile_1_year = quarterly_adv.rolling(4).apply(lookback_rank, raw=False)  # Percentile rolling 1-year
-    # Aggregate to yearly
-    yearly_field = daily_field_df.groupby('Year')[field].sum()
-    yearly_adv = daily_field_df.groupby('Year')[field].mean()
-    yearly_percentile = yearly_adv.rank(pct=True)
-    yearly_percentile_2_year = yearly_adv.rolling(2).apply(lookback_rank, raw=False)  # Percentile rolling 2-year
+    daily_percentile = daily_field.rank(pct=True)  # Percentile over full history
+    daily_percentile_rolling = daily_field.rolling(252).apply(lookback_rank, raw=False)     # Percentile rolling 1-year
+    # Percent change stats
+    daily_change = daily_field.pct_change()
+    daily_change_percentile = daily_change.rank(pct=True)
+    daily_change_pos = daily_change[daily_change > 0]
+    daily_change_pos_percentile = daily_change_pos.rank(pct=True)
+    daily_change_neg = daily_change[daily_change < 0]
+    daily_change_neg_percentile = (-daily_change_neg).rank(pct=True)
+    daily_change_posneg_percentile_df = pd.DataFrame({'Increase': daily_change_pos_percentile,
+                                                      'Decrease': daily_change_neg_percentile})
+    # Initialize storage dict
+    field_percentile_dict = {
+        'Daily': {
+            'Sum': daily_field,
+            'ADV': daily_field,
+            'Percentile (All)': daily_percentile,
+            'Percentile (Last 252)': daily_percentile_rolling,
+            'ADV Change': daily_change,
+            'ADV Change Percentile': daily_change_percentile,
+            'ADV Change Percentile Pos/Neg': daily_change_posneg_percentile_df
+        }
+    }
 
-    # Store
-    field_percentile_dict[field] = {}
-    field_percentile_dict[field]['Daily'] = {}
-    field_percentile_dict[field]['Daily']['Sum'] = daily_field
-    field_percentile_dict[field]['Daily']['ADV'] = daily_field
-    field_percentile_dict[field]['Daily']['Percentile (Total)'] = daily_percentile
-    field_percentile_dict[field]['Daily']['Percentile (1-Year)'] = daily_percentile_1_year
-    field_percentile_dict[field]['Monthly'] = {}
-    field_percentile_dict[field]['Monthly']['Sum'] = monthly_field
-    field_percentile_dict[field]['Monthly']['ADV'] = monthly_adv
-    field_percentile_dict[field]['Monthly']['Percentile (Total)'] = monthly_percentile
-    field_percentile_dict[field]['Monthly']['Percentile (1-Year)'] = monthly_percentile_1_year
-    field_percentile_dict[field]['Quarterly'] = {}
-    field_percentile_dict[field]['Quarterly']['Sum'] = quarterly_field
-    field_percentile_dict[field]['Quarterly']['ADV'] = quarterly_adv
-    field_percentile_dict[field]['Quarterly']['Percentile (Total)'] = quarterly_percentile
-    field_percentile_dict[field]['Quarterly']['Percentile (1-Year)'] = quarterly_percentile_1_year
-    field_percentile_dict[field]['Yearly'] = {}
-    field_percentile_dict[field]['Yearly']['Sum'] = yearly_field
-    field_percentile_dict[field]['Yearly']['ADV'] = yearly_adv
-    field_percentile_dict[field]['Yearly']['Percentile (Total)'] = yearly_percentile
-    field_percentile_dict[field]['Yearly']['Percentile (2-Year)'] = yearly_percentile_2_year
+    # Aggregate daily volumes to monthly/quarterly/yearly
+    for agg_level, lookback_n in zip(['Month', 'Quarter', 'Year'], [12, 4, 2]):
+        agg = f'{agg_level}ly'
+        field_percentile_dict[agg] = {}
+        # NOTE: this was originally written with field='Volume', and I've generalized it to work
+        #       with any field. "average daily volume" (ADV) is therefore too specific, but I won't
+        #       change that for fear of confusion. so think of it as "average daily value" instead.
+        # NOTE: ADV is what should be ranked - different months have different numbers of days, so sum doesn't work
+        field_percentile_dict[agg]['Sum'] = daily_field_df.groupby(agg_level)[field].sum()
+        field_percentile_dict[agg]['ADV'] = daily_field_df.groupby(agg_level)[field].mean()
+        field_percentile_dict[agg]['Percentile (All)'] = \
+            (field_percentile_dict[agg]['ADV']
+             .rank(pct=True))
+        field_percentile_dict[agg][f'Percentile (Last {lookback_n})'] = \
+            (field_percentile_dict[agg]['ADV']
+             .rolling(lookback_n).apply(lookback_rank, raw=False))  # Percentile rolling
+        # Percent change stats
+        agg_change = field_percentile_dict[agg]['ADV'].pct_change()
+        field_percentile_dict[agg]['ADV Change'] = agg_change
+        field_percentile_dict[agg]['ADV Change Percentile'] = agg_change.rank(pct=True)
+        agg_change_pos, agg_change_neg = agg_change[agg_change > 0], agg_change[agg_change < 0]
+        field_percentile_dict[agg]['ADV Change Percentile Pos/Neg'] = \
+            pd.DataFrame({'Increase': agg_change_pos.rank(pct=True),
+                          'Decrease': (-agg_change_neg).rank(pct=True)})
 
-# Run percentiles on Settlement+OI's OI, which unlike other fields from that source must be aggregated
-# (by sum) for percentiles to make any sense. Otherwise the roll obscures expiry-level OI change.
-field = 'OI'
-# Extract volume-based field up to daily level - aggregate volume by summing
-daily_field = product_settleoi.groupby(['Date'])[field].sum()
-# Attach month, quarter, and year to each row to allow groupby()
-yearmonth_col = pd.to_datetime(daily_field.index.strftime('%Y-%m'))
-yearquarter_col = \
-    pd.to_datetime(daily_field.index.to_series()
-                   .apply(lambda ts: f'{ts.year}-{month_to_quarter_shifter(ts.month):02}'))
-year_col = pd.to_datetime(daily_field.index.strftime('%Y'))
-daily_field_df = pd.DataFrame({field: daily_field, 'Month': yearmonth_col,
-                               'Quarter': yearquarter_col, 'Year': year_col})
-# No aggregation - daily
-# NOTE: at daily level, "volume" and "ADV" are conceptually the same
-daily_percentile = daily_field.rank(pct=True)    # Percentile over full history
-daily_percentile_1_year = daily_field.rolling(256).apply(lookback_rank, raw=False)    # Percentile rolling 1-year
-# Aggregate to monthly
-# NOTE: this was originally written with field='Volume', and I've generalized it to work
-#       with any field. "average daily volume" (ADV) is therefore too specific, but I won't
-#       change that for fear of confusion. so think of it as "average daily value" instead.
-# NOTE: ADV is what should be ranked - different months have different numbers of days, so sum doesn't work
-monthly_field = daily_field_df.groupby('Month')[field].sum()
-monthly_adv = daily_field_df.groupby('Month')[field].mean()
-monthly_percentile = monthly_adv.rank(pct=True)
-monthly_percentile_1_year = monthly_adv.rolling(12).apply(lookback_rank, raw=False)    # Percentile rolling 1-year
-# Aggregate to quarterly
-quarterly_field = daily_field_df.groupby('Quarter')[field].sum()
-quarterly_adv = daily_field_df.groupby('Quarter')[field].mean()
-quarterly_percentile = quarterly_adv.rank(pct=True)
-quarterly_percentile_1_year = quarterly_adv.rolling(4).apply(lookback_rank, raw=False)  # Percentile rolling 1-year
-# Aggregate to yearly
-yearly_field = daily_field_df.groupby('Year')[field].sum()
-yearly_adv = daily_field_df.groupby('Year')[field].mean()
-yearly_percentile = yearly_adv.rank(pct=True)
-yearly_percentile_2_year = yearly_adv.rolling(2).apply(lookback_rank, raw=False)  # Percentile rolling 2-year
+    return field_percentile_dict
 
-# Store
-field_percentile_dict[field] = {}
-field_percentile_dict[field]['Daily'] = {}
-field_percentile_dict[field]['Daily']['Sum'] = daily_field
-field_percentile_dict[field]['Daily']['ADV'] = daily_field
-field_percentile_dict[field]['Daily']['Percentile (Total)'] = daily_percentile
-field_percentile_dict[field]['Daily']['Percentile (1-Year)'] = daily_percentile_1_year
-field_percentile_dict[field]['Monthly'] = {}
-field_percentile_dict[field]['Monthly']['Sum'] = monthly_field
-field_percentile_dict[field]['Monthly']['ADV'] = monthly_adv
-field_percentile_dict[field]['Monthly']['Percentile (Total)'] = monthly_percentile
-field_percentile_dict[field]['Monthly']['Percentile (1-Year)'] = monthly_percentile_1_year
-field_percentile_dict[field]['Quarterly'] = {}
-field_percentile_dict[field]['Quarterly']['Sum'] = quarterly_field
-field_percentile_dict[field]['Quarterly']['ADV'] = quarterly_adv
-field_percentile_dict[field]['Quarterly']['Percentile (Total)'] = quarterly_percentile
-field_percentile_dict[field]['Quarterly']['Percentile (1-Year)'] = quarterly_percentile_1_year
-field_percentile_dict[field]['Yearly'] = {}
-field_percentile_dict[field]['Yearly']['Sum'] = yearly_field
-field_percentile_dict[field]['Yearly']['ADV'] = yearly_adv
-field_percentile_dict[field]['Yearly']['Percentile (Total)'] = yearly_percentile
-field_percentile_dict[field]['Yearly']['Percentile (2-Year)'] = yearly_percentile_2_year
+
+###############################################################################
+
+# Select product
+# NOTE: the 6 Order Fill fields - Volume, Standard, TAS, Block, ECRP, Spreads - only go back to 2018-03-20;
+#       the 6 Settlement+OI fields - Settle, OI, Open, High, Low, Close - go all the way back to 2013-05-20
+# NOTE: 1 additional constructed field - Notional - uses Volume and Settle; informationally it is closer to Volume
+product = 'VX'
+product_data = settle_data_dict[product]
+ORDERFILL_FIELDS = ['Volume', 'Standard', 'TAS', 'Block', 'ECRP', 'Spreads']
+SETTLEOI_FIELDS = ['Settle', 'OI', 'Open', 'High', 'Low', 'Close']
+CONSTRUCTED_FIELDS = ['Notional']
+product_orderfill = product_data[ORDERFILL_FIELDS]
+product_settleoi = product_data[SETTLEOI_FIELDS]
+product_constructed = product_data[CONSTRUCTED_FIELDS]
+# Crop NaNs from legacy data clash
+modern_start = product_orderfill['Volume'].first_valid_index()[0]   # Volume field used as representative
+product_orderfill = product_orderfill.loc[modern_start:]
+
+# Initialize storage dictionary
+percentile_dict = {}
+
+# Run percentiles on each volume-based field from Order Fill
+for i_field in ORDERFILL_FIELDS:
+    percentile_dict[i_field] = generate_volume_percentiles(product_orderfill, i_field)
+
+# Run percentiles on OI field from Settlement+OI. OI's aggregation is very specific: it must be summed up to
+# daily level (since the roll drives OI at expiry-level), then averaged up to monthly/quarterly/yearly
+percentile_dict['OI'] = generate_volume_percentiles(product_settleoi, 'OI')
+for i_agg in ['Monthly', 'Quarterly', 'Yearly']:
+    percentile_dict['OI'][i_agg]['Sum'] = None    # This field makes no sense for OI
+
+# Run percentiles on constructed Notionals
+percentile_dict['Notional'] = generate_volume_percentiles(product_constructed, 'Notional')
