@@ -84,7 +84,8 @@ def generate_volume_percentiles(data, field):
             'Percentile (Last 252)': daily_percentile_rolling,
             'ADV Change': daily_change,
             'ADV Change Percentile': daily_change_percentile,
-            'ADV Change Percentile Pos/Neg': daily_change_posneg_percentile_df
+            'ADV Change Percentile +': daily_change_posneg_percentile_df['Increase'],
+            'ADV Change Percentile -': daily_change_posneg_percentile_df['Decrease']
         }
     }
 
@@ -109,43 +110,50 @@ def generate_volume_percentiles(data, field):
         field_percentile_dict[agg]['ADV Change'] = agg_change
         field_percentile_dict[agg]['ADV Change Percentile'] = agg_change.rank(pct=True)
         agg_change_pos, agg_change_neg = agg_change[agg_change > 0], agg_change[agg_change < 0]
-        field_percentile_dict[agg]['ADV Change Percentile Pos/Neg'] = \
+        agg_change_posneg_percentile_df = \
             pd.DataFrame({'Increase': agg_change_pos.rank(pct=True),
                           'Decrease': (-agg_change_neg).rank(pct=True)})
+        field_percentile_dict[agg]['ADV Change Percentile +'], field_percentile_dict[agg]['ADV Change Percentile -'] = \
+            agg_change_posneg_percentile_df['Increase'], agg_change_posneg_percentile_df['Decrease']
 
     return field_percentile_dict
 
 
 ###############################################################################
 
-# Select product
-# NOTE: the 6 Order Fill fields - Volume, Standard, TAS, Block, ECRP, Spreads - only go back to 2018-03-20;
-#       the 6 Settlement+OI fields - Settle, OI, Open, High, Low, Close - go all the way back to 2013-05-20
-# NOTE: 1 additional constructed field - Notional - uses Volume and Settle; informationally it is closer to Volume
-product = 'VX'
-product_data = settle_data_dict[product]
-ORDERFILL_FIELDS = ['Volume', 'Standard', 'TAS', 'Block', 'ECRP', 'Spreads']
-SETTLEOI_FIELDS = ['Settle', 'OI', 'Open', 'High', 'Low', 'Close']
-CONSTRUCTED_FIELDS = ['Notional']
-product_orderfill = product_data[ORDERFILL_FIELDS]
-product_settleoi = product_data[SETTLEOI_FIELDS]
-product_constructed = product_data[CONSTRUCTED_FIELDS]
-# Crop NaNs from legacy data clash
-modern_start = product_orderfill['Volume'].first_valid_index()[0]   # Volume field used as representative
-product_orderfill = product_orderfill.loc[modern_start:]
+product_dict = {}
+for product in PRODUCTS:
+    # Select product and run percentiles on each volume-related field
+    # NOTE: the 6 Order Fill fields - Volume, Standard, TAS, Block, ECRP, Spreads - only go back to 2018-03-20;
+    #       the 6 Settlement+OI fields - Settle, OI, Open, High, Low, Close - go all the way back to 2013-05-20
+    # NOTE: 1 additional constructed field - Notional - uses Volume and Settle; informationally it is closer to Volume
+    product_data = settle_data_dict[product]
+    ORDERFILL_FIELDS = ['Volume', 'Standard', 'TAS', 'Block', 'ECRP', 'Spreads']
+    SETTLEOI_FIELDS = ['Settle', 'OI', 'Open', 'High', 'Low', 'Close']
+    CONSTRUCTED_FIELDS = ['Notional']
+    product_orderfill = product_data[ORDERFILL_FIELDS]
+    product_settleoi = product_data[SETTLEOI_FIELDS]
+    product_constructed = product_data[CONSTRUCTED_FIELDS]
+    # Crop NaNs from legacy data clash
+    modern_start = product_orderfill['Volume'].first_valid_index()[0]   # Volume field used as representative
+    product_orderfill = product_orderfill.loc[modern_start:]
+    product_constructed = product_constructed.loc[modern_start:]    # Constructed field limited by Order Fill history
 
-# Initialize storage dictionary
-percentile_dict = {}
+    # Initialize storage dictionary
+    percentile_dict = {}
 
-# Run percentiles on each volume-based field from Order Fill
-for i_field in ORDERFILL_FIELDS:
-    percentile_dict[i_field] = generate_volume_percentiles(product_orderfill, i_field)
+    # Run percentiles on each volume-based field from Order Fill
+    for i_field in ORDERFILL_FIELDS:
+        percentile_dict[i_field] = generate_volume_percentiles(product_orderfill, i_field)
 
-# Run percentiles on OI field from Settlement+OI. OI's aggregation is very specific: it must be summed up to
-# daily level (since the roll drives OI at expiry-level), then averaged up to monthly/quarterly/yearly
-percentile_dict['OI'] = generate_volume_percentiles(product_settleoi, 'OI')
-for i_agg in ['Monthly', 'Quarterly', 'Yearly']:
-    percentile_dict['OI'][i_agg]['Sum'] = None    # This field makes no sense for OI
+    # Run percentiles on OI field from Settlement+OI. OI's aggregation is very specific: it must be summed up to
+    # daily level (since the roll drives OI at expiry-level), then averaged up to monthly/quarterly/yearly
+    percentile_dict['OI'] = generate_volume_percentiles(product_settleoi, 'OI')
+    for i_agg in ['Monthly', 'Quarterly', 'Yearly']:
+        percentile_dict['OI'][i_agg]['Sum'] = None    # This field makes no sense for OI
 
-# Run percentiles on constructed Notionals
-percentile_dict['Notional'] = generate_volume_percentiles(product_constructed, 'Notional')
+    # Run percentiles on constructed Notionals
+    percentile_dict['Notional'] = generate_volume_percentiles(product_constructed, 'Notional')
+
+    # Store in higher level storage dictionary
+    product_dict[product] = percentile_dict
