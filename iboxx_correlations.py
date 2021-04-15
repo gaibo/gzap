@@ -1,12 +1,14 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from futures_reader import create_bloomberg_connection
+from pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()
 plt.style.use('cboe-fivethirtyeight')
 
 DOWNLOADS_DIR = 'C:/Users/gzhang/Downloads/'
 DATA_DIR = 'C:/Users/gzhang/Downloads/iBoxx Bloomberg Pulls/'
 START_DATE = pd.Timestamp('2000-01-01')
-END_DATE = pd.Timestamp('2021-03-31')
+END_DATE = pd.Timestamp('2021-04-14')
 con = create_bloomberg_connection()
 
 # High Yield: IBY1 futures, IBXXIBHY, HYG, IBOXHY, CWY1 futures
@@ -153,3 +155,14 @@ for asset_name, asset_corr in [('IBXXIBHY', iby1_ibxxibhy_corr), ('HYG', iby1_hy
                                ('5y Tsy Futures', iby1_fv1_corr), ('EUR/USD', iby1_eurusd_corr)]:
     ax.plot(asset_corr, label=f'{asset_name}')
 ax.legend()
+
+###############################################################################
+
+# Export IBHY first month vs. HYG correlation
+iby1_hyg_corr_dict = {}
+for n in [1, 2, 3, 6]:
+    iby1_hyg_corr_dict[n] = \
+        iby1_hyg_change.iloc[:, 0].rolling(n*21, center=False).corr(iby1_hyg_change.iloc[:, 1]).dropna()
+iby1_hyg_corr_df = pd.DataFrame({f'Rolling {n} Month': iby1_hyg_corr_dict[n] for n in [1, 2, 3, 6]})
+iby1_hyg_corr_df.index.name = 'Trade Date'
+iby1_hyg_corr_df.to_csv(DOWNLOADS_DIR+'IBY1_HYGTR_corr_rolling.csv')
