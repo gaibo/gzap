@@ -4,12 +4,14 @@ from options_futures_expirations_v3 import days_between
 plt.style.use('cboe-fivethirtyeight')
 
 DOWNLOADS_DIR = 'C:/Users/gzhang/Downloads/'
+USE_DATE = '2021-05-03'
+PRODUCTS = ['IBHY']  # Default ['VXM', 'IBHY', 'IBIG']
 
 
 # General workflow:
-# 1) Go to https://bi.cboe.com/#/views/ModifiedDailyiBoxxFuturesVolumeforDataPulling/iBoxxDailyVolume?:iid=1
+# 1) Go to https://bi.cboe.com/#/views/HistoricalDailyVolumeBreakdown/HistoricalDailyVolumeBreakdown?:iid=2
 #    and Download->Data->Summary tab->Download all rows as a text file.
-#    Save it in DOWNLOADS_DIR as f'{product}_Daily_Volume_data_{USE_DATE}.csv'.
+#    Save it in DOWNLOADS_DIR as f'{product}_Historical_Daily_Volume_Breakdown_data_{USE_DATE}.csv'.
 # 2) Run this script and check DOWNLOADS_DIR for f'{product}_new_accounts_{USE_DATE}.csv'.
 # 3) Open output file, filter to new dates, copy and paste them into f'{product}_new_accounts_{USE_DATE}.xlsx',
 #    which is a maintained Excel Pivot Table.
@@ -23,17 +25,17 @@ DOWNLOADS_DIR = 'C:/Users/gzhang/Downloads/'
 def evaluate_new_accounts(data):
     """ Track new accounts through DataFrame history and return separately-formatted DataFrame
     :param data: DataFrame with columns:
-                 ['Trade Date', 'Trading Session', 'CTI', 'Account', 'Operator Id', 'Name', 'Complex Trade', 'Size']
+                 ['Trade Date', 'Session', 'CTI', 'Account', 'Operator', 'User Name', 'Complex', 'Size']
     :return: DataFrame with columns:
              ['Trade Date', 'CTI', 'Name', 'Account', 'Size', 'New Account']
     """
     # Step 0: Check if any accounts switch CTI
-    ctiswitch_set = set(data[data['CTI'] == 4]['Account ']) & set(data[data['CTI'] != 4]['Account '])
+    ctiswitch_set = set(data[data['CTI'] == 4]['Account']) & set(data[data['CTI'] != 4]['Account'])
     if len(ctiswitch_set) != 0:
         print(f"Accounts that switch CTI: {ctiswitch_set}")
 
     # Step 1: Aggregate size by date, CTI, firm, account; each row will be unique
-    data_agg = data.groupby(['Trade Date', 'CTI', 'Name', 'Account '])['Size'].sum()
+    data_agg = data.groupby(['Trade Date', 'CTI', 'User Name', 'Account'])['Size'].sum()
 
     # Step 2: Generate "known" set of accounts for each day
     # Step 2+: Track join date for each account
@@ -41,26 +43,26 @@ def evaluate_new_accounts(data):
     known_set_dict = {data_days[0]: set()}  # No known accounts on first day
     account_join_dict = {}
     for day, prev_day in zip(data_days[1:], data_days[:-1]):
-        prev_day_account_set = set(data_agg.loc[prev_day].index.get_level_values('Account '))
+        prev_day_account_set = set(data_agg.loc[prev_day].index.get_level_values('Account'))
         known_set_dict[day] = known_set_dict[prev_day] | prev_day_account_set
         prev_day_account_join_dict = dict.fromkeys(prev_day_account_set, prev_day)
         account_join_dict = {**prev_day_account_join_dict, **account_join_dict}  # Order matters - main dict overwrites
     # Need an extra iteration for final day
-    final_day_account_set = set(data_agg.loc[data_days[-1]].index.get_level_values('Account '))
+    final_day_account_set = set(data_agg.loc[data_days[-1]].index.get_level_values('Account'))
     final_day_account_join_dict = dict.fromkeys(final_day_account_set, data_days[-1])
     account_join_dict = {**final_day_account_join_dict, **account_join_dict}
 
     # Step 3: Mark accounts each day that were not known at the beginning of the day
-    data_agg_reset = data_agg.reset_index('Account ')
+    data_agg_reset = data_agg.reset_index('Account')
     for day in data_days:
         # .values is great for doing stuff with no unique indexes
         data_agg_reset.loc[day, 'New Account'] = \
-            (~data_agg_reset.loc[day]['Account '].isin(known_set_dict[day])).values
+            (~data_agg_reset.loc[day]['Account'].isin(known_set_dict[day])).values
 
     # Step 4: Add account join date and trade-days-since-join context
     data_agg_full_reset = data_agg_reset.reset_index()
     def account_join_apply_helper(row):
-        join_date = account_join_dict[row['Account ']]
+        join_date = account_join_dict[row['Account']]
         if row['Trade Date'] < join_date:
             days_since_join = None
         else:
@@ -70,16 +72,13 @@ def evaluate_new_accounts(data):
     concat_df = pd.DataFrame(tuple_result.to_list(),
                              columns=['Account Join Date', 'Trade Days Since Join'])
     data_agg_reindexed = (pd.concat([data_agg_full_reset, concat_df], axis=1)
-                          .set_index(['Trade Date', 'CTI', 'Name']))
+                          .set_index(['Trade Date', 'CTI', 'User Name']))
 
     return data_agg_reindexed
 
 
 # -----------------------------------------------------------------------------
 
-# [CONFIGURE] Setup
-USE_DATE = '2021-03-29'
-PRODUCTS = ['VXM', 'IBHY', 'IBIG']  # Default ['VXM', 'IBHY', 'IBIG']
 # Initialize storage
 data_dict = {}
 new_accounts_dict = {}
@@ -90,9 +89,8 @@ new_accounts_cumsum_dict = {}
 for product in PRODUCTS:
     # 1) Load
     data_dict[product] = \
-        (pd.read_csv(DOWNLOADS_DIR + f'{product}_Historical_Daily_Volume_data_{USE_DATE}.csv',
-                     parse_dates=['Month, Day, Year of Trading Dt'])
-         .rename({'Month, Day, Year of Trading Dt': 'Trade Date'}, axis=1))
+        pd.read_csv(DOWNLOADS_DIR + f'{product}_Historical_Daily_Volume_Breakdown_data_{USE_DATE}.csv',
+                    parse_dates=['Trade Date'])
     print(f"{product} loaded.")
     # 2) Run function
     new_accounts_dict[product] = evaluate_new_accounts(data_dict[product])
