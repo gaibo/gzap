@@ -14,7 +14,7 @@ DOWNLOADS_DIR = 'C:/Users/gzhang/Downloads/'
 USE_DATE = '2021-04-30'
 PRODUCTS = ['IBHY', 'IBIG', 'VX', 'VXM']  # Default ['IBHY', 'IBIG', 'VX', 'VXM']
 MULTIPLIER_DICT = {'IBHY': 1000, 'IBIG': 1000, 'VX': 1000, 'VXM': 100}
-EXPORT_DIR = 'P:/PrdDevSharedDB/Cboe Futures Volume Historical Percentiles/'
+EXPORT_DIR = 'P:/PrdDevSharedDB/Cboe Futures Historical Percentiles/'
 
 ###############################################################################
 
@@ -230,10 +230,16 @@ for product in PRODUCTS:
 export_root_path = Path(EXPORT_DIR) / USE_DATE
 for product in PRODUCTS:
     export_path = export_root_path / product
-    export_path.mkdir(parents=True, exist_ok=True)
+    export_path_sub = export_path / 'Volume Subcategories'
+    export_path_sub.mkdir(parents=True, exist_ok=True)
     print(f"{export_path} established as export path.")
-    for i_field in VOLUME_COLS:
+    for i_field in VOLUME_REFERENCE_COLS:
         with pd.ExcelWriter(export_path / f'{i_field}.xlsx', datetime_format='YYYY-MM-DD') as writer:
+            for i_agg in ['Daily', 'Monthly', 'Quarterly', 'Yearly']:
+                agg_df = pd.DataFrame(product_dict[product][i_field][i_agg])
+                agg_df.to_excel(writer, sheet_name=i_agg, freeze_panes=(1, 1))
+    for i_field in VOLUME_SUBCAT_COLS:
+        with pd.ExcelWriter(export_path_sub / f'{i_field}.xlsx', datetime_format='YYYY-MM-DD') as writer:
             for i_agg in ['Daily', 'Monthly', 'Quarterly', 'Yearly']:
                 agg_df = pd.DataFrame(product_dict[product][i_field][i_agg])
                 agg_df.to_excel(writer, sheet_name=i_agg, freeze_panes=(1, 1))
