@@ -8,12 +8,13 @@ plt.style.use('cboe-fivethirtyeight')
 # 1) Go to https://bi.cboe.com/#/views/SettlementDataPull/Dashboard
 #    and Download->Data->Summary tab->Download all rows as a text file.
 #    Save it in DOWNLOADS_DIR as f'Unified_Data_Table_data_{USE_DATE}.csv'.
-# 2) Run this script and check DOWNLOADS_DIR for f'xxxx.csv' (probably multiple CSVs).
+# 2) Run this script and check EXPORT_DIR for folder named USE_DATE which contains XLSXs.
 
 DOWNLOADS_DIR = 'C:/Users/gzhang/Downloads/'
 USE_DATE = '2021-04-30'
 PRODUCTS = ['IBHY', 'IBIG', 'VX', 'VXM']  # Default ['IBHY', 'IBIG', 'VX', 'VXM']
 MULTIPLIER_DICT = {'IBHY': 1000, 'IBIG': 1000, 'VX': 1000, 'VXM': 100}
+EXPORT_DIR = 'P:/PrdDevSharedDB/Cboe Futures Volume Historical Percentiles/'
 
 ###############################################################################
 
@@ -24,21 +25,24 @@ settle_data = pd.read_csv(DOWNLOADS_DIR + DASHBOARD_DOWNLOAD_FILE,
 settle_data['Weekly'] = settle_data['Symbol'].apply(lambda s: s[-5:-3].isnumeric())     # Test for week number
 settle_data_trim = settle_data.drop(['Block and Standard', 'Block and TAS',
                                      'ECRP and Standard', 'ECRP and TAS'], axis=1)
-# settle_data_df = settle_data_trim.pivot(index=['Product', 'Date', 'Expiry', 'Symbol', 'Term', 'DTE'],
-#                                         columns='Measure Names', values='Measure Values')
-settle_data_df = settle_data_trim.pivot_table(index=['Product', 'Date', 'Expiry', 'Symbol', 'Term', 'DTE', 'Weekly'],
-                                              columns='Measure Names', values='Measure Values')
-# settle_data_df = (settle_data_trim.set_index(['Product', 'Date', 'Expiry', 'Symbol', 'Term', 'DTE', 'Measure Names'])
-#                   .squeeze().unstack())
-SETTLE_COLUMN_ORDER = ['Settle', 'Volume', 'Standard', 'TAS',
-                       'Block', 'ECRP', 'Spreads',
-                       'OI', 'Open', 'High', 'Low', 'Close']
-settle_data_df = settle_data_df[SETTLE_COLUMN_ORDER].copy()     # Enforce column order
+INDEX_COLS = ['Product', 'Date', 'Expiry', 'Symbol', 'Term', 'DTE', 'Weekly']
+# settle_data_df = settle_data_trim.pivot(index=INDEX_COLS, columns='Measure Names', values='Measure Values')
+settle_data_df = settle_data_trim.pivot_table(index=INDEX_COLS, columns='Measure Names', values='Measure Values')
+# settle_data_df = settle_data_trim.set_index(INDEX_COLS + ['Measure Names']).squeeze().unstack()
+CONTENT_COLS = ['Settle', 'Volume', 'Standard', 'TAS',
+                'Block', 'ECRP', 'Spreads', 'Customer',
+                'OI', 'Open', 'High', 'Low', 'Close']
+settle_data_df = settle_data_df[CONTENT_COLS].copy()    # Enforce column order
 # Create 'Notional' column by combining settle and volume
 for product in PRODUCTS:
     settle_data_df.loc[product, 'Notional'] = \
         (settle_data_df.loc[product, 'Settle'] * settle_data_df.loc[product, 'Volume']
          * MULTIPLIER_DICT[product]).values
+# Establish groupings for different analyses
+VOLUME_REFERENCE_COLS = ['Volume', 'Notional', 'OI']    # Most commonly referenced stats
+VOLUME_SUBCAT_COLS = ['Standard', 'TAS', 'Block', 'ECRP', 'Spreads', 'Customer']    # Subcategories; consider % of total
+VOLUME_COLS = VOLUME_REFERENCE_COLS + VOLUME_SUBCAT_COLS
+PRICE_COLS = ['Settle', 'Open', 'High', 'Low', 'Close']
 # Split DataFrame by product
 settle_data_dict = {product: settle_data_df.xs(product) for product in PRODUCTS}
 
@@ -54,7 +58,7 @@ def lookback_rank(ser):
 def generate_volume_percentiles(data, field):
     # Extract volume-based field up to daily level - aggregate volume by summing
     daily_field = data.groupby(['Date'])[field].sum()
-    if field in ['Standard', 'TAS', 'Block', 'ECRP', 'Spreads']:
+    if field in VOLUME_SUBCAT_COLS:
         daily_volume = data.groupby(['Date'])['Volume'].sum()
     else:
         daily_volume = None     # Not applicable/useful
@@ -79,7 +83,7 @@ def generate_volume_percentiles(data, field):
     daily_change_neg_percentile = (-daily_change_neg).rank(pct=True)
     daily_change_posneg_percentile_df = pd.DataFrame({'Increase': daily_change_pos_percentile,
                                                       'Decrease': daily_change_neg_percentile})
-    if field in ['Standard', 'TAS', 'Block', 'ECRP', 'Spreads']:
+    if field in VOLUME_SUBCAT_COLS:
         # Do the same analysis on % total volume if field is a subset of volume
         daily_percent_total = daily_field / daily_volume
         daily_percent_total_percentile = daily_percent_total.rank(pct=True)
@@ -99,7 +103,7 @@ def generate_volume_percentiles(data, field):
         daily_percent_total_change = None
         daily_percent_total_change_posneg_percentile_df = None
     # Initialize storage dict
-    if field in ['Standard', 'TAS', 'Block', 'ECRP', 'Spreads']:
+    if field in VOLUME_SUBCAT_COLS:
         field_percentile_dict = {
             'Daily': {
                 'Sum': daily_field,
@@ -155,7 +159,7 @@ def generate_volume_percentiles(data, field):
                           'Decrease': (-agg_change_neg).rank(pct=True)})
         field_percentile_dict[agg]['ADV Change Percentile +'], field_percentile_dict[agg]['ADV Change Percentile -'] = \
             agg_change_posneg_percentile_df['Increase'], agg_change_posneg_percentile_df['Decrease']
-        if field in ['Standard', 'TAS', 'Block', 'ECRP', 'Spreads']:
+        if field in VOLUME_SUBCAT_COLS:
             # Do the same analysis on % total volume if field is a subset of volume
             field_percentile_dict[agg]['% Total'] = \
                 field_percentile_dict[agg]['Sum'] / daily_field_df.groupby(agg_level)['Total Volume'].sum()
@@ -183,11 +187,14 @@ def generate_volume_percentiles(data, field):
 product_dict = {}
 for product in PRODUCTS:
     # Select product and run percentiles on each volume-related field
-    # NOTE: the 6 Order Fill fields - Volume, Standard, TAS, Block, ECRP, Spreads - only go back to 2018-03-20;
-    #       the 6 Settlement+OI fields - Settle, OI, Open, High, Low, Close - go all the way back to 2013-05-20
-    # NOTE: 1 additional constructed field - Notional - uses Volume and Settle; informationally it is closer to Volume
+    # NOTE: the 7 Order Fill fields - Volume, Standard, TAS, Block, ECRP, Spreads, Customer -
+    #         only go back to 2018-02-26;
+    #       the 6 Settlement+OI fields - Settle, OI, Open, High, Low, Close -
+    #         go all the way back to 2013-05-20;
+    #       the 1 constructed field - Notional -
+    #         uses Volume and Settle so only goes back to 2018-02-26; informationally it is grouped with Volume
     product_data = settle_data_dict[product]
-    ORDERFILL_FIELDS = ['Volume', 'Standard', 'TAS', 'Block', 'ECRP', 'Spreads']
+    ORDERFILL_FIELDS = ['Volume', 'Standard', 'TAS', 'Block', 'ECRP', 'Spreads', 'Customer']
     SETTLEOI_FIELDS = ['Settle', 'OI', 'Open', 'High', 'Low', 'Close']
     CONSTRUCTED_FIELDS = ['Notional']
     product_orderfill = product_data[ORDERFILL_FIELDS]
@@ -204,12 +211,6 @@ for product in PRODUCTS:
     # Run percentiles on each volume-based field from Order Fill
     for i_field in ORDERFILL_FIELDS:
         percentile_dict[i_field] = generate_volume_percentiles(product_orderfill, i_field)
-    # product_orderfill_subsplits = product_orderfill.copy()
-    # for i_field in ['Standard', 'TAS', 'Block', 'ECRP', 'Spreads']:
-    #     product_orderfill_subsplits[i_field] = product_orderfill[i_field] / product_orderfill['Volume']
-    #     percentile_dict[i_field + ' Percent'] = generate_volume_percentiles(product_orderfill_subsplits, i_field)
-    #     for i_agg in ['Monthly', 'Quarterly', 'Yearly']:
-    #         percentile_dict[i_field + ' Percent'][i_agg]['Sum'] = None  # This field makes no sense for percent splits
 
     # Run percentiles on OI field from Settlement+OI. OI's aggregation is very specific: it must be summed up to
     # daily level (since the roll drives OI at expiry-level), then averaged up to monthly/quarterly/yearly
@@ -217,7 +218,7 @@ for product in PRODUCTS:
     for i_agg in ['Monthly', 'Quarterly', 'Yearly']:
         percentile_dict['OI'][i_agg]['Sum'] = None    # This field makes no sense for OI
 
-    # Run percentiles on constructed Notionals
+    # Run percentiles on constructed Notional field
     percentile_dict['Notional'] = generate_volume_percentiles(product_constructed, 'Notional')
 
     # Store in higher level storage dictionary
@@ -226,11 +227,12 @@ for product in PRODUCTS:
 ###############################################################################
 
 # Write to disk for general public access
+export_root_path = Path(EXPORT_DIR) / USE_DATE
 for product in PRODUCTS:
-    export_path = Path(f'P:/PrdDevSharedDB/Cboe Futures Volume Historical Percentiles/{USE_DATE}/{product}/')
+    export_path = export_root_path / product
     export_path.mkdir(parents=True, exist_ok=True)
-    print(f"{export_path} created (if not before).")
-    for i_field in ['Volume', 'Standard', 'TAS', 'Block', 'ECRP', 'Spreads', 'OI', 'Notional']:
+    print(f"{export_path} established as export path.")
+    for i_field in VOLUME_COLS:
         with pd.ExcelWriter(export_path / f'{i_field}.xlsx', datetime_format='YYYY-MM-DD') as writer:
             for i_agg in ['Daily', 'Monthly', 'Quarterly', 'Yearly']:
                 agg_df = pd.DataFrame(product_dict[product][i_field][i_agg])
