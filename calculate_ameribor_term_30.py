@@ -140,7 +140,8 @@ combined_data = combined_data.sort_values(['Date', 'DBPV', 'Principal Amount'],
 ####
 
 # Temp 2021 test
-test = combined_data.set_index('Date').loc['2021-01-04':'2021-03-19']
+# test = combined_data.set_index('Date').loc['2021-01-04':'2021-03-19']
+test = combined_data.set_index('Date').loc['2016-01-15':'2021-03-19']
 test_dates = test.index.unique()
 # test_daily_totals = test.groupby('Date')['DBPV'].sum()
 # test['Daily Total DBPV'] = test_daily_totals
@@ -150,8 +151,10 @@ VOLUME_THRESHOLD_NOT_METS = []
 SAFEGUARD_NEEDEDS = []
 TERM_30_RATES_FIRSTPASS = []
 TERM_30_RATES = []
+DAY_DF_DICT_FIRSTPASS = {}
 DAY_DF_DICT = {}
 for five_days_ago, today in zip(test_dates[:-4], test_dates[4:]):
+    print(today.strftime('%Y-%m-%d'))
     test_curr_five_days = test.loc[five_days_ago:today].copy()
     curr_five_day_volume = test_curr_five_days['Principal Amount'].sum()
     if curr_five_day_volume < 25e9:
@@ -186,7 +189,8 @@ for five_days_ago, today in zip(test_dates[:-4], test_dates[4:]):
                                   term_30_rate_firstpass, term_30_rate))
     TERM_30_RATES_FIRSTPASS.append((today, term_30_rate_firstpass))
     TERM_30_RATES.append((today, term_30_rate))
-    DAY_DF_DICT[today] = test_curr_five_days
+    DAY_DF_DICT_FIRSTPASS[today] = test_curr_five_days
+    DAY_DF_DICT[today] = test_curr_five_days_safeguard
 test_rates_firstpass = (pd.DataFrame(TERM_30_RATES_FIRSTPASS, columns=['Date', 'Term-30 Rate (First Pass)'])
                         .set_index('Date'))
 test_rates = pd.DataFrame(TERM_30_RATES, columns=['Date', 'Term-30 Rate']).set_index('Date')
