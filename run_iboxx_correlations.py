@@ -14,6 +14,7 @@ ROLL_N_BEFORE_EXPIRY = 3    # Default 3
 con = create_bloomberg_connection()
 
 ###############################################################################
+# Pull from Bloomberg
 
 # High Yield: IBY1 futures, IBXXIBHY, HYG, IBOXHY, CWY1 futures
 # NOTE: futures daily percent return requires stitching together near and next terms
@@ -46,6 +47,9 @@ scaled_cdx_na_hy = scaled_cds['CDX NA HY'].dropna()
 ihb1 = con.bdh('IHB1 Index', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
                f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
 ihb1.to_csv(DATA_DIR + f"IHB1_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+ihb2 = con.bdh('IHB2 Index', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
+               f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+ihb2.to_csv(DATA_DIR + f"IHB2_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
 ibxxibig = con.bdh('IBXXIBIG Index', ['PX_LAST'],
                    f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
 ibxxibig.to_csv(DATA_DIR + f"IBXXIBIG_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
@@ -96,20 +100,6 @@ eurusd = con.bdh('EURUSD BGN Curncy', ['PX_LAST'],
 eurusd.to_csv(DATA_DIR + f"EURUSD_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
 
 ###############################################################################
-
-# Pull from Bloomberg
-iby1 = con.bdh('IBY1 Index', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
-               f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
-iby2 = con.bdh('IBY2 Index', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
-               f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
-ibxxibhy = con.bdh('IBXXIBHY Index', ['PX_LAST'],
-                   f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
-ihb1 = con.bdh('IHB1 Index', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
-               f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
-ihb2 = con.bdh('IHB2 Index', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
-               f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
-ibxxibig = con.bdh('IBXXIBIG Index', ['PX_LAST'],
-                   f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
 
 # Generate iBoxx maturities and surrounding "useful" dates
 iboxx_maturities = generate_expiries(START_DATE, END_DATE, specific_product='iBoxx')
