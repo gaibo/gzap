@@ -1,5 +1,5 @@
 import pandas as pd
-from options_futures_expirations_v3 import BUSDAY_OFFSET
+from options_futures_expirations_v3 import BUSDAY_OFFSET, DAY_OFFSET, ensure_bus_day
 from pathlib import Path
 
 # Load DTCC commercial paper and commercial deposit data
@@ -94,14 +94,16 @@ afx_data = afx_data[afx_data['busted_at'].isna() & afx_data['funded_at'].notna()
 afx_data = afx_data[(afx_data['instrument'] == 'overnight_unsecured_ameribor_loan')
                     | (afx_data['instrument'] == 'thirty_day_unsecured_ameribor_loan')]
 # Create crucial columns matching DTCC format
-afx_data.loc[(afx_data['instrument'] == 'overnight_unsecured_ameribor_loan'),
-             'Days To Maturity'] = 1
-afx_data.loc[(afx_data['instrument'] == 'thirty_day_unsecured_ameribor_loan'),
-             'Days To Maturity'] = 30
-afx_data.loc[(afx_data['instrument'] == 'overnight_unsecured_ameribor_loan'),
-             'Duration (Days)'] = 1
-afx_data.loc[(afx_data['instrument'] == 'thirty_day_unsecured_ameribor_loan'),
-             'Duration (Days)'] = 30
+# NOTE: required logic for correct days to maturity: find next business day AFTER incrementing by 1 or 30
+afx_data['Trade Date'] = afx_data['funded_at'].apply(lambda tstz: tstz.replace(tzinfo=None)).dt.normalize()
+afx_data.loc[(afx_data['instrument'] == 'overnight_unsecured_ameribor_loan'), 'Maturity Date'] = \
+    ensure_bus_day(afx_data.loc[(afx_data['instrument'] == 'overnight_unsecured_ameribor_loan'), 'Trade Date']
+                   + DAY_OFFSET, shift_to='next', busday_type='SIFMA').values
+afx_data.loc[(afx_data['instrument'] == 'thirty_day_unsecured_ameribor_loan'), 'Maturity Date'] = \
+    ensure_bus_day(afx_data.loc[(afx_data['instrument'] == 'thirty_day_unsecured_ameribor_loan'), 'Trade Date']
+                   + 30*DAY_OFFSET, shift_to='next', busday_type='SIFMA').values
+afx_data['Days To Maturity'] = (afx_data['Maturity Date'] - afx_data['Trade Date']).dt.days
+afx_data['Duration (Days)'] = afx_data['Days To Maturity']
 afx_data['Principal Amount'] = afx_data['quantity'] * 1e6   # Originally in millions
 afx_data['Interest Rate'] = afx_data['price'] / 1000 / 100  # Originally in thousands of basis points
 # Filter 3: principal >= $1MM (shouldn't be needed for AFX but still)
@@ -122,7 +124,7 @@ dtcc_combine[['Product Type', 'Principal Amount', 'Duration (Days)', 'Days To Ma
     dtcc_data[['Product Type', 'Principal Amount', 'Duration (Days)', 'Days To Maturity', 'Interest Rate']]
 dtcc_combine[['Issuer Name', 'CUSIP']] = dtcc_data[['Issuer Name', 'CUSIP']]
 afx_combine = pd.DataFrame()
-afx_combine['Date'] = afx_data['funded_at'].apply(lambda tstz: tstz.replace(tzinfo=None)).dt.normalize()
+afx_combine['Date'] = afx_data['Trade Date']
 afx_combine[['Product Type', 'Principal Amount', 'Duration (Days)', 'Days To Maturity', 'Interest Rate']] = \
     afx_data[['instrument', 'Principal Amount', 'Duration (Days)', 'Days To Maturity', 'Interest Rate']]
 afx_combine[['borrower_name', 'lender_name', 'matched_at', 'funded_at']] = \
@@ -196,5 +198,6 @@ test_rates_firstpass = (pd.DataFrame(TERM_30_RATES_FIRSTPASS, columns=['Date', '
 test_rates = pd.DataFrame(TERM_30_RATES, columns=['Date', 'Term-30 Rate']).set_index('Date')
 threshold_info = (pd.DataFrame(VOLUME_THRESHOLD_NOT_METS, columns=['Date', '5-Day Volume'])
                   .set_index('Date'))
-safeguard_info = (pd.DataFrame(SAFEGUARD_NEEDEDS, columns=['Date', 'Transactions Omitted', 'First Pass Rate', 'Second Pass Rate'])
+safeguard_info = (pd.DataFrame(SAFEGUARD_NEEDEDS, columns=['Date', 'Transactions Omitted',
+                                                           'First Pass Rate', 'Second Pass Rate'])
                   .set_index('Date'))
