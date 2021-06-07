@@ -6,7 +6,8 @@ from pathlib import Path
 DTCC_DATA_DIR = Path('C:/Users/gzhang/Downloads/Ameribor/For CBOE/')
 DTCC_DATA_USECOLS = ['Principal Amount', 'Dated/ Issue Date', 'Settlement Date',
                      'Duration (Days)', 'Interest Rate Type', 'Country Code', 'Sector Code',
-                     'Product Type', 'CUSIP', 'Issuer Name', 'Maturity Date', 'Settlement Amount',
+                     'Product Type', 'CUSIP', 'Issuer Name',
+                     'Maturity Date', 'Settlement Amount', 'Parties to Transaction Classification',
                      'Interest Rate', 'Days To Maturity']
 dtcc_data_list = []
 for year in range(2016, 2022):
@@ -17,8 +18,9 @@ for year in range(2016, 2022):
             {'Product.Type': 'Product Type', 'Issuer.Name': 'Issuer Name', 'Settlement.Date': 'Settlement Date',
              'Dated..Issue.Date': 'Dated/ Issue Date', 'Maturity.Date': 'Maturity Date',
              'Principal.Amount': 'Principal Amount', 'Settlement.Amount': 'Settlement Amount',
-             'Interest.Rate': 'Interest Rate', 'Interest.Rate.Type': 'Interest Rate Type', 'Sector.Code': 'Sector Code',
-             'Duration..Days.': 'Duration (Days)', 'Days.To.Maturity': 'Days To Maturity',
+             'Interest.Rate': 'Interest Rate', 'Interest.Rate.Type': 'Interest Rate Type',
+             'Parties.to.Transaction.Classification': 'Parties to Transaction Classification',
+             'Sector.Code': 'Sector Code', 'Duration..Days.': 'Duration (Days)', 'Days.To.Maturity': 'Days To Maturity',
              'Country.Code': 'Country Code'}, axis=1)
         year_dtcc_data_raw = year_dtcc_data_raw[DTCC_DATA_USECOLS]
         year_dtcc_data_raw = year_dtcc_data_raw.drop(year_dtcc_data_raw.index[-1])
@@ -112,23 +114,39 @@ afx_data = afx_data[afx_data['Principal Amount'] >= 1e6]
 ####
 
 # Combine DTCC data with AFX data
-# Crucial to both: ['Date', 'Product Type', 'Principal Amount', 'Duration (Days)', 'Days To Maturity', 'Interest Rate']
+# Crucial to both: ['Date', 'Product Type', 'Principal Amount', 'Maturity Date',
+#                   'Duration (Days)', 'Days To Maturity', 'Interest Rate']
 # DTCC filter process: ['Dated/ Issue Date', 'Settlement Date', 'Interest Rate Type', 'Country Code', 'Sector Code']
-# DTCC nice to have: ['Issuer Name', 'CUSIP', 'Maturity Date', 'Settlement Amount']
+# DTCC nice to have: ['Dated/ Issue Date', 'Settlement Date', 'Interest Rate Type', 'Country Code', 'Sector Code',
+#                     'Issuer Name', 'CUSIP', 'Settlement Amount', 'Parties to Transaction Classification']
 # AFX filter process: ['instrument', 'busted_at', 'funded_at']
 # AFX nice to have: ['borrower_name', 'lender_name', 'matched_at',
 #                    'price', 'quantity', 'trade_id', 'borrower_id', 'lender_id']
+# DTCC
 dtcc_combine = pd.DataFrame()
+# Crucial
 dtcc_combine['Date'] = dtcc_data['Dated/ Issue Date']
-dtcc_combine[['Product Type', 'Principal Amount', 'Duration (Days)', 'Days To Maturity', 'Interest Rate']] = \
-    dtcc_data[['Product Type', 'Principal Amount', 'Duration (Days)', 'Days To Maturity', 'Interest Rate']]
-dtcc_combine[['Issuer Name', 'CUSIP']] = dtcc_data[['Issuer Name', 'CUSIP']]
+dtcc_combine[['Product Type', 'Principal Amount', 'Maturity Date',
+              'Duration (Days)', 'Days To Maturity', 'Interest Rate']] = \
+    dtcc_data[['Product Type', 'Principal Amount', 'Maturity Date',
+               'Duration (Days)', 'Days To Maturity', 'Interest Rate']]
+# Nice (default ['Issuer Name', 'CUSIP'])
+dtcc_combine[['Dated/Issue Date', 'Settlement Date', 'Interest Rate Type', 'Country Code', 'Sector Code',
+              'Issuer Name', 'CUSIP', 'Parties to Transaction Classification']] = \
+    dtcc_data[['Dated/ Issue Date', 'Settlement Date', 'Interest Rate Type', 'Country Code', 'Sector Code',
+               'Issuer Name', 'CUSIP', 'Parties to Transaction Classification']]
+# AFX
 afx_combine = pd.DataFrame()
+# Crucial
 afx_combine['Date'] = afx_data['Trade Date']
-afx_combine[['Product Type', 'Principal Amount', 'Duration (Days)', 'Days To Maturity', 'Interest Rate']] = \
-    afx_data[['instrument', 'Principal Amount', 'Duration (Days)', 'Days To Maturity', 'Interest Rate']]
+afx_combine[['Product Type', 'Principal Amount', 'Maturity Date',
+             'Duration (Days)', 'Days To Maturity', 'Interest Rate']] = \
+    afx_data[['instrument', 'Principal Amount', 'Maturity Date',
+              'Duration (Days)', 'Days To Maturity', 'Interest Rate']]
+# Nice (default ['borrower_name', 'lender_name', 'matched_at', 'funded_at'])
 afx_combine[['borrower_name', 'lender_name', 'matched_at', 'funded_at']] = \
     afx_data[['borrower_name', 'lender_name', 'matched_at', 'funded_at']]
+# Combin DTCC+AFX
 combined_data = pd.concat([dtcc_combine, afx_combine], sort=False)  # Note: still no sorting
 
 ####
@@ -155,14 +173,33 @@ TERM_30_RATES_FIRSTPASS = []
 TERM_30_RATES = []
 DAY_DF_DICT_FIRSTPASS = {}
 DAY_DF_DICT = {}
-for five_days_ago, today in zip(test_dates[:-4], test_dates[4:]):
+for i, (five_days_ago, today) in enumerate(zip(test_dates[:-4], test_dates[4:])):
     print(today.strftime('%Y-%m-%d'))
+
+    # Test set of 5 days for volume threshold, extending beyond 5 as needed to meet minimum
     test_curr_five_days = test.loc[five_days_ago:today].copy()
     curr_five_day_volume = test_curr_five_days['Principal Amount'].sum()
     if curr_five_day_volume < 25e9:
-        VOLUME_THRESHOLD_NOT_METS.append((today, curr_five_day_volume))
-        TERM_30_RATES.append((today, None))
-        continue
+        failed_five_day_volume = curr_five_day_volume
+        n_days_extended = 0
+        extend_success = False
+        while curr_five_day_volume < 25e9:
+            n_days_extended += 1
+            new_date_idx = i - n_days_extended
+            if new_date_idx < 0:
+                # Fail: ran out of dates to extend
+                TERM_30_RATES.append((today, None))
+                VOLUME_THRESHOLD_NOT_METS.append((today, failed_five_day_volume, None, None))
+                break
+            test_curr_five_days = test.loc[test_dates[new_date_idx]:today].copy()
+            curr_five_day_volume = test_curr_five_days['Principal Amount'].sum()
+        else:
+            # Success: reaching here means volume was successfully extended
+            extend_success = True
+            VOLUME_THRESHOLD_NOT_METS.append((today, failed_five_day_volume, n_days_extended, curr_five_day_volume))
+        if not extend_success:
+            continue    # Just move on to next date, skipping process
+
     # Re-sort for 5-day window
     test_curr_five_days = test_curr_five_days.sort_values(['DBPV', 'Principal Amount'], ascending=[False, False])
     # Calculate total DBPV
@@ -196,8 +233,19 @@ for five_days_ago, today in zip(test_dates[:-4], test_dates[4:]):
 test_rates_firstpass = (pd.DataFrame(TERM_30_RATES_FIRSTPASS, columns=['Date', 'Term-30 Rate (First Pass)'])
                         .set_index('Date'))
 test_rates = pd.DataFrame(TERM_30_RATES, columns=['Date', 'Term-30 Rate']).set_index('Date')
-threshold_info = (pd.DataFrame(VOLUME_THRESHOLD_NOT_METS, columns=['Date', '5-Day Volume'])
+threshold_info = (pd.DataFrame(VOLUME_THRESHOLD_NOT_METS, columns=['Date', 'Failed 5-Day Volume',
+                                                                   'Days Extended', 'Extended Volume'])
                   .set_index('Date'))
 safeguard_info = (pd.DataFrame(SAFEGUARD_NEEDEDS, columns=['Date', 'Transactions Omitted',
                                                            'First Pass Rate', 'Second Pass Rate'])
                   .set_index('Date'))
+
+####
+
+EXPORT_DIR = Path('C:/Users/gzhang/Downloads/Ameribor/Term-30 Legal Filing/')
+
+# Export input data for 6 months
+past_six_months_dates = test.loc['2020-09-01':'2021-03-19'].index.unique()
+for date in past_six_months_dates:
+    export_loc = EXPORT_DIR / '6 Months Input Data' / f'{date.strftime("%Y-%m-%d")}_dtccafx_ambor30t_input.csv'
+    DAY_DF_DICT[date].drop(['borrower_name', 'lender_name'], axis=1).to_csv(export_loc)
