@@ -1,6 +1,8 @@
 import pandas as pd
 from options_futures_expirations_v3 import BUSDAY_OFFSET, DAY_OFFSET, ensure_bus_day
 from pathlib import Path
+from utility.universal_tools import chop_segments_off_string
+import os
 
 # Load DTCC commercial paper and commercial deposit data
 DTCC_DATA_DIR = Path('C:/Users/gzhang/Downloads/Ameribor/For CBOE/')
@@ -77,19 +79,8 @@ for day in trading_days:
 afx_data_raw = pd.concat(afx_data_list)
 afx_data = afx_data_raw.copy()
 
-
 # Create 'instrument' designation to separate overnight from 30-day, etc.
-def apply_helper_instrument(s):
-    s_list = s.split('_')
-    if len(s_list) <= 4:
-        # Cannot parse with universal rule
-        return s
-    else:
-        # Concat important parts for identification
-        return '_'.join(s_list[:-4])
-
-
-afx_data['instrument'] = afx_data['trade_id'].apply(apply_helper_instrument)
+afx_data['instrument'] = afx_data['trade_id'].apply(chop_segments_off_string)
 # Filter 0: drop duplicates - 2 records of some trades
 afx_data = afx_data.drop_duplicates('trade_id')
 # Filter 1: throw out busted trades, assert funded
@@ -114,6 +105,87 @@ afx_data['Principal Amount'] = afx_data['quantity'] * 1e6   # Originally in mill
 afx_data['Interest Rate'] = afx_data['price'] / 1000 / 100  # Originally in thousands of basis points
 # Filter 3: principal >= $1MM (shouldn't be needed for AFX but still)
 afx_data = afx_data[afx_data['Principal Amount'] >= 1e6]
+
+####
+
+# Load additional bespoke data
+
+# DTCC
+DTCC_DATA_DIR_2 = Path('C:/Users/gzhang/Downloads/Ameribor/AFX DTCC/')
+dtcc_data_list_2 = []
+for day in pd.date_range('2021-02-16', '2021-06-08', freq=BUSDAY_OFFSET):
+    day_str = day.strftime('%y%m%d')
+    try:
+        day_filename = sorted([f for f in os.listdir(DTCC_DATA_DIR_2) if f.startswith(f'D{day_str}')])[-1]
+        if day_filename[-4:] != '.csv':
+            os.rename(DTCC_DATA_DIR_2/day_filename, DTCC_DATA_DIR_2/(day_filename+'.csv'))
+            day_filename += '.csv'
+    except IndexError:
+        MISSING_AFX_DAYS.append(day)
+        continue
+    # Load day's trades
+    day_trades = pd.read_csv(DTCC_DATA_DIR_2 / day_filename,
+                             skiprows=1, usecols=DTCC_DATA_USECOLS,
+                             parse_dates=['Dated/ Issue Date', 'Settlement Date', 'Maturity Date'])
+    dtcc_data_list_2.append(day_trades)
+dtcc_data_2_raw = pd.concat(dtcc_data_list_2)
+dtcc_data_2 = dtcc_data_2_raw.copy()
+# Filter 1: principal >= $1MM
+dtcc_data_2 = dtcc_data_2[dtcc_data_2['Principal Amount'] >= 1e6]
+# Filter 2: issue date == settle date
+dtcc_data_2 = dtcc_data_2[dtcc_data_2['Dated/ Issue Date'] == dtcc_data_2['Settlement Date']]
+# Filter 3: duration >= 2, <=40 days
+dtcc_data_2 = dtcc_data_2[(dtcc_data_2['Duration (Days)'] >= 2) & (dtcc_data_2['Duration (Days)'] <= 40)]
+# Filter 4: fixed interest rate delivery
+dtcc_data_2 = dtcc_data_2[dtcc_data_2['Interest Rate Type'] == 'F']
+# Filter 5: American company, Financial sector
+dtcc_data_2 = dtcc_data_2[(dtcc_data_2['Country Code'] == 'USA') & (dtcc_data_2['Sector Code'] == 'FIN')]
+dtcc_combine_2 = pd.DataFrame()
+# Create combine version
+dtcc_combine_2['Date'] = dtcc_data_2['Dated/ Issue Date']
+dtcc_combine_2[['Product Type', 'Principal Amount', 'Maturity Date',
+                'Duration (Days)', 'Days To Maturity', 'Interest Rate']] = \
+    dtcc_data_2[['Product Type', 'Principal Amount', 'Maturity Date',
+                 'Duration (Days)', 'Days To Maturity', 'Interest Rate']]
+dtcc_combine_2[['Dated/Issue Date', 'Settlement Date', 'Interest Rate Type', 'Country Code', 'Sector Code',
+                'Issuer Name', 'CUSIP', 'Parties to Transaction Classification']] = \
+    dtcc_data_2[['Dated/ Issue Date', 'Settlement Date', 'Interest Rate Type', 'Country Code', 'Sector Code',
+                 'Issuer Name', 'CUSIP', 'Parties to Transaction Classification']]
+
+# AFX
+AFX_DATA_DIR_2 = Path('C:/Users/gzhang/Downloads/Ameribor/')
+afx_data_2_raw = pd.read_csv(AFX_DATA_DIR_2 / 'ameribor_trades_bespoke_2021-03-19_2021-06-08.csv',
+                             parse_dates=['trade_date', 'settlement_date', 'maturity_date'])
+afx_data_2 = afx_data_2_raw.copy()
+afx_data_2 = afx_data_2[afx_data_2['side'] == 'Borrow']
+afx_data_2 = afx_data_2[afx_data_2['status'] != 'busted']
+afx_data_2 = afx_data_2.rename({'institution': 'borrower_name',
+                                'trade_date': 'Trade Date',
+                                'settlement_date': 'Settlement Date',
+                                'maturity_date': 'Maturity Date',
+                                'counterparty': 'lender_name',
+                                'amount': 'Principal Amount',
+                                'rate': 'Interest Rate'}, axis=1)
+afx_data_2['instrument'] = afx_data_2['market'].apply(lambda s: chop_segments_off_string(s, n_segments=3))
+afx_data_2 = afx_data_2[(afx_data_2['instrument'] == 'overnight_unsecured_ameribor_loan')
+                        | (afx_data_2['instrument'] == 'thirty_day_unsecured_ameribor_loan')
+                        | (afx_data_2['instrument'] == 'bilateral_loan_overnight')
+                        | (afx_data_2['instrument'] == 'direct_settlement_loan_overnight')]
+afx_data_2['Days To Maturity'] = (afx_data_2['Maturity Date'] - afx_data_2['Trade Date']).dt.days
+afx_data_2['Duration (Days)'] = afx_data_2['Days To Maturity']
+afx_data_2 = afx_data_2[afx_data_2['Principal Amount'] >= 1e6]
+# Create combine version
+afx_combine_2 = pd.DataFrame()
+afx_combine_2[['Date', 'Product Type', 'Principal Amount', 'Maturity Date',
+               'Duration (Days)', 'Days To Maturity', 'Interest Rate',
+               'borrower_name', 'lender_name']] = \
+    afx_data_2[['Trade Date', 'instrument', 'Principal Amount', 'Maturity Date',
+                'Duration (Days)', 'Days To Maturity', 'Interest Rate',
+                'borrower_name', 'lender_name']]
+
+# Combine DTCC+AFX
+combined_data_2 = pd.concat([dtcc_combine_2, afx_combine_2], sort=False)  # Note: still no sorting
+combined_data_2 = combined_data_2[combined_data_2['Date'] > pd.Timestamp('2021-03-19')]
 
 ####
 
@@ -150,8 +222,10 @@ afx_combine[['Product Type', 'Principal Amount', 'Maturity Date',
 # Nice (default ['borrower_name', 'lender_name', 'matched_at', 'funded_at'])
 afx_combine[['borrower_name', 'lender_name', 'matched_at', 'funded_at']] = \
     afx_data[['borrower_name', 'lender_name', 'matched_at', 'funded_at']]
-# Combin DTCC+AFX
+# Combine DTCC+AFX
 combined_data = pd.concat([dtcc_combine, afx_combine], sort=False)  # Note: still no sorting
+combined_data = combined_data[combined_data['Date'] <= pd.Timestamp('2021-03-19')]
+combined_data = pd.concat([combined_data, combined_data_2], sort=False)     # Revisionism lol
 
 ####
 
@@ -165,7 +239,7 @@ combined_data = combined_data.sort_values(['Date', 'DBPV', 'Principal Amount'],
 # Run the AMBOR30T calculation process
 
 # Determine dataset
-test = combined_data.set_index('Date').loc['2016-01-15':'2021-03-19']
+test = combined_data.set_index('Date').loc['2016-01-15':'2021-06-08']   # '2016-01-15':'2021-03-19'
 test_dates = test.index.unique()    # No idea how this compares to our trading calendars
 
 
@@ -220,7 +294,7 @@ for i, today in enumerate(test_dates):
         today_data = today_data_filtered
     ELIGIBLE_TRANSACTIONS_DF = ELIGIBLE_TRANSACTIONS_DF.append(today_data)
     ISOLATED_DAILY_TOTAL_DBPV_DICT[today] = today_data['DBPV'].sum()/360/10000
-    ISOLATED_DAILY_TOTAL_VOLUME_DICT[today] = today_data['Principal Amount'].sum()
+    ISOLATED_DAILY_TOTAL_VOLUME_DICT[today] = today_data['Principal Amount'].sum()/1e9
 
     # Apply $25bn moveable left bound date and calculate AMBOR30T rate
     left_bound_i = i - 4    # Initial planned lookback is 5 days
@@ -293,6 +367,10 @@ outlier_info = (pd.DataFrame(OUTLIER_FILTER_APPLIEDS, columns=['Date', 'Transact
 daily_total_dbpv = pd.Series(ISOLATED_DAILY_TOTAL_DBPV_DICT).sort_index()
 daily_rate = pd.Series(ISOLATED_DAILY_RATE_DICT).sort_index()
 daily_total_volume = pd.Series(ISOLATED_DAILY_TOTAL_VOLUME_DICT).sort_index()
+daily_values_breakdown = pd.DataFrame({'BPV Weighted IR': daily_rate,
+                                       'Underlying Volume': daily_total_volume,
+                                       'Total BPV': daily_total_dbpv})
+daily_values_breakdown.index.name = 'Date'
 
 ####
 
@@ -307,8 +385,13 @@ for date in past_six_months_dates:
 DOWNLOADS_DIR = Path('C:/Users/gzhang/Downloads/')
 
 # Export input data for full history
-full_dates = ELIGIBLE_TRANSACTIONS_DF.loc['2016-06-01':'2021-03-19'].index.unique()
+full_dates = ELIGIBLE_TRANSACTIONS_DF.loc['2016-06-01':'2021-06-08'].index.unique()
 for date in full_dates:
     export_loc = (DOWNLOADS_DIR / 'My AMBOR30T Full History Input Data' /
                   f'{date.strftime("%Y-%m-%d")}_dtccafx_ambor30t_input.csv')
     AMBOR30T_INPUT_DF_DICT[date].to_csv(export_loc)
+
+test_rates.to_csv(DOWNLOADS_DIR / 'ambor30t_test_rates.csv', header=True)
+threshold_info.to_csv(DOWNLOADS_DIR / 'ambor30t_test_thresholds.csv')
+outlier_info.to_csv(DOWNLOADS_DIR / 'ambor30t_test_outliers.csv')
+daily_values_breakdown.to_csv(DOWNLOADS_DIR / 'ambor30t_test_daily_breakdown.csv')
