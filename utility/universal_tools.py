@@ -89,3 +89,26 @@ def get_best_fit(x_data, y_data, fit_intercept=True):
     r_sq = model.score(x, y)
     slope = model.coef_[0]
     return r_sq, slope, model
+
+
+def chop_segments_off_string(s, delimiter='_', n_segments=4, from_direction='end'):
+    """ Crop from given string a number of segments from start or end
+        NOTE: for future versions, consider passing arrays of corresponding parameters
+        NOTE: current functionality is conservative with error handling
+    :param s: the string to chop off of, from which substring is obtained
+    :param delimiter: 'fdsa_rewqf_fdsa' can be delimited by '_' into 3 segments
+    :param n_segments: number of segments to remove from substring
+    :param from_direction: 'start' to chop from beginning of string, 'end' from end
+    :return: substring; original string if number of segments to crop is too many
+    """
+    s_list = s.split(delimiter)
+    if len(s_list) <= n_segments:
+        return s    # Return original string to prevent unintentional loss of info
+    else:
+        # Concat important parts for identification
+        if from_direction == 'end':
+            return delimiter.join(s_list[:-n_segments])
+        elif from_direction == 'start':
+            return delimiter.join(s_list[n_segments:])
+        else:
+            raise ValueError(f"Cannot recognize from_direction=\"{from_direction}\"; must be 'end' or 'start'")
