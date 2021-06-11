@@ -1,8 +1,14 @@
 import pandas as pd
-from options_futures_expirations_v3 import BUSDAY_OFFSET, DAY_OFFSET, ensure_bus_day
+from options_futures_expirations_v3 import DAY_OFFSET, ensure_bus_day
 from pathlib import Path
 from utility.universal_tools import chop_segments_off_string
 import os
+
+# [MANUAL] Configure
+OFFICIAL_START = pd.Timestamp('2016-06-01')
+OUR_DATA_FORMAT_TRANSITION = pd.Timestamp('2021-03-19')     # Up to and including this date is dataset 1, then dataset 2
+OUR_START = pd.Timestamp('2016-01-15')  # We have enough DTCC and AFX data to try calculating further than 2016-06-01
+OUR_END = pd.Timestamp('2021-06-08')    # Set this to the latest date for which we have both DTCC and AFX data
 
 # Load DTCC commercial paper and commercial deposit data
 DTCC_DATA_DIR = Path('C:/Users/gzhang/Downloads/Ameribor/For CBOE/')
@@ -13,6 +19,7 @@ DTCC_DATA_USECOLS = ['Principal Amount', 'Dated/ Issue Date', 'Settlement Date',
                      'Interest Rate', 'Days To Maturity']
 dtcc_data_list = []
 for year in range(2016, 2022):
+    print(f"Loading DTCC dataset 1 {year}")
     if year == 2020:
         # Account for irregular column formatting
         year_dtcc_data_raw = pd.read_csv(DTCC_DATA_DIR / f'{str(year)}DTCCfile.csv')
@@ -54,12 +61,13 @@ AFX_DATA_DIR = Path('P:/ProductDevelopment/Database/AFX/AFX_data/')
 AFX_DATA_USECOLS = ['trade_id', 'matched_at', 'funded_at', 'busted_at',
                     'price', 'quantity',
                     'borrower_id', 'lender_id']
-trading_days = pd.date_range('2016-01-15', '2021-03-19', freq=BUSDAY_OFFSET)
+afx_trading_days = pd.to_datetime([f for f in os.listdir(AFX_DATA_DIR) if f.startswith('20')]).sort_values()
+afx_trading_days = afx_trading_days[afx_trading_days >= OUR_START]  # Earlier days have different columns
 afx_data_list = []
 MISSING_AFX_DAYS = []
-for day in trading_days:
+for day in afx_trading_days:
     day_str = day.strftime('%Y%m%d')
-    print(day_str)
+    print(f"Loading AFX dataset 1 {day_str}")
     # Load day's trades
     try:
         day_trades = pd.read_csv(AFX_DATA_DIR / day_str / 'trades.csv',
@@ -113,8 +121,11 @@ afx_data = afx_data[afx_data['Principal Amount'] >= 1e6]
 # DTCC
 DTCC_DATA_DIR_2 = Path('C:/Users/gzhang/Downloads/Ameribor/AFX DTCC/')
 dtcc_data_list_2 = []
-for day in pd.date_range('2021-02-16', '2021-06-08', freq=BUSDAY_OFFSET):
+dtcc_trading_days_2 = pd.to_datetime([f[1:7] for f in os.listdir(DTCC_DATA_DIR_2) if f.startswith('D')],
+                                     yearfirst=True).sort_values()
+for day in dtcc_trading_days_2:
     day_str = day.strftime('%y%m%d')
+    print(f"Loading DTCC dataset 2 {day_str}")
     try:
         day_filename = sorted([f for f in os.listdir(DTCC_DATA_DIR_2) if f.startswith(f'D{day_str}')])[-1]
         if day_filename[-4:] != '.csv':
@@ -154,7 +165,9 @@ dtcc_combine_2[['Dated/Issue Date', 'Settlement Date', 'Interest Rate Type', 'Co
 
 # AFX
 AFX_DATA_DIR_2 = Path('C:/Users/gzhang/Downloads/Ameribor/')
-afx_data_2_raw = pd.read_csv(AFX_DATA_DIR_2 / 'ameribor_trades_bespoke_2021-03-19_2021-06-08.csv',
+AFX_DATA_2_FILENAME = 'ameribor_trades_bespoke_2021-03-19_2021-06-08.csv'
+print(f"Loading AFX dataset 2 from {AFX_DATA_DIR_2/AFX_DATA_2_FILENAME}")
+afx_data_2_raw = pd.read_csv(AFX_DATA_DIR_2 / AFX_DATA_2_FILENAME,
                              parse_dates=['trade_date', 'settlement_date', 'maturity_date'])
 afx_data_2 = afx_data_2_raw.copy()
 afx_data_2 = afx_data_2[afx_data_2['side'] == 'Borrow']
@@ -185,7 +198,8 @@ afx_combine_2[['Date', 'Product Type', 'Principal Amount', 'Maturity Date',
 
 # Combine DTCC+AFX
 combined_data_2 = pd.concat([dtcc_combine_2, afx_combine_2], sort=False)  # Note: still no sorting
-combined_data_2 = combined_data_2[combined_data_2['Date'] > pd.Timestamp('2021-03-19')]
+combined_data_2 = combined_data_2[(combined_data_2['Date'] > OUR_DATA_FORMAT_TRANSITION)
+                                  & (combined_data_2['Date'] <= OUR_END)]
 
 ####
 
@@ -224,7 +238,8 @@ afx_combine[['borrower_name', 'lender_name', 'matched_at', 'funded_at']] = \
     afx_data[['borrower_name', 'lender_name', 'matched_at', 'funded_at']]
 # Combine DTCC+AFX
 combined_data = pd.concat([dtcc_combine, afx_combine], sort=False)  # Note: still no sorting
-combined_data = combined_data[combined_data['Date'] <= pd.Timestamp('2021-03-19')]
+combined_data = combined_data[(combined_data['Date'] >= OUR_START)
+                              & (combined_data['Date'] <= OUR_DATA_FORMAT_TRANSITION)]
 combined_data = pd.concat([combined_data, combined_data_2], sort=False)     # Revisionism lol
 
 ####
@@ -239,7 +254,7 @@ combined_data = combined_data.sort_values(['Date', 'DBPV', 'Principal Amount'],
 # Run the AMBOR30T calculation process
 
 # Determine dataset
-test = combined_data.set_index('Date').loc['2016-01-15':'2021-06-08']   # '2016-01-15':'2021-03-19'
+test = combined_data.set_index('Date').loc[OUR_START:OUR_END]   # '2016-01-15':'2021-03-19'
 test_dates = test.index.unique()    # No idea how this compares to our trading calendars
 
 
@@ -271,7 +286,7 @@ VOLUME_THRESHOLD_NOT_METS = []
 AMBOR30T_IMPOSSIBLES = []
 AMBOR30T_INPUT_DF_DICT = {}
 for i, today in enumerate(test_dates):
-    print(today.strftime('%Y-%m-%d'))
+    print(f"Calculating {today.strftime('%Y-%m-%d')}:")
 
     # Look up latest date's data
     today_data = test.loc[today].copy()
@@ -374,23 +389,24 @@ daily_values_breakdown.index.name = 'Date'
 
 ####
 
-EXPORT_DIR = Path('C:/Users/gzhang/Downloads/Ameribor/Term-30 Legal Filing/')
-
-# Export input data for 6 months
-past_six_months_dates = ELIGIBLE_TRANSACTIONS_DF.loc['2020-09-01':'2021-03-19'].index.unique()
-for date in past_six_months_dates:
-    export_loc = EXPORT_DIR / '6 Months Input Data' / f'{date.strftime("%Y-%m-%d")}_dtccafx_ambor30t_input.csv'
-    AMBOR30T_INPUT_DF_DICT[date].drop(['borrower_name', 'lender_name'], axis=1).to_csv(export_loc)
+# EXPORT_DIR = Path('C:/Users/gzhang/Downloads/Ameribor/Term-30 Legal Filing/')
+#
+# # Export input data for 6 months
+# cftc_export_dates = ELIGIBLE_TRANSACTIONS_DF.loc['2020-06-01':'2021-05-31'].index.unique()
+# for date in cftc_export_dates:
+#     export_loc = EXPORT_DIR / '12 Months Input Data' / f'{date.strftime("%Y-%m-%d")}_dtccafx_ambor30t_input.csv'
+#     AMBOR30T_INPUT_DF_DICT[date].drop(['borrower_name', 'lender_name'], axis=1).to_csv(export_loc)
 
 DOWNLOADS_DIR = Path('C:/Users/gzhang/Downloads/')
 
-# Export input data for full history
-full_dates = ELIGIBLE_TRANSACTIONS_DF.loc['2016-06-01':'2021-06-08'].index.unique()
-for date in full_dates:
-    export_loc = (DOWNLOADS_DIR / 'My AMBOR30T Full History Input Data' /
-                  f'{date.strftime("%Y-%m-%d")}_dtccafx_ambor30t_input.csv')
-    AMBOR30T_INPUT_DF_DICT[date].to_csv(export_loc)
+# # Export input data for full history
+# full_dates = ELIGIBLE_TRANSACTIONS_DF.loc[OFFICIAL_START:OUR_END].index.unique()
+# for date in full_dates:
+#     export_loc = (DOWNLOADS_DIR / 'My AMBOR30T Full History Input Data' /
+#                   f'{date.strftime("%Y-%m-%d")}_dtccafx_ambor30t_input.csv')
+#     AMBOR30T_INPUT_DF_DICT[date].to_csv(export_loc)
 
+# Export rates and helper calculations
 test_rates.to_csv(DOWNLOADS_DIR / 'ambor30t_test_rates.csv', header=True)
 threshold_info.to_csv(DOWNLOADS_DIR / 'ambor30t_test_thresholds.csv')
 outlier_info.to_csv(DOWNLOADS_DIR / 'ambor30t_test_outliers.csv')
