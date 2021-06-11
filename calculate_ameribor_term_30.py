@@ -103,10 +103,10 @@ afx_data = afx_data[(afx_data['instrument'] == 'overnight_unsecured_ameribor_loa
 afx_data['Trade Date'] = afx_data['funded_at'].apply(lambda tstz: tstz.replace(tzinfo=None)).dt.normalize()
 afx_data.loc[(afx_data['instrument'] == 'overnight_unsecured_ameribor_loan'), 'Maturity Date'] = \
     ensure_bus_day(afx_data.loc[(afx_data['instrument'] == 'overnight_unsecured_ameribor_loan'), 'Trade Date']
-                   + DAY_OFFSET, shift_to='next', busday_type='SIFMA').values
+                   + DAY_OFFSET, shift_to='next', busday_type='AFX').values
 afx_data.loc[(afx_data['instrument'] == 'thirty_day_unsecured_ameribor_loan'), 'Maturity Date'] = \
     ensure_bus_day(afx_data.loc[(afx_data['instrument'] == 'thirty_day_unsecured_ameribor_loan'), 'Trade Date']
-                   + 30*DAY_OFFSET, shift_to='next', busday_type='SIFMA').values
+                   + 30*DAY_OFFSET, shift_to='next', busday_type='AFX').values
 afx_data['Days To Maturity'] = (afx_data['Maturity Date'] - afx_data['Trade Date']).dt.days
 afx_data['Duration (Days)'] = afx_data['Days To Maturity']
 afx_data['Principal Amount'] = afx_data['quantity'] * 1e6   # Originally in millions
