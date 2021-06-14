@@ -3,6 +3,7 @@ from options_futures_expirations_v3 import BUSDAY_OFFSET, generate_expiries
 from futures_reader import create_bloomberg_connection, stitch_bloomberg_futures
 import matplotlib.pyplot as plt
 from collections.abc import Iterable
+import os
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
 plt.style.use('cboe-fivethirtyeight')
@@ -13,6 +14,7 @@ START_DATE = pd.Timestamp('2000-01-01')
 END_DATE = pd.Timestamp('now').normalize() - BUSDAY_OFFSET  # Default yesterday
 ROLL_N_BEFORE_EXPIRY = 3    # Default 3
 con = create_bloomberg_connection()
+
 
 ###############################################################################
 # Pull from Bloomberg
@@ -101,6 +103,7 @@ eurusd = con.bdh('EURUSD BGN Curncy', ['PX_LAST'],
                  f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
 eurusd.to_csv(DATA_DIR + f"EURUSD_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
 
+
 ###############################################################################
 
 # This is literally insane, but have to fix maturity date settlement values from Bloomberg for iBoxx futures
@@ -110,6 +113,7 @@ iby1.loc[iby1.index & iboxx_maturities, 'PX_LAST'] = \
     ibxxibhy.loc[iby1.index & iboxx_maturities, 'PX_LAST'].round(2).values
 ihb1.loc[ihb1.index & iboxx_maturities, 'PX_LAST'] = \
     ibxxibig.loc[ihb1.index & iboxx_maturities, 'PX_LAST'].round(2).values
+
 
 ###############################################################################
 # Calculate bespoke rolled futures
@@ -173,7 +177,19 @@ def calc_overall_corr(timeseries_1, timeseries_2, start_datelike=None, end_datel
     return ts_df_cropped.corr().iloc[1, 0]  # Get element from correlation matrix
 
 
-CORR_START = '2019-07-01'
+def save_fig(figure, save_name, save_dir='.'):
+    if save_dir == '' or save_dir[-1] != '/':
+        save_dir += '/'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        print('Made directory {}'.format(save_dir))
+    # Write figure
+    save_loc = save_dir + save_name
+    figure.savefig(save_loc, bbox_inches='tight')
+    print('Wrote {}'.format(save_loc))
+
+
+CORR_START = None   # '2019-07-01'
 CORR_END = None
 ASSET_CHANGE_DICT = {'IBHY': iby_roll_df['Stitched Change'],
                      'IBXXIBHY': ibxxibhy['PX_LAST'].pct_change(),
@@ -186,64 +202,62 @@ ASSET_CHANGE_DICT = {'IBHY': iby_roll_df['Stitched Change'],
                      '5-Year Treasury Futures': fv_roll_df['Stitched Change'],
                      '10-Year Treasury Futures': ty_roll_df['Stitched Change'],
                      '30-Year Treasury Futures': us_roll_df['Stitched Change'],
-                     'EUR/USD': eurusd['PX_LAST'].pct_change(),
+                     'EUR-USD': eurusd['PX_LAST'].pct_change(),
                      'IBIG': ihb_roll_df['Stitched Change'],
                      'IBXXIBIG': ibxxibig['PX_LAST'].pct_change(),
                      'LQD': lqd['TOT_RETURN_INDEX_GROSS_DVDS'].pct_change(),
                      'IBOXIG': iboxig['PX_LAST'].pct_change(),
                      'CDX NA IG': scaled_cdx_na_ig.pct_change()}
 
-# IBHY first month vs. HYG
+# IBHY
+ibhy1_change = ASSET_CHANGE_DICT['IBHY']
 ibhy_corr_targets = ['IBXXIBHY', 'HYG', 'IBOXHY', 'CDX NA HY', 'SPX', 'VIX', '2-Year Treasury Futures',
-                     '5-Year Treasury Futures', '10-Year Treasury Futures', '30-Year Treasury Futures', 'EUR/USD']
-ibhy1_change = iby_roll_df['Stitched Change']
-hyg_change = hyg['TOT_RETURN_INDEX_GROSS_DVDS'].pct_change()
-ibhy1_hyg_corr_df = create_rolling_corr_df(ibhy1_change, hyg_change).loc[CORR_START:CORR_END]
-ibhy1_hyg_overall_corr = calc_overall_corr(ibhy1_change, hyg_change, CORR_START, CORR_END)
+                     '5-Year Treasury Futures', '10-Year Treasury Futures', '30-Year Treasury Futures', 'EUR-USD']
+ibhy_corr_df_dict = {}
+ibhy_overall_corr_dict = {}
+for corr_target in ibhy_corr_targets:
+    ibhy_corr_df_dict[corr_target] = \
+        create_rolling_corr_df(ibhy1_change, ASSET_CHANGE_DICT[corr_target]).loc[CORR_START:CORR_END]
+    ibhy_overall_corr_dict[corr_target] = \
+        calc_overall_corr(ibhy1_change, ASSET_CHANGE_DICT[corr_target], CORR_START, CORR_END)
+    # Plot: various window rolls
+    fig, ax = plt.subplots(figsize=(19.2, 10.8))
+    ax.set_title(f'Correlation: IBHY Futures 1st Month vs. {corr_target}')
+    for n in [1, 3, 6]:
+        ax.plot(ibhy_corr_df_dict[corr_target][f'Rolling {n} Month'], label=f'{n}-Month Rolling Correlation')
+    ax.axhline(ibhy_overall_corr_dict[corr_target], color='k', linestyle='--',
+               label=f'Overall Correlation ({ibhy_overall_corr_dict[corr_target]*100:.1f}%)')
+    ax.legend()
+    save_fig(fig, f'IBHY1_{corr_target}_corr_rolling.png', DOWNLOADS_DIR)
 
-# Plot - Various Window Rolls
-_, ax = plt.subplots(figsize=(19.2, 10.8))
-ax.set_title('Correlation: IBHY Futures 1st Month vs. HYG Total Return')
-for n in [1, 3, 6]:
-    ax.plot(ibhy1_hyg_corr_df[f'Rolling {n} Month'], label=f'{n}-Month Rolling Correlation')
-ax.axhline(ibhy1_hyg_overall_corr, color='k', linestyle='--',
-           label=f'Overall Correlation ({ibhy1_hyg_overall_corr*100:.1f}%)')
-ax.legend()
+# IBIG
+ibig1_change = ASSET_CHANGE_DICT['IBIG']
+ibig_corr_targets = ['IBXXIBIG', 'LQD', 'IBOXIG', 'CDX NA IG', 'SPX', 'VIX', '2-Year Treasury Futures',
+                     '5-Year Treasury Futures', '10-Year Treasury Futures', '30-Year Treasury Futures', 'EUR-USD']
+ibig_corr_df_dict = {}
+ibig_overall_corr_dict = {}
+for corr_target in ibig_corr_targets:
+    ibig_corr_df_dict[corr_target] = \
+        create_rolling_corr_df(ibig1_change, ASSET_CHANGE_DICT[corr_target]).loc[CORR_START:CORR_END]
+    ibig_overall_corr_dict[corr_target] = \
+        calc_overall_corr(ibig1_change, ASSET_CHANGE_DICT[corr_target], CORR_START, CORR_END)
+    # Plot: various window rolls
+    fig, ax = plt.subplots(figsize=(19.2, 10.8))
+    ax.set_title(f'Correlation: IBIG Futures 1st Month vs. {corr_target}')
+    for n in [1, 3, 6]:
+        ax.plot(ibig_corr_df_dict[corr_target][f'Rolling {n} Month'], label=f'{n}-Month Rolling Correlation')
+    ax.axhline(ibig_overall_corr_dict[corr_target], color='k', linestyle='--',
+               label=f'Overall Correlation ({ibig_overall_corr_dict[corr_target]*100:.1f}%)')
+    ax.legend()
+    save_fig(fig, f'IBIG1_{corr_target}_corr_rolling.png', DOWNLOADS_DIR)
 
-####
 
-# IBIG first month vs. LQD
-ibig1_change = ihb_roll_df['Stitched Change']
-lqd = con.bdh('LQD US Equity', ['PX_LAST', 'PX_VOLUME', 'TOT_RETURN_INDEX_GROSS_DVDS'],
-              f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
-lqd_tr = lqd['TOT_RETURN_INDEX_GROSS_DVDS']
-lqd_change = lqd_tr.pct_change()
-# Subtle: must line up the series' indexes
-# NOTE: this is not a joke - ibhy1_change.rolling(n*21, center=False).corr(hyg_change).dropna()
-#       does not work unless both series have identical indexes, no NaNs; otherwise, the
-#       cleanest method is literally
-#       ibhy1_hyg_change_df.iloc[:, 0].rolling(n*21, center=False).corr(ibhy1_hyg_change_df.iloc[:, 1]).dropna()
-ibig1_lqd_change_df = pd.DataFrame({'IBIG1': ibig1_change, 'LQD': lqd_change}).dropna(how='any')
-ibig1_lqd_corr_dict = {}
-for n in [1, 2, 3, 6]:
-    ibig1_lqd_corr_dict[n] = \
-        ibig1_lqd_change_df.iloc[:, 0].rolling(n*21, center=False).corr(ibig1_lqd_change_df.iloc[:, 1]).dropna()
-ibig1_lqd_corr_df = pd.DataFrame({f'Rolling {n} Month': ibig1_lqd_corr_dict[n] for n in [1, 2, 3, 6]})
-ibig1_lqd_corr_df.index.name = 'Trade Date'
-
-# Plot - Various Window Rolls
-_, ax = plt.subplots(figsize=(19.2, 10.8))
-ax.set_title('Correlation: IBIG Futures 1st Month vs. LQD Total Return')
-for n in [1, 3, 6]:
-    ax.plot(ibig1_lqd_corr_dict[n].loc['2019-07-01':],
-            label=f'{n}-Month Rolling Correlation')
-overall_corr = ibig1_lqd_change_df.loc['2019-07-01':].corr().iloc[1, 0]
-ax.axhline(overall_corr, label=f'Overall Correlation ({overall_corr*100:.1f}%)',
-           color='k', linestyle='--')
-ax.legend()
+###############################################################################
 
 # Export roll_df
 iby_roll_df.to_csv(DOWNLOADS_DIR+'iby_roll_df.csv')
 ihb_roll_df.to_csv(DOWNLOADS_DIR+'ihb_roll_df.csv')
-ibhy1_hyg_corr_df.to_csv(DOWNLOADS_DIR+'IBHY1_HYGTR_corr_rolling.csv')
-ibig1_lqd_corr_df.to_csv(DOWNLOADS_DIR+'IBIG1_LQDTR_corr_rolling.csv')
+for corr_target in ibhy_corr_targets:
+    ibhy_corr_df_dict[corr_target].to_csv(DOWNLOADS_DIR+f'IBHY1_{corr_target}_corr_rolling.csv')
+for corr_target in ibig_corr_targets:
+    ibig_corr_df_dict[corr_target].to_csv(DOWNLOADS_DIR+f'IBIG1_{corr_target}_corr_rolling.csv')
