@@ -411,3 +411,37 @@ test_rates.to_csv(DOWNLOADS_DIR / 'ambor30t_test_rates.csv', header=True)
 threshold_info.to_csv(DOWNLOADS_DIR / 'ambor30t_test_thresholds.csv')
 outlier_info.to_csv(DOWNLOADS_DIR / 'ambor30t_test_outliers.csv')
 daily_values_breakdown.to_csv(DOWNLOADS_DIR / 'ambor30t_test_daily_breakdown.csv')
+
+####
+
+# Compare DTCC and AFX contributions for CFTC
+cftc_export_transactions = ELIGIBLE_TRANSACTIONS_DF.loc['2020-09-01':'2021-03-19'].copy()
+cftc_export_transactions.loc[(cftc_export_transactions['Product Type'] == 'CP')
+                             | (cftc_export_transactions['Product Type'] == 'CD'),
+                             'DTCC or AFX'] = 'DTCC'
+cftc_export_transactions.loc[(cftc_export_transactions['Product Type'] == 'overnight_unsecured_ameribor_loan')
+                             | (cftc_export_transactions['Product Type'] == 'thirty_day_unsecured_ameribor_loan')
+                             | (cftc_export_transactions['Product Type'] == 'bilateral_loan_overnight')
+                             | (cftc_export_transactions['Product Type'] == 'direct_settlement_loan_overnight'),
+                             'DTCC or AFX'] = 'AFX'
+dtcc_trans = cftc_export_transactions[cftc_export_transactions['DTCC or AFX'] == 'DTCC']
+afx_trans = cftc_export_transactions[cftc_export_transactions['DTCC or AFX'] == 'AFX']
+
+# Relative Share - DTCC vs. AFX
+# Number of transactions
+n_trans_dtcc = dtcc_trans.shape[0]
+n_trans_afx = afx_trans.shape[0]
+# Total principal amount (volume)
+volume_trans_dtcc = dtcc_trans['Principal Amount'].sum()
+volume_trans_afx = afx_trans['Principal Amount'].sum()
+# Total weighted volume (DBPV)
+dbpv_trans_dtcc = dtcc_trans['DBPV'].sum()
+dbpv_trans_afx = afx_trans['DBPV'].sum()
+
+# Distribution of Duration - DTCC vs. AFX
+dur_n_dtcc = dtcc_trans.groupby('Duration (Days)')['Principal Amount'].count()
+dur_n_afx = afx_trans.groupby('Duration (Days)')['Principal Amount'].count()
+dur_volume_dtcc = dtcc_trans.groupby('Duration (Days)')['Principal Amount'].sum()
+dur_volume_afx = afx_trans.groupby('Duration (Days)')['Principal Amount'].sum()
+dur_dbpv_dtcc = dtcc_trans.groupby('Duration (Days)')['DBPV'].sum()
+dur_dbpv_afx = afx_trans.groupby('Duration (Days)')['DBPV'].sum()
