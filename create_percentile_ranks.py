@@ -11,7 +11,7 @@ plt.style.use('cboe-fivethirtyeight')
 # 2) Run this script and check EXPORT_DIR for folder named USE_DATE which contains XLSXs.
 
 DOWNLOADS_DIR = 'C:/Users/gzhang/Downloads/'
-USE_DATE = '2021-04-30'
+USE_DATE = '2021-05-24'
 PRODUCTS = ['IBHY', 'IBIG', 'VX', 'VXM']  # Default ['IBHY', 'IBIG', 'VX', 'VXM']
 MULTIPLIER_DICT = {'IBHY': 1000, 'IBIG': 1000, 'VX': 1000, 'VXM': 100}
 EXPORT_DIR = 'P:/PrdDevSharedDB/Cboe Futures Historical Percentiles/'
