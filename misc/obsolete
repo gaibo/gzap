@@ -1,3 +1,109 @@
+# Temp 2021 test
+# test = combined_data.set_index('Date').loc['2021-01-04':'2021-03-19']
+test = combined_data.set_index('Date').loc['2016-01-15':'2021-03-19']
+test_dates = test.index.unique()
+# test_daily_totals = test.groupby('Date')['DBPV'].sum()
+# test['Daily Total DBPV'] = test_daily_totals
+# test['Transaction DBPV Weight'] = test['DBPV'] / test['Daily Total DBPV']
+# test['Transaction Weighted Interest Rate'] = test['Transaction DBPV Weight'] * test['Interest Rate']
+VOLUME_THRESHOLD_NOT_METS = []
+SAFEGUARD_NEEDEDS = []
+TERM_30_RATES_FIRSTPASS = []
+TERM_30_RATES = []
+DAY_DF_DICT_FIRSTPASS = {}
+DAY_DF_DICT = {}
+for i, (five_days_ago, today) in enumerate(zip(test_dates[:-4], test_dates[4:])):
+    print(today.strftime('%Y-%m-%d'))
+
+    # Test set of 5 days for volume threshold, extending beyond 5 as needed to meet minimum
+    test_curr_five_days = test.loc[five_days_ago:today].copy()
+    curr_five_day_volume = test_curr_five_days['Principal Amount'].sum()
+    if curr_five_day_volume < 25e9:
+        failed_five_day_volume = curr_five_day_volume
+        n_days_extended = 0
+        extend_success = False
+        while curr_five_day_volume < 25e9:
+            n_days_extended += 1
+            new_date_idx = i - n_days_extended
+            if new_date_idx < 0:
+                # Fail: ran out of dates to extend
+                TERM_30_RATES.append((today, None))
+                VOLUME_THRESHOLD_NOT_METS.append((today, failed_five_day_volume, None, None))
+                break
+            test_curr_five_days = test.loc[test_dates[new_date_idx]:today].copy()
+            curr_five_day_volume = test_curr_five_days['Principal Amount'].sum()
+        else:
+            # Success: reaching here means volume was successfully extended
+            extend_success = True
+            VOLUME_THRESHOLD_NOT_METS.append((today, failed_five_day_volume, n_days_extended, curr_five_day_volume))
+        if not extend_success:
+            continue    # Just move on to next date, skipping process
+
+    # Apply 250bp filter on DTCC data (does not apply to AFX data apparently)
+    prev_rate = TERM_30_RATES[-1][1]
+    test_curr_five_days_safeguard = \
+        test_curr_five_days[~((test_curr_five_days['Product Type'] == 'CP')
+                              | (test_curr_five_days['Product Type'] == 'CD'))
+                            | ~((test_curr_five_days['Interest Rate'] > prev_rate + 2.5)
+                                | (test_curr_five_days['Interest Rate'] < prev_rate - 2.5))].copy()
+    DAY_DF_DICT_FIRSTPASS[today] = test_curr_five_days
+    DAY_DF_DICT[today] = test_curr_five_days_safeguard
+
+    # Re-sort for 5-day window
+    test_curr_five_days = test_curr_five_days.sort_values(['DBPV', 'Principal Amount'], ascending=[False, False])
+    # Calculate total DBPV
+    test_curr_five_days['5-Day Total DBPV'] = test_curr_five_days['DBPV'].sum()
+    # Calculate each transaction's DBPV weight
+    test_curr_five_days['Transaction DBPV Weight'] = \
+        test_curr_five_days['DBPV'] / test_curr_five_days['5-Day Total DBPV']
+    # Calculate each transaction's weighted interest rate
+    test_curr_five_days['Transaction Weighted Interest Rate'] = \
+        test_curr_five_days['Transaction DBPV Weight'] * test_curr_five_days['Interest Rate']
+    # Calculate AMERIBOR Term-30 rate - FIRST PASS
+    term_30_rate_firstpass = test_curr_five_days['Transaction Weighted Interest Rate'].sum()
+    # Safeguard - check for transactions outside of 250bp range from first pass rate
+    test_curr_five_days_safeguard = \
+        test_curr_five_days[~((test_curr_five_days['Interest Rate'] > term_30_rate_firstpass + 2.5)
+                              | (test_curr_five_days['Interest Rate'] < term_30_rate_firstpass - 2.5))].copy()
+    # Calculate SECOND PASS
+    test_curr_five_days_safeguard['5-Day Total DBPV'] = test_curr_five_days_safeguard['DBPV'].sum()
+    test_curr_five_days_safeguard['Transaction DBPV Weight'] = \
+        test_curr_five_days_safeguard['DBPV'] / test_curr_five_days_safeguard['5-Day Total DBPV']
+    test_curr_five_days_safeguard['Transaction Weighted Interest Rate'] = \
+        test_curr_five_days_safeguard['Transaction DBPV Weight'] * test_curr_five_days_safeguard['Interest Rate']
+    term_30_rate = test_curr_five_days_safeguard['Transaction Weighted Interest Rate'].sum()
+    if term_30_rate_firstpass != term_30_rate:
+        SAFEGUARD_NEEDEDS.append((today, test_curr_five_days.shape[0]-test_curr_five_days_safeguard.shape[0],
+                                  term_30_rate_firstpass, term_30_rate))
+    TERM_30_RATES_FIRSTPASS.append((today, term_30_rate_firstpass))
+    TERM_30_RATES.append((today, term_30_rate))
+    DAY_DF_DICT_FIRSTPASS[today] = test_curr_five_days
+    DAY_DF_DICT[today] = test_curr_five_days_safeguard
+test_rates_firstpass = (pd.DataFrame(TERM_30_RATES_FIRSTPASS, columns=['Date', 'Term-30 Rate (First Pass)'])
+                        .set_index('Date'))
+test_rates = pd.DataFrame(TERM_30_RATES, columns=['Date', 'Term-30 Rate']).set_index('Date')
+threshold_info = (pd.DataFrame(VOLUME_THRESHOLD_NOT_METS, columns=['Date', 'Failed 5-Day Volume',
+                                                                   'Days Extended', 'Extended Volume'])
+                  .set_index('Date'))
+safeguard_info = (pd.DataFrame(SAFEGUARD_NEEDEDS, columns=['Date', 'Transactions Omitted',
+                                                           'First Pass Rate', 'Second Pass Rate'])
+                  .set_index('Date'))
+
+
+####
+
+# product_orderfill_subsplits = product_orderfill.copy()
+    # for i_field in ['Standard', 'TAS', 'Block', 'ECRP', 'Spreads']:
+    #     product_orderfill_subsplits[i_field] = product_orderfill[i_field] / product_orderfill['Volume']
+    #     percentile_dict[i_field + ' Percent'] = generate_volume_percentiles(product_orderfill_subsplits, i_field)
+    #     for i_agg in ['Monthly', 'Quarterly', 'Yearly']:
+    #         percentile_dict[i_field + ' Percent'][i_agg]['Sum'] = None  # This field makes no sense for percent splits
+
+
+from cboe_exchange_holidays_v3 import get_cboe_holidays
+uvxy_holidays = get_cboe_holidays(start_datelike=uvxy_start)
+uvxy_test = uvxy[uvxy_start:].drop(uvxy_holidays, errors='ignore')
+
 # field_percentile_dict['Daily'] = {}
     # field_percentile_dict['Daily']['Sum'] = daily_field
     # field_percentile_dict['Daily']['ADV'] = daily_field

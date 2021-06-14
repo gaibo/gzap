@@ -1,3 +1,12 @@
+# To reload a function from a module
+# 1) If you imported without "import <module>", import module now
+import options_data_tools
+from options_data_tools import add_rate     # May be able to skip this line? Test next time
+# 2) Now that module is imported, reload it and overwrite function
+import importlib
+importlib.reload(options_data_tools)
+from options_data_tools import add_rate
+
 # Git go back to state just before commit, i.e. previous commit but with changes in staging
 git reset --soft HEAD^  # HEAD^ is the previous commit
 
