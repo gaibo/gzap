@@ -8,7 +8,7 @@ plt.style.use('cboe-fivethirtyeight')
 DOWNLOADS_DIR = 'C:/Users/gzhang/Downloads/'
 DATA_DIR = 'C:/Users/gzhang/Downloads/iBoxx Bloomberg Pulls/'
 START_DATE = pd.Timestamp('2000-01-01')
-END_DATE = pd.Timestamp('2021-04-14')
+END_DATE = pd.Timestamp('2021-04-29')
 con = create_bloomberg_connection()
 
 # High Yield: IBY1 futures, IBXXIBHY, HYG, IBOXHY, CWY1 futures

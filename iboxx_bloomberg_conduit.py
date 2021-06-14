@@ -143,9 +143,9 @@ ibhy1_hyg_corr_df.index.name = 'Trade Date'
 _, ax = plt.subplots(figsize=(19.2, 10.8))
 ax.set_title('Correlation: IBHY Futures 1st Month vs. HYG Total Return')
 for n in [1, 3, 6]:
-    ax.plot(ibhy1_hyg_corr_dict[n].loc['2020-01-01':'2021-03-31'],
+    ax.plot(ibhy1_hyg_corr_dict[n].loc['2019-07-01':],
             label=f'{n}-Month Rolling Correlation')
-overall_corr = ibhy1_hyg_change_df.loc['2020-01-01':'2021-03-31'].corr().iloc[1, 0]
+overall_corr = ibhy1_hyg_change_df.loc['2019-07-01':].corr().iloc[1, 0]
 ax.axhline(overall_corr, label=f'Overall Correlation ({overall_corr*100:.1f}%)',
            color='k', linestyle='--')
 ax.legend()
@@ -173,9 +173,9 @@ ibig1_lqd_corr_df.index.name = 'Trade Date'
 _, ax = plt.subplots(figsize=(19.2, 10.8))
 ax.set_title('Correlation: IBIG Futures 1st Month vs. LQD Total Return')
 for n in [1, 3, 6]:
-    ax.plot(ibig1_lqd_corr_dict[n].loc['2020-01-01':'2021-03-31'],
+    ax.plot(ibig1_lqd_corr_dict[n].loc['2019-07-01':],
             label=f'{n}-Month Rolling Correlation')
-overall_corr = ibig1_lqd_change_df.loc['2020-01-01':'2021-03-31'].corr().iloc[1, 0]
+overall_corr = ibig1_lqd_change_df.loc['2019-07-01':].corr().iloc[1, 0]
 ax.axhline(overall_corr, label=f'Overall Correlation ({overall_corr*100:.1f}%)',
            color='k', linestyle='--')
 ax.legend()
