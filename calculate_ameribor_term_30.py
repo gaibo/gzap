@@ -11,7 +11,7 @@ OUR_START = pd.Timestamp('2016-01-15')  # We have enough DTCC and AFX data to tr
 OUR_END = pd.Timestamp('2021-06-08')    # Set this to the latest date for which we have both DTCC and AFX data
 
 # Load DTCC commercial paper and commercial deposit data
-DTCC_DATA_DIR = Path('C:/Users/gzhang/Downloads/Ameribor/For CBOE/')
+DTCC_DATA_DIR = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/Ameribor/For CBOE/')
 DTCC_DATA_USECOLS = ['Principal Amount', 'Dated/ Issue Date', 'Settlement Date',
                      'Duration (Days)', 'Interest Rate Type', 'Country Code', 'Sector Code',
                      'Product Type', 'CUSIP', 'Issuer Name',
@@ -58,7 +58,7 @@ dtcc_data = dtcc_data[(dtcc_data['Country Code'] == 'USA') & (dtcc_data['Sector 
 
 # Load AFX loan data
 AFX_DATA_DIR = Path('P:/ProductDevelopment/Database/AFX/AFX_data/')
-AFX_DATA_USECOLS = ['trade_id', 'matched_at', 'funded_at', 'busted_at',
+AFX_DATA_USECOLS = ['id', 'trade_id', 'matched_at', 'funded_at', 'busted_at',
                     'price', 'quantity',
                     'borrower_id', 'lender_id']
 afx_trading_days = pd.to_datetime([f for f in os.listdir(AFX_DATA_DIR) if f.startswith('20')]).sort_values()
@@ -78,19 +78,19 @@ for day in afx_trading_days:
         continue
     # Merge in institution reference info
     day_institutions = pd.read_csv(AFX_DATA_DIR / day_str / 'institutions.csv',
-                                   usecols=['id', 'name'])
-    day_afx_data = (day_trades.merge(day_institutions, how='left', left_on='borrower_id', right_on='id')
-                    .drop('id', axis=1).rename({'name': 'borrower_name'}, axis=1))
-    day_afx_data = (day_afx_data.merge(day_institutions, how='left', left_on='lender_id', right_on='id')
-                    .drop('id', axis=1).rename({'name': 'lender_name'}, axis=1))
+                                   usecols=['id', 'name']).rename({'id': 'inst_id'}, axis=1)
+    day_afx_data = (day_trades.merge(day_institutions, how='left', left_on='borrower_id', right_on='inst_id')
+                    .drop('inst_id', axis=1).rename({'name': 'borrower_name'}, axis=1))
+    day_afx_data = (day_afx_data.merge(day_institutions, how='left', left_on='lender_id', right_on='inst_id')
+                    .drop('inst_id', axis=1).rename({'name': 'lender_name'}, axis=1))
     afx_data_list.append(day_afx_data)
 afx_data_raw = pd.concat(afx_data_list)
 afx_data = afx_data_raw.copy()
 
 # Create 'instrument' designation to separate overnight from 30-day, etc.
 afx_data['instrument'] = afx_data['trade_id'].apply(chop_segments_off_string)
-# Filter 0: drop duplicates - 2 records of some trades
-afx_data = afx_data.drop_duplicates('trade_id')
+# Filter 0: drop duplicates - transactions appear on multiple days as they get updated when repaid
+afx_data = afx_data.drop_duplicates('trade_id', keep='last')    # Both 'id' and 'trade_id' are unique to transaction
 # Filter 1: throw out busted trades, assert funded
 afx_data = afx_data[afx_data['busted_at'].isna() & afx_data['funded_at'].notna()]
 # Filter 2: overnight or 30-day lending markets only
@@ -107,19 +107,44 @@ afx_data.loc[(afx_data['instrument'] == 'overnight_unsecured_ameribor_loan'), 'M
 afx_data.loc[(afx_data['instrument'] == 'thirty_day_unsecured_ameribor_loan'), 'Maturity Date'] = \
     ensure_bus_day(afx_data.loc[(afx_data['instrument'] == 'thirty_day_unsecured_ameribor_loan'), 'Trade Date']
                    + 30*DAY_OFFSET, shift_to='next', busday_type='AFX').values
+afx_data.loc[(afx_data['instrument'] == 'bilateral_loan_overnight'), 'Maturity Date'] = \
+    ensure_bus_day(afx_data.loc[(afx_data['instrument'] == 'bilateral_loan_overnight'), 'Trade Date']
+                   + DAY_OFFSET, shift_to='next', busday_type='AFX').values
+afx_data.loc[(afx_data['instrument'] == 'direct_settlement_loan_overnight'), 'Maturity Date'] = \
+    ensure_bus_day(afx_data.loc[(afx_data['instrument'] == 'direct_settlement_loan_overnight'), 'Trade Date']
+                   + DAY_OFFSET, shift_to='next', busday_type='AFX').values
 afx_data['Days To Maturity'] = (afx_data['Maturity Date'] - afx_data['Trade Date']).dt.days
 afx_data['Duration (Days)'] = afx_data['Days To Maturity']
 afx_data['Principal Amount'] = afx_data['quantity'] * 1e6   # Originally in millions
-afx_data['Interest Rate'] = afx_data['price'] / 1000 / 100  # Originally in thousands of basis points
+# NOTE: AFX price->interest rate is convoluted because of format change:
+#   - between 2017-08-18 and 2017-08-21, interest rate format in the field "price" changed
+#   - before transition "price" numbers should be divided by 1000
+#   - after transition "price" numbers should be divided by 10,000 (i.e. rate in "thousands of basis points")
+#   - keep in mind our physical storage folders' trades.csv contain overlapping days' data,
+#     but if we go by 'Trade Date', it is a clean change; I previously thought there was overlap on 2017-08-21
+#   - 2020-06-30 + 6 days in 2021 contain transactions with modern format at 1400 or below, i.e. 0.14% rate;
+#     other than on those 7 days, (1400, 2000) gap can numerically distinguish old format from new
+AFX_PRICE_FORMAT_CHANGE = pd.Timestamp('2017-08-21')
+afx_price_format_old = (afx_data['Trade Date'] < AFX_PRICE_FORMAT_CHANGE)
+afx_price_format_new = (afx_data['Trade Date'] >= AFX_PRICE_FORMAT_CHANGE)
+afx_data.loc[afx_price_format_old, 'Interest Rate'] = \
+    afx_data.loc[afx_price_format_old, 'price'] / 1000   # Proper way to read; not sure meaning
+afx_data.loc[afx_price_format_new, 'Interest Rate'] = \
+    afx_data.loc[afx_price_format_new, 'price'] / 1000 / 100    # Convert thousands of basis points to %
 # Filter 3: principal >= $1MM (shouldn't be needed for AFX but still)
 afx_data = afx_data[afx_data['Principal Amount'] >= 1e6]
+# Bespoke Filter: Exclude Marex deposit rolls
+marex_rolls = pd.read_excel('C:/Users/gzhang/OneDrive - CBOE/Downloads/'
+                            'Ameribor/Deposit Product Trades to Be Removed.xlsx')
+marex_rolls_ids = marex_rolls['trade_id']
+afx_data = afx_data[~afx_data['id'].isin(marex_rolls_ids)]
 
 ####
 
 # Load additional bespoke data
 
 # DTCC
-DTCC_DATA_DIR_2 = Path('C:/Users/gzhang/Downloads/Ameribor/AFX DTCC/')
+DTCC_DATA_DIR_2 = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/Ameribor/AFX DTCC/')
 dtcc_data_list_2 = []
 dtcc_trading_days_2 = pd.to_datetime([f[1:7] for f in os.listdir(DTCC_DATA_DIR_2) if f.startswith('D')],
                                      yearfirst=True).sort_values()
@@ -164,7 +189,7 @@ dtcc_combine_2[['Dated/Issue Date', 'Settlement Date', 'Interest Rate Type', 'Co
                  'Issuer Name', 'CUSIP', 'Parties to Transaction Classification']]
 
 # AFX
-AFX_DATA_DIR_2 = Path('C:/Users/gzhang/Downloads/Ameribor/')
+AFX_DATA_DIR_2 = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/Ameribor/')
 AFX_DATA_2_FILENAME = 'ameribor_trades_bespoke_2021-03-19_2021-06-08.csv'
 print(f"Loading AFX dataset 2 from {AFX_DATA_DIR_2/AFX_DATA_2_FILENAME}")
 afx_data_2_raw = pd.read_csv(AFX_DATA_DIR_2 / AFX_DATA_2_FILENAME,
@@ -389,7 +414,7 @@ daily_values_breakdown.index.name = 'Date'
 
 ####
 
-# EXPORT_DIR = Path('C:/Users/gzhang/Downloads/Ameribor/Term-30 Legal Filing/')
+# EXPORT_DIR = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/Ameribor/Term-30 Legal Filing/')
 #
 # # Export input data for 6 months
 # cftc_export_dates = ELIGIBLE_TRANSACTIONS_DF.loc['2020-06-01':'2021-05-31'].index.unique()
@@ -397,7 +422,7 @@ daily_values_breakdown.index.name = 'Date'
 #     export_loc = EXPORT_DIR / '12 Months Input Data' / f'{date.strftime("%Y-%m-%d")}_dtccafx_ambor30t_input.csv'
 #     AMBOR30T_INPUT_DF_DICT[date].drop(['borrower_name', 'lender_name'], axis=1).to_csv(export_loc)
 
-DOWNLOADS_DIR = Path('C:/Users/gzhang/Downloads/')
+DOWNLOADS_DIR = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/')
 
 # # Export input data for full history
 # full_dates = ELIGIBLE_TRANSACTIONS_DF.loc[OFFICIAL_START:OUR_END].index.unique()

@@ -1,3 +1,13 @@
+AFX_PRICE_FORMAT_CHANGE = pd.Timestamp('2017-08-18')
+afx_price_format_change_idxs_1 = (afx_data['Trade Date'] < AFX_PRICE_FORMAT_CHANGE)
+afx_price_format_change_idxs_2 = (afx_data['Trade Date'] == AFX_PRICE_FORMAT_CHANGE) & (afx_data['price'] <= 1400)
+afx_price_format_change_idxs_3 = (afx_data['Trade Date'] == AFX_PRICE_FORMAT_CHANGE) & (afx_data['price'] > 1400)
+afx_price_format_change_idxs_4 = (afx_data['Trade Date'] > AFX_PRICE_FORMAT_CHANGE)
+afx_data.loc[afx_price_format_change_idxs_1 | afx_price_format_change_idxs_2, 'Interest Rate'] = \
+    afx_data.loc[afx_price_format_change_idxs_1 | afx_price_format_change_idxs_2, 'price'] / 1000   # Proper way to read
+afx_data.loc[afx_price_format_change_idxs_3 | afx_price_format_change_idxs_4, 'Interest Rate'] = \
+    afx_data.loc[afx_price_format_change_idxs_3 | afx_price_format_change_idxs_4, 'price'] / 1000 / 100
+
 # Temp 2021 test
 # test = combined_data.set_index('Date').loc['2021-01-04':'2021-03-19']
 test = combined_data.set_index('Date').loc['2016-01-15':'2021-03-19']
