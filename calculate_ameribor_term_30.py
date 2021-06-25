@@ -414,15 +414,13 @@ daily_values_breakdown.index.name = 'Date'
 
 ####
 
-# EXPORT_DIR = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/Ameribor/Term-30 Legal Filing/')
-#
-# # Export input data for 6 months
-# cftc_export_dates = ELIGIBLE_TRANSACTIONS_DF.loc['2020-06-01':'2021-05-31'].index.unique()
-# for date in cftc_export_dates:
-#     export_loc = EXPORT_DIR / '12 Months Input Data' / f'{date.strftime("%Y-%m-%d")}_dtccafx_ambor30t_input.csv'
-#     AMBOR30T_INPUT_DF_DICT[date].drop(['borrower_name', 'lender_name'], axis=1).to_csv(export_loc)
+DOWNLOADS_DIR = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/')  # For miscellaneous work
 
-DOWNLOADS_DIR = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/')
+# Export rates and helper calculations
+test_rates.to_csv(DOWNLOADS_DIR / 'ambor30t_test_rates.csv', header=True)
+threshold_info.to_csv(DOWNLOADS_DIR / 'ambor30t_test_thresholds.csv')
+outlier_info.to_csv(DOWNLOADS_DIR / 'ambor30t_test_outliers.csv')
+daily_values_breakdown.to_csv(DOWNLOADS_DIR / 'ambor30t_test_daily_breakdown.csv')
 
 # # Export input data for full history
 # full_dates = ELIGIBLE_TRANSACTIONS_DF.loc[OFFICIAL_START:OUR_END].index.unique()
@@ -431,11 +429,13 @@ DOWNLOADS_DIR = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/')
 #                   f'{date.strftime("%Y-%m-%d")}_dtccafx_ambor30t_input.csv')
 #     AMBOR30T_INPUT_DF_DICT[date].to_csv(export_loc)
 
-# Export rates and helper calculations
-test_rates.to_csv(DOWNLOADS_DIR / 'ambor30t_test_rates.csv', header=True)
-threshold_info.to_csv(DOWNLOADS_DIR / 'ambor30t_test_thresholds.csv')
-outlier_info.to_csv(DOWNLOADS_DIR / 'ambor30t_test_outliers.csv')
-daily_values_breakdown.to_csv(DOWNLOADS_DIR / 'ambor30t_test_daily_breakdown.csv')
+# # Export input data for 6+ months for CFTC legal filing
+# CFTC_DIR = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/Ameribor/Term-30 Legal Filing/')
+# cftc_export_dates = ELIGIBLE_TRANSACTIONS_DF.loc[OFFICIAL_START:OUR_END].index.unique()
+# for date in cftc_export_dates:
+#     export_loc = (CFTC_DIR / 'Input Data (Identities Scrubbed)' /
+#                   f'{date.strftime("%Y-%m-%d")}_dtccafx_ambor30t_input.csv')
+#     AMBOR30T_INPUT_DF_DICT[date].drop(['borrower_name', 'lender_name'], axis=1).to_csv(export_loc)
 
 ####
 
