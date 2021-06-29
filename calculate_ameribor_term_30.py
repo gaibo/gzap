@@ -148,6 +148,7 @@ DTCC_DATA_DIR_2 = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/Ameribor/AFX D
 dtcc_data_list_2 = []
 dtcc_trading_days_2 = pd.to_datetime([f[1:7] for f in os.listdir(DTCC_DATA_DIR_2) if f.startswith('D')],
                                      yearfirst=True).sort_values()
+MISSING_DTCC_DAYS_2 = []
 for day in dtcc_trading_days_2:
     day_str = day.strftime('%y%m%d')
     print(f"Loading DTCC dataset 2 {day_str}")
@@ -157,7 +158,7 @@ for day in dtcc_trading_days_2:
             os.rename(DTCC_DATA_DIR_2/day_filename, DTCC_DATA_DIR_2/(day_filename+'.csv'))
             day_filename += '.csv'
     except IndexError:
-        MISSING_AFX_DAYS.append(day)
+        MISSING_DTCC_DAYS_2.append(day)
         continue
     # Load day's trades
     day_trades = pd.read_csv(DTCC_DATA_DIR_2 / day_filename,
