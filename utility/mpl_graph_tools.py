@@ -2,14 +2,52 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from itertools import zip_longest, combinations
 import seaborn as sns
-from pandas.plotting import register_matplotlib_converters
 import os
-
 from model.data_structures import ETF, Index, VolatilityIndex
 from utility.universal_tools import share_dateindex, get_best_fit
-
+from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
+
 BIG_FIGSIZE = (19.2, 10.8)
+
+
+def suplabel(x_or_y, label_text, fig=None, y_right=False, label_pad=5, ha='center', va='center', **label_kwargs):
+    """ Add "super" xlabel or ylabel to figure, in the style of fig.suptitle(),
+        to span multiple graphical axes
+    :param x_or_y: 'x'- or 'y'-axis, on which to add text label
+    :param label_text: the text label to add
+    :param fig: figure on which to add; set None to use current figure via plt.gcf()
+    :param y_right: set True if 'y'-axis and label should be on right side, not default left
+    :param label_pad: "padding" from the axis; default 5
+    :param ha: horizontal alignment; 'center' | 'right' | 'left'
+    :param va: vertical alignment; 'center' | 'top' | 'bottom' | 'baseline'
+    :param label_kwargs: additional kwargs for coniguring label_text
+    :return: Text object added to fig
+    """
+    if fig is None:
+        fig = plt.gcf()
+    x_or_y = x_or_y.lower()
+    if x_or_y == 'x':
+        x = 0.5
+        ymins = [ax.get_position().ymin for ax in fig.axes]
+        ymin = min(ymins)
+        y = ymin - label_pad/fig.dpi
+        rotation = 0
+    elif x_or_y == 'y':
+        if y_right:
+            xmaxs = [ax.get_position().xmax for ax in fig.axes]
+            xmax = min(xmaxs)
+            x = xmax + label_pad/2/fig.dpi  # Empirically, y-axis label_pad looks better smaller
+        else:
+            xmins = [ax.get_position().xmin for ax in fig.axes]
+            xmin = min(xmins)
+            x = xmin - label_pad/2/fig.dpi  # Empirically, y-axis label_pad looks better smaller
+        y = 0.5
+        rotation = 90
+    else:
+        raise ValueError(f"x_or_y must specify 'x' or 'y' axis; '{x_or_y}' is unclear")
+    return fig.text(x, y, label_text, rotation=rotation, ha=ha, va=va,
+                    transform=fig.transFigure, **label_kwargs)
 
 
 # Export the specified figure to specified directory
@@ -103,8 +141,8 @@ def make_fillbetween(x, y1, y2=0, label=None, color=None,
     return fig, ax
 
 
-def make_regime(interval_list, label=None, color=None,
-                xlabel=None, ylabel=None, title=None, ax=None):
+def make_regime(interval_list, label=None, xlabel=None, ylabel=None, title=None,
+                ax=None, alpha=0.5, **axvspan_kwargs):
     # Prepare Figure and Axes
     if ax is None:
         fig, ax = plt.subplots()
@@ -113,7 +151,7 @@ def make_regime(interval_list, label=None, color=None,
     # Create regimes from list of intervals
     span_handle = None
     for interval in interval_list:
-        span_handle = ax.axvspan(*interval, color=color, alpha=0.5)
+        span_handle = ax.axvspan(*interval, alpha=alpha, **axvspan_kwargs)
     # Configure
     if label:
         span_handle.set_label(label)    # Set label using last span's handle to avoid duplicates
@@ -161,7 +199,7 @@ def make_scatterplot(x_data, y_data, do_center=False, color=None,
 
 
 def make_histogram(data, hist=True, n_bins=10, line=True, label=None, color=None, color_line=None,
-                   xlabel=None, ylabel=None, title=None, ax=None):
+                   xlabel=None, ylabel=None, title=None, ax=None, **hist_kwargs):
     # Prepare Figure and Axes
     if ax is None:
         fig, ax = plt.subplots()
@@ -169,7 +207,7 @@ def make_histogram(data, hist=True, n_bins=10, line=True, label=None, color=None
         fig = None
     # Create distribution histogram
     if hist:
-        ax.hist(data, bins=n_bins, density=True, label=label, color=color)
+        ax.hist(data, bins=n_bins, density=True, label=label, color=color, **hist_kwargs)
     # Create density plot line
     if line:
         if isinstance(data, list):
