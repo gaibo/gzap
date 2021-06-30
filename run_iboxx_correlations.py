@@ -3,7 +3,7 @@ from options_futures_expirations_v3 import BUSDAY_OFFSET, generate_expiries
 from futures_reader import create_bloomberg_connection, stitch_bloomberg_futures
 import matplotlib.pyplot as plt
 from collections.abc import Iterable
-import os
+from mpl_tools import save_fig
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
 plt.style.use('cboe-fivethirtyeight')
@@ -142,17 +142,23 @@ us_roll_df = stitch_bloomberg_futures(us1['PX_LAST'], us2['PX_LAST'], roll_n_bef
 ###############################################################################
 # Calculate correlations
 
-def create_rolling_corr_df(timeseries_1, timeseries_2, rolling_months=(1, 2, 3, 6)):
+def create_rolling_corr_df(timeseries_1, timeseries_2, rolling_months=(1, 2, 3, 6), drop_or_ffill='drop'):
     """ Generate DataFrame of rolling correlations
         NOTE: generally for correlations, the 2 input time series are returns (% change); however, there may
               be cases where instead you care about level change (subtraction) or even raw level numbers
-        NOTE: dates that are not in common are just dropped; forward-filling functionality may be good idea
     :param timeseries_1: time series dataset 1
     :param timeseries_2: time series dataset 2
     :param rolling_months: number(s) of months for the rolling window; dimension will be number of DF columns
+    :param drop_or_ffill: set 'drop' to drop dates that are not in common; set 'ffill' to forward-fill NaNs
     :return: pd.DataFrame with 'Rolling {n} Month' columns containing rolling correlation time series
     """
-    ts_df = pd.DataFrame({'TS1': timeseries_1, 'TS2': timeseries_2}).dropna(how='any')
+    ts_df = pd.DataFrame({'TS1': timeseries_1, 'TS2': timeseries_2})    # Contains NaN on uncommon dates
+    if drop_or_ffill == 'drop':
+        ts_df = ts_df.dropna(how='any')
+    elif drop_or_ffill == 'ffill':
+        ts_df = ts_df.fillna(method='ffill')
+    else:
+        raise ValueError(f"drop_or_ffill must be either 'drop' or 'ffill', not '{drop_or_ffill}'")
     corr_dict = {}
     if not isinstance(rolling_months, Iterable):
         rolling_months = [rolling_months]
@@ -164,29 +170,24 @@ def create_rolling_corr_df(timeseries_1, timeseries_2, rolling_months=(1, 2, 3, 
     return corr_df
 
 
-def calc_overall_corr(timeseries_1, timeseries_2, start_datelike=None, end_datelike=None):
+def calc_overall_corr(timeseries_1, timeseries_2, start_datelike=None, end_datelike=None, drop_or_ffill='drop'):
     """ Calculate overall correlation between two time series
     :param timeseries_1: time series dataset 1
     :param timeseries_2: time series dataset 2
     :param start_datelike: date-like representation of start date; set None to use entirety of time series
     :param end_datelike: date-like representation of end date; set None to use entirety of time series
+    :param drop_or_ffill: set 'drop' to drop dates that are not in common; set 'ffill' to forward-fill NaNs
     :return: number between -1 and 1
     """
-    ts_df = pd.DataFrame({'TS1': timeseries_1, 'TS2': timeseries_2}).dropna(how='any')
+    ts_df = pd.DataFrame({'TS1': timeseries_1, 'TS2': timeseries_2})  # Contains NaN on uncommon dates
+    if drop_or_ffill == 'drop':
+        ts_df = ts_df.dropna(how='any')
+    elif drop_or_ffill == 'ffill':
+        ts_df = ts_df.fillna(method='ffill')
+    else:
+        raise ValueError(f"drop_or_ffill must be either 'drop' or 'ffill', not '{drop_or_ffill}'")
     ts_df_cropped = ts_df.loc[start_datelike:end_datelike]
     return ts_df_cropped.corr().iloc[1, 0]  # Get element from correlation matrix
-
-
-def save_fig(figure, save_name, save_dir='.'):
-    if save_dir == '' or save_dir[-1] != '/':
-        save_dir += '/'
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-        print('Made directory {}'.format(save_dir))
-    # Write figure
-    save_loc = save_dir + save_name
-    figure.savefig(save_loc, bbox_inches='tight')
-    print('Wrote {}'.format(save_loc))
 
 
 CORR_START = None   # '2019-07-01'
