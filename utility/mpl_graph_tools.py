@@ -4,7 +4,7 @@ from itertools import zip_longest, combinations
 from collections.abc import Iterable
 import seaborn as sns
 from model.data_structures import ETF, Index, VolatilityIndex, CashInstr
-from utility.universal_tools import share_dateindex, get_best_fit
+from universal_tools import share_dateindex, get_best_fit
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
 

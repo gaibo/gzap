@@ -1,7 +1,7 @@
 import pandas as pd
 from pathlib import Path
 import os
-from utility.universal_tools import chop_segments_off_string
+from universal_tools import chop_segments_off_string
 from options_futures_expirations_v3 import DAY_OFFSET, ensure_bus_day
 
 # [MANUAL] Configure
