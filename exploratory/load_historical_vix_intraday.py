@@ -633,7 +633,7 @@ big_days = first_n_terms.loc['2020'][first_n_terms.loc['2020', 'Abs Minus'] > 0.
 # There are a bunch of big days in March as well, so we can figure out what was happening at beginning of COVID
 # Plot
 from cboe_exchange_holidays_v3 import datelike_to_timestamp
-from utility.mpl_graph_tools import save_fig
+from mpl_tools import save_fig
 def big_diff_case_study_plot(trade_datelike, expiry_datelike, intraday_dataset, big_days_dataset):
     trade_date = datelike_to_timestamp(trade_datelike)
     expiry_date = datelike_to_timestamp(expiry_datelike)
