@@ -8,8 +8,8 @@ from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
 plt.style.use('cboe-fivethirtyeight')
 
-DATA_DIR = 'C:/Users/gzhang/Downloads/iBoxx Bloomberg Pulls/'   # Local data save
-DOWNLOADS_DIR = 'C:/Users/gzhang/Downloads/'
+DATA_DIR = 'C:/Users/gzhang/OneDrive - CBOE/Downloads/iBoxx Bloomberg Pulls/'   # Local data save
+DOWNLOADS_DIR = 'C:/Users/gzhang/OneDrive - CBOE/Downloads/'
 START_DATE = pd.Timestamp('2000-01-01')
 END_DATE = pd.Timestamp('now').normalize() - BUSDAY_OFFSET  # Default yesterday
 ROLL_N_BEFORE_EXPIRY = 3    # Default 3
@@ -166,8 +166,31 @@ ASSET_CHANGE_DICT = {'IBHY': iby_roll_df['Stitched Change'],
 ibhy1_change = ASSET_CHANGE_DICT['IBHY']
 ibhy_corr_targets = ['IBXXIBHY', 'HYG', 'IBOXHY', 'CDX NA HY', 'SPX', 'VIX', '2-Year Treasury Futures',
                      '5-Year Treasury Futures', '10-Year Treasury Futures', '30-Year Treasury Futures', 'EUR-USD']
+# Overall correlation tables
+ibhy_overall_corr_tables = {}
+for corr_target in ibhy_corr_targets:
+    # Fixed variations to generate:
+    #   1) Full history
+    #   2) 2019-03 to present
+    #   3) 2019-07 to present
+    #   4) 2019-03 to 2020-02-24
+    #   5) 2019-07 to 2020-02-24
+    #   6) 2020-02-24 to present
+    # For future, consider replacing present with potential earlier cutoff
+    variations_dict = {
+        'Full': calc_overall_corr(ibhy1_change, ASSET_CHANGE_DICT[corr_target]),
+        '2019-03 to Present': calc_overall_corr(ibhy1_change, ASSET_CHANGE_DICT[corr_target], '2019-03', None),
+        '2019-07 to Present': calc_overall_corr(ibhy1_change, ASSET_CHANGE_DICT[corr_target], '2019-07', None),
+        '2019-03 to 2020-02-24': calc_overall_corr(ibhy1_change, ASSET_CHANGE_DICT[corr_target],
+                                                   '2019-03', '2020-02-24'),
+        '2019-07 to 2020-02-24': calc_overall_corr(ibhy1_change, ASSET_CHANGE_DICT[corr_target],
+                                                   '2019-07', '2020-02-24'),
+        '2020-02-24 to Present': calc_overall_corr(ibhy1_change, ASSET_CHANGE_DICT[corr_target], '2020-02-24', None)
+    }
+    ibhy_overall_corr_tables[corr_target] = pd.DataFrame(variations_dict, index=[f'{corr_target}'])
+# Rolling correlation
 ibhy_corr_df_dict = {}
-ibhy_overall_corr_dict = {}
+ibhy_overall_corr_dict = {}     # Strictly follows CORR_START and CORR_END i.e. bounds of rolling charts
 for corr_target in ibhy_corr_targets:
     ibhy_corr_df_dict[corr_target] = \
         create_rolling_corr_df(ibhy1_change, ASSET_CHANGE_DICT[corr_target]).loc[CORR_START:CORR_END]
@@ -187,8 +210,31 @@ for corr_target in ibhy_corr_targets:
 ibig1_change = ASSET_CHANGE_DICT['IBIG']
 ibig_corr_targets = ['IBXXIBIG', 'LQD', 'IBOXIG', 'CDX NA IG', 'SPX', 'VIX', '2-Year Treasury Futures',
                      '5-Year Treasury Futures', '10-Year Treasury Futures', '30-Year Treasury Futures', 'EUR-USD']
+# Overall correlation variations
+ibig_overall_corr_tables = {}
+for corr_target in ibig_corr_targets:
+    # Fixed variations to generate:
+    #   1) Full history
+    #   2) 2019-03 to present
+    #   3) 2019-07 to present
+    #   4) 2019-03 to 2020-02-24
+    #   5) 2019-07 to 2020-02-24
+    #   6) 2020-02-24 to present
+    # For future, consider replacing present with potential earlier cutoff
+    variations_dict = {
+        'Full': calc_overall_corr(ibig1_change, ASSET_CHANGE_DICT[corr_target]),
+        '2019-03 to Present': calc_overall_corr(ibig1_change, ASSET_CHANGE_DICT[corr_target], '2019-03', None),
+        '2019-07 to Present': calc_overall_corr(ibig1_change, ASSET_CHANGE_DICT[corr_target], '2019-07', None),
+        '2019-03 to 2020-02-24': calc_overall_corr(ibig1_change, ASSET_CHANGE_DICT[corr_target],
+                                                   '2019-03', '2020-02-24'),
+        '2019-07 to 2020-02-24': calc_overall_corr(ibig1_change, ASSET_CHANGE_DICT[corr_target],
+                                                   '2019-07', '2020-02-24'),
+        '2020-02-24 to Present': calc_overall_corr(ibig1_change, ASSET_CHANGE_DICT[corr_target], '2020-02-24', None)
+    }
+    ibig_overall_corr_tables[corr_target] = pd.DataFrame(variations_dict, index=[f'{corr_target}'])
+# Rolling correlation
 ibig_corr_df_dict = {}
-ibig_overall_corr_dict = {}
+ibig_overall_corr_dict = {}     # Strictly follows CORR_START and CORR_END i.e. bounds of rolling charts
 for corr_target in ibig_corr_targets:
     ibig_corr_df_dict[corr_target] = \
         create_rolling_corr_df(ibig1_change, ASSET_CHANGE_DICT[corr_target]).loc[CORR_START:CORR_END]
@@ -207,10 +253,34 @@ for corr_target in ibig_corr_targets:
 
 ###############################################################################
 
-# Export roll_df
+# Export roll_df for how we chose to roll
 iby_roll_df.to_csv(DOWNLOADS_DIR+'iby_roll_df.csv')
 ihb_roll_df.to_csv(DOWNLOADS_DIR+'ihb_roll_df.csv')
-for corr_target in ibhy_corr_targets:
-    ibhy_corr_df_dict[corr_target].to_csv(DOWNLOADS_DIR+f'IBHY1_{corr_target}_corr_rolling.csv')
-for corr_target in ibig_corr_targets:
-    ibig_corr_df_dict[corr_target].to_csv(DOWNLOADS_DIR+f'IBIG1_{corr_target}_corr_rolling.csv')
+
+# Export correlations
+# Condense into 1) rolling correlation spreadsheet where each sheet is a corr_target
+#               2) overall correlation spreadsheet where each row is a corr_target
+# IBHY
+with pd.ExcelWriter(DOWNLOADS_DIR+'IBHY1_corr_rolling.xlsx', datetime_format='YYYY-MM-DD') as writer:
+    for corr_target in ibhy_corr_targets:
+        ibhy_corr_df_dict[corr_target].to_excel(writer, sheet_name=corr_target, freeze_panes=(1, 1))
+with pd.ExcelWriter(DOWNLOADS_DIR+'IBHY1_corr_overall.xlsx', datetime_format='YYYY-MM-DD') as writer:
+    concat_df = pd.concat([ibhy_overall_corr_tables[corr_target] for corr_target in ibhy_corr_targets])
+    concat_df.index.name = 'IBHY1 Correlations'
+    concat_df.to_excel(writer, freeze_panes=(1, 1))
+# IBIG
+with pd.ExcelWriter(DOWNLOADS_DIR+'IBIG1_corr_rolling.xlsx', datetime_format='YYYY-MM-DD') as writer:
+    for corr_target in ibig_corr_targets:
+        ibig_corr_df_dict[corr_target].to_excel(writer, sheet_name=corr_target, freeze_panes=(1, 1))
+with pd.ExcelWriter(DOWNLOADS_DIR+'IBIG1_corr_overall.xlsx', datetime_format='YYYY-MM-DD') as writer:
+    concat_df = pd.concat([ibig_overall_corr_tables[corr_target] for corr_target in ibig_corr_targets])
+    concat_df.index.name = 'IBIG1 Correlations'
+    concat_df.to_excel(writer, freeze_panes=(1, 1))
+
+# # [OBSOLETE, v1] Produce CSVs for each iBoxx-target pair; results in way too many CSVs
+# for corr_target in ibhy_corr_targets:
+#     ibhy_corr_df_dict[corr_target].to_csv(DOWNLOADS_DIR+f'IBHY1_{corr_target}_corr_rolling.csv')
+#     ibhy_overall_corr_tables[corr_target].to_csv(DOWNLOADS_DIR + f'IBHY1_{corr_target}_corr_overall.csv')
+# for corr_target in ibig_corr_targets:
+#     ibig_corr_df_dict[corr_target].to_csv(DOWNLOADS_DIR+f'IBIG1_{corr_target}_corr_rolling.csv')
+#     ibig_overall_corr_tables[corr_target].to_csv(DOWNLOADS_DIR + f'IBIG1_{corr_target}_corr_overall.csv')
