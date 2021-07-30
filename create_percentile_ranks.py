@@ -10,10 +10,10 @@ plt.style.use('cboe-fivethirtyeight')
 #    Save it in DOWNLOADS_DIR as f'Unified_Data_Table_data_{USE_DATE}.csv'.
 # 2) Run this script and check EXPORT_DIR for folder named USE_DATE which contains XLSXs.
 
-DOWNLOADS_DIR = 'C:/Users/gzhang/Downloads/'
-USE_DATE = '2021-05-24'
-PRODUCTS = ['IBHY', 'IBIG', 'VX', 'VXM']  # Default ['IBHY', 'IBIG', 'VX', 'VXM']
-MULTIPLIER_DICT = {'IBHY': 1000, 'IBIG': 1000, 'VX': 1000, 'VXM': 100}
+DOWNLOADS_DIR = 'C:/Users/gzhang/OneDrive - CBOE/Downloads/'
+USE_DATE = '2021-07-28'
+PRODUCTS = ['IBHY', 'IBIG', 'VX', 'VXM', 'AMW', 'AMB1', 'AMB3']  # Default ['IBHY', 'IBIG', 'VX', 'VXM']
+MULTIPLIER_DICT = {'IBHY': 1000, 'IBIG': 1000, 'VX': 1000, 'VXM': 100, 'AMW': 35, 'AMB1': 50, 'AMB3': 25}
 EXPORT_DIR = 'P:/PrdDevSharedDB/Cboe Futures Historical Percentiles/'
 
 ###############################################################################
@@ -22,7 +22,7 @@ EXPORT_DIR = 'P:/PrdDevSharedDB/Cboe Futures Historical Percentiles/'
 DASHBOARD_DOWNLOAD_FILE = f'Unified_Data_Table_data_{USE_DATE}.csv'
 settle_data = pd.read_csv(DOWNLOADS_DIR + DASHBOARD_DOWNLOAD_FILE,
                           parse_dates=['Date', 'Expiry'], thousands=',')
-settle_data['Weekly'] = settle_data['Symbol'].apply(lambda s: s[-5:-3].isnumeric())     # Test for week number
+settle_data['Weekly'] = settle_data['Symbol'].apply(lambda s: s[-5:-3].isnumeric())     # Test for week number (VX)
 settle_data_trim = settle_data.drop(['Block and Standard', 'Block and TAS',
                                      'ECRP and Standard', 'ECRP and TAS'], axis=1)
 INDEX_COLS = ['Product', 'Date', 'Expiry', 'Symbol', 'Term', 'DTE', 'Weekly']
@@ -227,6 +227,7 @@ for product in PRODUCTS:
 ###############################################################################
 
 # Write to disk for general public access
+# NOTE: optimize for Excel usage - can't open multiple files with same name, so do VX_Volume.xlsx
 export_root_path = Path(EXPORT_DIR) / USE_DATE
 for product in PRODUCTS:
     export_path = export_root_path / product
@@ -234,12 +235,12 @@ for product in PRODUCTS:
     export_path_sub.mkdir(parents=True, exist_ok=True)
     print(f"{export_path} established as export path.")
     for i_field in VOLUME_REFERENCE_COLS:
-        with pd.ExcelWriter(export_path / f'{i_field}.xlsx', datetime_format='YYYY-MM-DD') as writer:
+        with pd.ExcelWriter(export_path / f'{product}_{i_field}.xlsx', datetime_format='YYYY-MM-DD') as writer:
             for i_agg in ['Daily', 'Monthly', 'Quarterly', 'Yearly']:
                 agg_df = pd.DataFrame(product_dict[product][i_field][i_agg])
                 agg_df.to_excel(writer, sheet_name=i_agg, freeze_panes=(1, 1))
     for i_field in VOLUME_SUBCAT_COLS:
-        with pd.ExcelWriter(export_path_sub / f'{i_field}.xlsx', datetime_format='YYYY-MM-DD') as writer:
+        with pd.ExcelWriter(export_path_sub / f'{product}_{i_field}.xlsx', datetime_format='YYYY-MM-DD') as writer:
             for i_agg in ['Daily', 'Monthly', 'Quarterly', 'Yearly']:
                 agg_df = pd.DataFrame(product_dict[product][i_field][i_agg])
                 agg_df.to_excel(writer, sheet_name=i_agg, freeze_panes=(1, 1))
