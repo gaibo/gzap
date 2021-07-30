@@ -39,12 +39,21 @@ hyg.to_csv(DATA_DIR + f"HYG_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
 iboxhy = con.bdh('IBOXHY Index', ['PX_LAST'],
                  f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
 iboxhy.to_csv(DATA_DIR + f"IBOXHY_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+iboxxmja = con.bdh('IBOXXMJA Index', ['PX_LAST'],
+                   f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+iboxxmja.to_csv(DATA_DIR + f"IBOXXMJA_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
 cwy1 = con.bdh('CWY1 Index', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL', 'FUT_AGGTE_OPEN_INT'],
                f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
 cwy1.to_csv(DATA_DIR + f"CWY1_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
 scaled_cds = pd.read_csv('P:/PrdDevSharedDB/BBG Pull Scripts/scaled_cds_indexes.csv',
                          index_col='date', parse_dates=True)
 scaled_cdx_na_hy = scaled_cds['CDX NA HY'].dropna()
+lf98truu = con.bdh('LF98TRUU Index', ['PX_LAST'],
+                   f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+lf98truu.to_csv(DATA_DIR + f"LF98TRUU_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+jnk = con.bdh('JNK US Equity', ['PX_LAST', 'PX_VOLUME', 'TOT_RETURN_INDEX_GROSS_DVDS'],
+              f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+jnk.to_csv(DATA_DIR + f"JNK_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
 
 # Investment Grade: IHB1 futures, IBXXIBIG, LQD, IBOXIG, CWI1 futures
 # NOTE: CWI futures from Bloomberg are unusable - prices are broken
@@ -67,6 +76,9 @@ cwi1 = con.bdh('CWI1 Index', ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'FUT_AGGTE_VOL
                f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
 cwi1.to_csv(DATA_DIR + f"CWI1_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
 scaled_cdx_na_ig = scaled_cds['CDX NA IG'].dropna()
+luactruu = con.bdh('LUACTRUU Index', ['PX_LAST'],
+                   f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+luactruu.to_csv(DATA_DIR + f"LUACTRUU_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
 
 # Market Standards: SPX, VIX, Treasuries, EUR/USD rate
 spx = con.bdh('SPX Index', ['PX_LAST', 'TOT_RETURN_INDEX_GROSS_DVDS'],
@@ -148,7 +160,10 @@ ASSET_CHANGE_DICT = {'IBHY': iby_roll_df['Stitched Change'],
                      'IBXXIBHY': ibxxibhy['PX_LAST'].pct_change(),
                      'HYG': hyg['TOT_RETURN_INDEX_GROSS_DVDS'].pct_change(),
                      'IBOXHY': iboxhy['PX_LAST'].pct_change(),
+                     'IBOXXMJA': iboxxmja['PX_LAST'].pct_change(),
                      'CDX NA HY': scaled_cdx_na_hy.pct_change(),
+                     'Bloomberg Barclays HY': lf98truu['PX_LAST'].pct_change(),
+                     'JNK': jnk['TOT_RETURN_INDEX_GROSS_DVDS'].pct_change(),
                      'SPX': spx['TOT_RETURN_INDEX_GROSS_DVDS'].pct_change(),
                      'VIX': vix['PX_LAST'].pct_change(),
                      '2-Year Treasury Futures': tu_roll_df['Stitched Change'],
@@ -160,12 +175,14 @@ ASSET_CHANGE_DICT = {'IBHY': iby_roll_df['Stitched Change'],
                      'IBXXIBIG': ibxxibig['PX_LAST'].pct_change(),
                      'LQD': lqd['TOT_RETURN_INDEX_GROSS_DVDS'].pct_change(),
                      'IBOXIG': iboxig['PX_LAST'].pct_change(),
-                     'CDX NA IG': scaled_cdx_na_ig.pct_change()}
+                     'CDX NA IG': scaled_cdx_na_ig.pct_change(),
+                     'Bloomberg Barclays IG': luactruu['PX_LAST'].pct_change()}
 
 # IBHY
 ibhy1_change = ASSET_CHANGE_DICT['IBHY']
-ibhy_corr_targets = ['IBXXIBHY', 'HYG', 'IBOXHY', 'CDX NA HY', 'SPX', 'VIX', '2-Year Treasury Futures',
-                     '5-Year Treasury Futures', '10-Year Treasury Futures', '30-Year Treasury Futures', 'EUR-USD']
+ibhy_corr_targets = ['IBXXIBHY', 'HYG', 'IBOXHY', 'IBOXXMJA', 'CDX NA HY', 'Bloomberg Barclays HY', 'JNK',
+                     'SPX', 'VIX', '2-Year Treasury Futures', '5-Year Treasury Futures', '10-Year Treasury Futures',
+                     '30-Year Treasury Futures', 'EUR-USD']
 # Overall correlation tables
 ibhy_overall_corr_tables = {}
 for corr_target in ibhy_corr_targets:
@@ -176,6 +193,7 @@ for corr_target in ibhy_corr_targets:
     #   4) 2019-03 to 2020-02-24
     #   5) 2019-07 to 2020-02-24
     #   6) 2020-02-24 to present
+    #   7) 2020-07-15 to present
     # For future, consider replacing present with potential earlier cutoff
     variations_dict = {
         'Full': calc_overall_corr(ibhy1_change, ASSET_CHANGE_DICT[corr_target]),
@@ -185,7 +203,8 @@ for corr_target in ibhy_corr_targets:
                                                    '2019-03', '2020-02-24'),
         '2019-07 to 2020-02-24': calc_overall_corr(ibhy1_change, ASSET_CHANGE_DICT[corr_target],
                                                    '2019-07', '2020-02-24'),
-        '2020-02-24 to Present': calc_overall_corr(ibhy1_change, ASSET_CHANGE_DICT[corr_target], '2020-02-24', None)
+        '2020-02-24 to Present': calc_overall_corr(ibhy1_change, ASSET_CHANGE_DICT[corr_target], '2020-02-24', None),
+        '2020-07-15 to Present': calc_overall_corr(ibhy1_change, ASSET_CHANGE_DICT[corr_target], '2020-07-15', None)
     }
     ibhy_overall_corr_tables[corr_target] = pd.DataFrame(variations_dict, index=[f'{corr_target}'])
 # Rolling correlation
@@ -208,8 +227,9 @@ for corr_target in ibhy_corr_targets:
 
 # IBIG
 ibig1_change = ASSET_CHANGE_DICT['IBIG']
-ibig_corr_targets = ['IBXXIBIG', 'LQD', 'IBOXIG', 'CDX NA IG', 'SPX', 'VIX', '2-Year Treasury Futures',
-                     '5-Year Treasury Futures', '10-Year Treasury Futures', '30-Year Treasury Futures', 'EUR-USD']
+ibig_corr_targets = ['IBXXIBIG', 'LQD', 'IBOXIG', 'CDX NA IG', 'Bloomberg Barclays IG',
+                     'SPX', 'VIX', '2-Year Treasury Futures', '5-Year Treasury Futures', '10-Year Treasury Futures',
+                     '30-Year Treasury Futures', 'EUR-USD']
 # Overall correlation variations
 ibig_overall_corr_tables = {}
 for corr_target in ibig_corr_targets:
@@ -220,6 +240,7 @@ for corr_target in ibig_corr_targets:
     #   4) 2019-03 to 2020-02-24
     #   5) 2019-07 to 2020-02-24
     #   6) 2020-02-24 to present
+    #   7) 2020-07-15 to present
     # For future, consider replacing present with potential earlier cutoff
     variations_dict = {
         'Full': calc_overall_corr(ibig1_change, ASSET_CHANGE_DICT[corr_target]),
@@ -229,7 +250,8 @@ for corr_target in ibig_corr_targets:
                                                    '2019-03', '2020-02-24'),
         '2019-07 to 2020-02-24': calc_overall_corr(ibig1_change, ASSET_CHANGE_DICT[corr_target],
                                                    '2019-07', '2020-02-24'),
-        '2020-02-24 to Present': calc_overall_corr(ibig1_change, ASSET_CHANGE_DICT[corr_target], '2020-02-24', None)
+        '2020-02-24 to Present': calc_overall_corr(ibig1_change, ASSET_CHANGE_DICT[corr_target], '2020-02-24', None),
+        '2020-07-15 to Present': calc_overall_corr(ibig1_change, ASSET_CHANGE_DICT[corr_target], '2020-07-15', None)
     }
     ibig_overall_corr_tables[corr_target] = pd.DataFrame(variations_dict, index=[f'{corr_target}'])
 # Rolling correlation
