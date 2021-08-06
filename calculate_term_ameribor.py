@@ -3,16 +3,22 @@ from pathlib import Path
 import os
 from universal_tools import chop_segments_off_string
 from options_futures_expirations_v3 import DAY_OFFSET, ensure_bus_day
+from universal_tools import share_dateindex
+
+DOWNLOADS_DIR = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/')  # For miscellaneous work
+AMERIBOR_DIR = DOWNLOADS_DIR / 'Ameribor'   # Where I keep all Ameribor-related stuff
 
 # [MANUAL] Configure
 OFFICIAL_START = pd.Timestamp('2016-06-01')
 OUR_DATA_FORMAT_TRANSITION = pd.Timestamp('2021-03-19')     # Up to and including this date is dataset 1, then dataset 2
 OUR_START = pd.Timestamp('2016-01-15')  # We have enough DTCC and AFX data to try calculating further than 2016-06-01
 OUR_END = pd.Timestamp('2021-06-08')    # Set this to the latest date for which we have both DTCC and AFX data
-DTCC_DURATION_LOWER_BOUND = 41      # AMBOR30T: 2; AMBOR90T: 41
-DTCC_DURATION_UPPER_BOUND = 120     # AMBOR30T: 40; AMBOR90T: 120
-INCLUDE_AFX = False     # AMBOR30T: True; AMBOR90T: False
-VOLUME_THRESHOLD = 10e9     # AMBOR30T: 25e9; AMBOR90T: 10e9
+DTCC_DURATION_LOWER_BOUND = 2      # AMBOR30T: 2; AMBOR90T: 41
+DTCC_DURATION_UPPER_BOUND = 40     # AMBOR30T: 40; AMBOR90T: 120
+INCLUDE_AFX = True     # AMBOR30T: True; AMBOR90T: False
+VOLUME_THRESHOLD = 25e9     # AMBOR30T: 25e9; AMBOR90T: 10e9
+OUTLIER_TRIMMING_BOUND = 250    # In basis points
+EFFR_SPREAD_LOOKBACK = 252  # In days
 
 
 ###############################################################################
@@ -330,6 +336,13 @@ combined_data = combined_data.sort_values(['Date', 'DBPV', 'Principal Amount'],
 
 
 ###############################################################################
+# Load EFFR rates as Term Ameribor fallback
+
+effr_raw = pd.read_excel(AMERIBOR_DIR / 'EFFR.xlsx', parse_dates=['Effective Date'])
+effr = effr_raw.set_index('Effective Date')['Rate (%)'].sort_index()
+
+
+###############################################################################
 # Run the Term AMERIBOR calculation process
 
 # Determine dataset
@@ -339,12 +352,13 @@ test_dates = test.index.unique()    # Essentially Federal Reserve K.8 business c
 
 def filter_outliers_from_rate(data_df, filter_rate):
     # Let through 1) all AFX transactions
-    #             2) DTCC transactions that are NOT outside 250bp bounds
+    #             2) DTCC transactions that are NOT outside 250bp (configurable) bounds
+    bound = OUTLIER_TRIMMING_BOUND/100
     filtered_data_df = \
         data_df[~((data_df['Product Type'] == 'CP')
                   | (data_df['Product Type'] == 'CD'))
-                | ~((data_df['Interest Rate'] > filter_rate + 2.5)
-                    | (data_df['Interest Rate'] < filter_rate - 2.5))].copy()
+                | ~((data_df['Interest Rate'] > filter_rate + bound)
+                    | (data_df['Interest Rate'] < filter_rate - bound))].copy()
     return filtered_data_df
 
 
@@ -363,6 +377,8 @@ OUTLIER_FILTER_IMPOSSIBLES = []
 OUTLIER_FILTER_APPLIEDS = []
 VOLUME_THRESHOLD_NOT_METS = []
 RATE_IMPOSSIBLES = []
+FALLBACK_IMPOSSIBLES = []
+FALLBACK_RATES = []
 RATE_INPUT_DF_DICT = {}
 ISOLATED_DAILY_TOTAL_VOLUME_DICT = {}
 ISOLATED_DAILY_TOTAL_DBPV_DICT = {}
@@ -429,6 +445,21 @@ for i, today in enumerate(test_dates):
         if not extend_success:
             RATE_IMPOSSIBLES.append(today)
             continue  # Just move on to next date, skipping calculation
+        if n_days_extended > 5:
+            # Overextension fallback - EFFR rate + spread
+            if len(RATE_DICT) < EFFR_SPREAD_LOOKBACK:
+                # Edge case: not enough calculated rates - can't apply fallback
+                FALLBACK_IMPOSSIBLES.append(today)
+                continue    # Edge case at beginning of history: don't have enough data for fallback methodology
+            rates_so_far = pd.Series(RATE_DICT).sort_index()
+            [rates_so_far, matched_effr] = share_dateindex([rates_so_far, effr], ffill=True)
+            spread_over_effr = rates_so_far - matched_effr
+            avg_spread_over_effr = spread_over_effr.rolling(EFFR_SPREAD_LOOKBACK).mean()
+            spread, effr_today = avg_spread_over_effr.iloc[-1], effr.loc[:today].iloc[-1]
+            term_rate = effr_today + spread
+            FALLBACK_RATES.append((today, effr_today, spread, term_rate))
+            # RATE_DICT[today] = term_rate  # Once finalized, we can apply this methodology
+            # continue    # No need to attempt regular calculation if applying methodology
 
     # 3) Calculate latest date's Term AMERIBOR rate
     # Re-sort for 5+-day window
@@ -462,11 +493,13 @@ for i, today in enumerate(test_dates):
 
 test_rates = pd.Series(RATE_DICT).sort_index()
 test_rates.index.name, test_rates.name = 'Date', 'Replicated Term Rate'
+outlier_info = (pd.DataFrame(OUTLIER_FILTER_APPLIEDS, columns=['Date', 'Transactions Omitted'])
+                .set_index('Date'))
 threshold_info = (pd.DataFrame(VOLUME_THRESHOLD_NOT_METS, columns=['Date', 'Failed 5-Day Volume',
                                                                    'Days Extended', 'Extended Volume'])
                   .set_index('Date'))
-outlier_info = (pd.DataFrame(OUTLIER_FILTER_APPLIEDS, columns=['Date', 'Transactions Omitted'])
-                .set_index('Date'))
+fallback_info = (pd.DataFrame(FALLBACK_RATES, columns=['Date', 'Date EFFR', 'Spread Applied', 'Fallback Term Rate'])
+                 .set_index('Date'))
 daily_total_dbpv = pd.Series(ISOLATED_DAILY_TOTAL_DBPV_DICT).sort_index()
 daily_rate = pd.Series(ISOLATED_DAILY_RATE_DICT).sort_index()
 daily_total_volume = pd.Series(ISOLATED_DAILY_TOTAL_VOLUME_DICT).sort_index()
@@ -479,13 +512,14 @@ daily_values_breakdown.index.name = 'Date'
 ###############################################################################
 # Export results to disk
 
-DOWNLOADS_DIR = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/')  # For miscellaneous work
-export_prefix = 'ambor90t'  # Explicitly switch between 'ambor30t' and 'ambor90t' for clarity
+# Explicitly switch between 'ambor30t' and 'ambor90t' for filename clarity
+export_prefix = f'ambor30t_{OUTLIER_TRIMMING_BOUND}bp'
 
 # Export rates and helper calculations
 test_rates.to_csv(DOWNLOADS_DIR / f'{export_prefix}_test_rates.csv', header=True)
-threshold_info.to_csv(DOWNLOADS_DIR / f'{export_prefix}_test_thresholds.csv')
 outlier_info.to_csv(DOWNLOADS_DIR / f'{export_prefix}_test_outliers.csv')
+threshold_info.to_csv(DOWNLOADS_DIR / f'{export_prefix}_test_thresholds.csv')
+fallback_info.to_csv(DOWNLOADS_DIR / f'{export_prefix}_test_fallbacks.csv')
 daily_values_breakdown.to_csv(DOWNLOADS_DIR / f'{export_prefix}_test_daily_breakdown.csv')
 
 # # Export input data for full history
@@ -507,34 +541,34 @@ daily_values_breakdown.to_csv(DOWNLOADS_DIR / f'{export_prefix}_test_daily_break
 ###############################################################################
 # CFTC quick stats - 2020-09-01 to 2021-03-19
 
-# Compare DTCC and AFX contributions for CFTC
-cftc_export_transactions = ELIGIBLE_TRANSACTIONS_DF.loc['2020-09-01':'2021-03-19'].copy()
-cftc_export_transactions.loc[(cftc_export_transactions['Product Type'] == 'CP')
-                             | (cftc_export_transactions['Product Type'] == 'CD'),
-                             'DTCC or AFX'] = 'DTCC'
-cftc_export_transactions.loc[(cftc_export_transactions['Product Type'] == 'overnight_unsecured_ameribor_loan')
-                             | (cftc_export_transactions['Product Type'] == 'thirty_day_unsecured_ameribor_loan')
-                             | (cftc_export_transactions['Product Type'] == 'bilateral_loan_overnight')
-                             | (cftc_export_transactions['Product Type'] == 'direct_settlement_loan_overnight'),
-                             'DTCC or AFX'] = 'AFX'
-dtcc_trans = cftc_export_transactions[cftc_export_transactions['DTCC or AFX'] == 'DTCC']
-afx_trans = cftc_export_transactions[cftc_export_transactions['DTCC or AFX'] == 'AFX']
-
-# Relative Share - DTCC vs. AFX
-# Number of transactions
-n_trans_dtcc = dtcc_trans.shape[0]
-n_trans_afx = afx_trans.shape[0]
-# Total principal amount (volume)
-volume_trans_dtcc = dtcc_trans['Principal Amount'].sum()
-volume_trans_afx = afx_trans['Principal Amount'].sum()
-# Total weighted volume (DBPV)
-dbpv_trans_dtcc = dtcc_trans['DBPV'].sum()
-dbpv_trans_afx = afx_trans['DBPV'].sum()
-
-# Distribution of Duration - DTCC vs. AFX
-dur_n_dtcc = dtcc_trans.groupby('Duration (Days)')['Principal Amount'].count()
-dur_n_afx = afx_trans.groupby('Duration (Days)')['Principal Amount'].count()
-dur_volume_dtcc = dtcc_trans.groupby('Duration (Days)')['Principal Amount'].sum()
-dur_volume_afx = afx_trans.groupby('Duration (Days)')['Principal Amount'].sum()
-dur_dbpv_dtcc = dtcc_trans.groupby('Duration (Days)')['DBPV'].sum()
-dur_dbpv_afx = afx_trans.groupby('Duration (Days)')['DBPV'].sum()
+# # Compare DTCC and AFX contributions for CFTC
+# cftc_export_transactions = ELIGIBLE_TRANSACTIONS_DF.loc['2020-09-01':'2021-03-19'].copy()
+# cftc_export_transactions.loc[(cftc_export_transactions['Product Type'] == 'CP')
+#                              | (cftc_export_transactions['Product Type'] == 'CD'),
+#                              'DTCC or AFX'] = 'DTCC'
+# cftc_export_transactions.loc[(cftc_export_transactions['Product Type'] == 'overnight_unsecured_ameribor_loan')
+#                              | (cftc_export_transactions['Product Type'] == 'thirty_day_unsecured_ameribor_loan')
+#                              | (cftc_export_transactions['Product Type'] == 'bilateral_loan_overnight')
+#                              | (cftc_export_transactions['Product Type'] == 'direct_settlement_loan_overnight'),
+#                              'DTCC or AFX'] = 'AFX'
+# dtcc_trans = cftc_export_transactions[cftc_export_transactions['DTCC or AFX'] == 'DTCC']
+# afx_trans = cftc_export_transactions[cftc_export_transactions['DTCC or AFX'] == 'AFX']
+#
+# # Relative Share - DTCC vs. AFX
+# # Number of transactions
+# n_trans_dtcc = dtcc_trans.shape[0]
+# n_trans_afx = afx_trans.shape[0]
+# # Total principal amount (volume)
+# volume_trans_dtcc = dtcc_trans['Principal Amount'].sum()
+# volume_trans_afx = afx_trans['Principal Amount'].sum()
+# # Total weighted volume (DBPV)
+# dbpv_trans_dtcc = dtcc_trans['DBPV'].sum()
+# dbpv_trans_afx = afx_trans['DBPV'].sum()
+#
+# # Distribution of Duration - DTCC vs. AFX
+# dur_n_dtcc = dtcc_trans.groupby('Duration (Days)')['Principal Amount'].count()
+# dur_n_afx = afx_trans.groupby('Duration (Days)')['Principal Amount'].count()
+# dur_volume_dtcc = dtcc_trans.groupby('Duration (Days)')['Principal Amount'].sum()
+# dur_volume_afx = afx_trans.groupby('Duration (Days)')['Principal Amount'].sum()
+# dur_dbpv_dtcc = dtcc_trans.groupby('Duration (Days)')['DBPV'].sum()
+# dur_dbpv_afx = afx_trans.groupby('Duration (Days)')['DBPV'].sum()
