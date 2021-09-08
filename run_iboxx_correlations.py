@@ -51,6 +51,9 @@ scaled_cdx_na_hy = scaled_cds['CDX NA HY'].dropna()
 lf98truu = con.bdh('LF98TRUU Index', ['PX_LAST'],
                    f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
 lf98truu.to_csv(DATA_DIR + f"LF98TRUU_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
+h0a4 = con.bdh('H0A4 Index', ['PX_LAST'],
+               f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
+h0a4.to_csv(DATA_DIR + f"H0A4_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
 jnk = con.bdh('JNK US Equity', ['PX_LAST', 'PX_VOLUME', 'TOT_RETURN_INDEX_GROSS_DVDS'],
               f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
 jnk.to_csv(DATA_DIR + f"JNK_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
@@ -163,6 +166,7 @@ ASSET_CHANGE_DICT = {'IBHY': iby_roll_df['Stitched Change'],
                      'IBOXXMJA': iboxxmja['PX_LAST'].pct_change(),
                      'CDX NA HY': scaled_cdx_na_hy.pct_change(),
                      'Bloomberg Barclays HY': lf98truu['PX_LAST'].pct_change(),
+                     'ICE BofA BB-B': h0a4['PX_LAST'].pct_change(),
                      'JNK': jnk['TOT_RETURN_INDEX_GROSS_DVDS'].pct_change(),
                      'SPX': spx['TOT_RETURN_INDEX_GROSS_DVDS'].pct_change(),
                      'VIX': vix['PX_LAST'].pct_change(),
@@ -180,9 +184,9 @@ ASSET_CHANGE_DICT = {'IBHY': iby_roll_df['Stitched Change'],
 
 # IBHY
 ibhy1_change = ASSET_CHANGE_DICT['IBHY']
-ibhy_corr_targets = ['IBXXIBHY', 'HYG', 'IBOXHY', 'IBOXXMJA', 'CDX NA HY', 'Bloomberg Barclays HY', 'JNK',
-                     'SPX', 'VIX', '2-Year Treasury Futures', '5-Year Treasury Futures', '10-Year Treasury Futures',
-                     '30-Year Treasury Futures', 'EUR-USD']
+ibhy_corr_targets = ['IBXXIBHY', 'HYG', 'IBOXHY', 'IBOXXMJA', 'CDX NA HY', 'Bloomberg Barclays HY', 'ICE BofA BB-B',
+                     'JNK', 'SPX', 'VIX', '2-Year Treasury Futures', '5-Year Treasury Futures',
+                     '10-Year Treasury Futures', '30-Year Treasury Futures', 'EUR-USD']
 # Overall correlation tables
 ibhy_overall_corr_tables = {}
 for corr_target in ibhy_corr_targets:
