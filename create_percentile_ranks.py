@@ -11,8 +11,8 @@ plt.style.use('cboe-fivethirtyeight')
 # 2) Run this script and check EXPORT_DIR for folder named USE_DATE which contains XLSXs.
 
 DOWNLOADS_DIR = 'C:/Users/gzhang/OneDrive - CBOE/Downloads/'
-USE_DATE = '2021-07-28'
-PRODUCTS = ['IBHY', 'IBIG', 'VX', 'VXM', 'AMW', 'AMB1', 'AMB3']  # Default ['IBHY', 'IBIG', 'VX', 'VXM']
+USE_DATE = '2021-09-30'
+PRODUCTS = ['IBHY', 'IBIG', 'VX', 'VXM', 'AMW', 'AMB1', 'AMB3', 'AMT1']     # Default ['IBHY', 'IBIG', 'VX', 'VXM']
 MULTIPLIER_DICT = {'IBHY': 1000, 'IBIG': 1000, 'VX': 1000, 'VXM': 100, 'AMW': 35, 'AMB1': 50, 'AMB3': 25}
 EXPORT_DIR = 'P:/PrdDevSharedDB/Cboe Futures Historical Percentiles/'
 
@@ -52,7 +52,7 @@ def lookback_rank(ser):
     :param ser: pd.Series framed by .rolling() framework
     :return: rank (in percent) of last element of series within the series
     """
-    return ser.rank(pct=True)[-1]
+    return ser.rank(pct=True, method='min')[-1]
 
 
 def generate_volume_percentiles(data, field):
@@ -73,26 +73,26 @@ def generate_volume_percentiles(data, field):
 
     # No aggregation - daily
     # NOTE: at daily level, "volume" and "ADV" are conceptually the same
-    daily_percentile = daily_field.rank(pct=True)  # Percentile over full history
+    daily_percentile = daily_field.rank(pct=True, method='min')  # Percentile over full history
     daily_percentile_rolling = daily_field.rolling(252).apply(lookback_rank, raw=False)     # Percentile rolling 1-year
     # Percent change stats
     daily_change = daily_field.pct_change()
     daily_change_pos = daily_change[daily_change > 0]
-    daily_change_pos_percentile = daily_change_pos.rank(pct=True)
+    daily_change_pos_percentile = daily_change_pos.rank(pct=True, method='min')
     daily_change_neg = daily_change[daily_change < 0]
-    daily_change_neg_percentile = (-daily_change_neg).rank(pct=True)
+    daily_change_neg_percentile = (-daily_change_neg).rank(pct=True, method='min')
     daily_change_posneg_percentile_df = pd.DataFrame({'Increase': daily_change_pos_percentile,
                                                       'Decrease': daily_change_neg_percentile})
     if field in VOLUME_SUBCAT_COLS:
         # Do the same analysis on % total volume if field is a subset of volume
         daily_percent_total = daily_field / daily_volume
-        daily_percent_total_percentile = daily_percent_total.rank(pct=True)
+        daily_percent_total_percentile = daily_percent_total.rank(pct=True, method='min')
         daily_percent_total_percentile_rolling = daily_percent_total.rolling(252).apply(lookback_rank, raw=False)
         daily_percent_total_change = daily_percent_total.pct_change()
         daily_percent_total_change_pos = daily_percent_total_change[daily_percent_total_change > 0]
-        daily_percent_total_change_pos_percentile = daily_percent_total_change_pos.rank(pct=True)
+        daily_percent_total_change_pos_percentile = daily_percent_total_change_pos.rank(pct=True, method='min')
         daily_percent_total_change_neg = daily_percent_total_change[daily_percent_total_change < 0]
-        daily_percent_total_change_neg_percentile = (-daily_percent_total_change_neg).rank(pct=True)
+        daily_percent_total_change_neg_percentile = (-daily_percent_total_change_neg).rank(pct=True, method='min')
         daily_percent_total_change_posneg_percentile_df = \
             pd.DataFrame({'Increase': daily_percent_total_change_pos_percentile,
                           'Decrease': daily_percent_total_change_neg_percentile})
@@ -146,7 +146,7 @@ def generate_volume_percentiles(data, field):
         field_percentile_dict[agg]['ADV'] = daily_field_df.groupby(agg_level)[field].mean()
         field_percentile_dict[agg]['Percentile (All)'] = \
             (field_percentile_dict[agg]['ADV']
-             .rank(pct=True))
+             .rank(pct=True, method='min'))
         field_percentile_dict[agg][f'Percentile (Last {lookback_n})'] = \
             (field_percentile_dict[agg]['ADV']
              .rolling(lookback_n).apply(lookback_rank, raw=False))  # Percentile rolling
@@ -155,8 +155,8 @@ def generate_volume_percentiles(data, field):
         field_percentile_dict[agg]['ADV Change'] = agg_change
         agg_change_pos, agg_change_neg = agg_change[agg_change > 0], agg_change[agg_change < 0]
         agg_change_posneg_percentile_df = \
-            pd.DataFrame({'Increase': agg_change_pos.rank(pct=True),
-                          'Decrease': (-agg_change_neg).rank(pct=True)})
+            pd.DataFrame({'Increase': agg_change_pos.rank(pct=True, method='min'),
+                          'Decrease': (-agg_change_neg).rank(pct=True, method='min')})
         field_percentile_dict[agg]['ADV Change Percentile +'], field_percentile_dict[agg]['ADV Change Percentile -'] = \
             agg_change_posneg_percentile_df['Increase'], agg_change_posneg_percentile_df['Decrease']
         if field in VOLUME_SUBCAT_COLS:
@@ -165,7 +165,7 @@ def generate_volume_percentiles(data, field):
                 field_percentile_dict[agg]['Sum'] / daily_field_df.groupby(agg_level)['Total Volume'].sum()
             field_percentile_dict[agg]['% Total Percentile (All)'] = \
                 (field_percentile_dict[agg]['% Total']
-                 .rank(pct=True))
+                 .rank(pct=True, method='min'))
             field_percentile_dict[agg][f'% Total Percentile (Last {lookback_n})'] = \
                 (field_percentile_dict[agg]['% Total']
                  .rolling(lookback_n).apply(lookback_rank, raw=False))  # Percentile rolling
@@ -174,8 +174,8 @@ def generate_volume_percentiles(data, field):
             field_percentile_dict[agg]['% Total Change'] = agg_change
             agg_change_pos, agg_change_neg = agg_change[agg_change > 0], agg_change[agg_change < 0]
             agg_change_posneg_percentile_df = \
-                pd.DataFrame({'Increase': agg_change_pos.rank(pct=True),
-                              'Decrease': (-agg_change_neg).rank(pct=True)})
+                pd.DataFrame({'Increase': agg_change_pos.rank(pct=True, method='min'),
+                              'Decrease': (-agg_change_neg).rank(pct=True, method='min')})
             field_percentile_dict[agg]['% Total Change Percentile +'], \
                 field_percentile_dict[agg]['% Total Change Percentile -'] = \
                 agg_change_posneg_percentile_df['Increase'], agg_change_posneg_percentile_df['Decrease']
