@@ -11,9 +11,10 @@ plt.style.use('cboe-fivethirtyeight')
 # 2) Run this script and check EXPORT_DIR for folder named USE_DATE which contains XLSXs.
 
 DOWNLOADS_DIR = 'C:/Users/gzhang/OneDrive - CBOE/Downloads/'
-USE_DATE = '2021-09-30'
-PRODUCTS = ['IBHY', 'IBIG', 'VX', 'VXM', 'AMW', 'AMB1', 'AMB3', 'AMT1']     # Default ['IBHY', 'IBIG', 'VX', 'VXM']
-MULTIPLIER_DICT = {'IBHY': 1000, 'IBIG': 1000, 'VX': 1000, 'VXM': 100, 'AMW': 35, 'AMB1': 50, 'AMB3': 25}
+USE_DATE = '2021-10-29'
+# Default: ['IBHY', 'IBIG', 'VX', 'VXM', 'AMW', 'AMB1', 'AMB3', 'AMT1']
+PRODUCTS = ['IBHY', 'IBIG', 'VX', 'VXM', 'AMW', 'AMB1', 'AMB3', 'AMT1']
+MULTIPLIER_DICT = {'IBHY': 1000, 'IBIG': 1000, 'VX': 1000, 'VXM': 100, 'AMW': 35, 'AMB1': 50, 'AMB3': 25, 'AMT1': 25}
 EXPORT_DIR = 'P:/PrdDevSharedDB/Cboe Futures Historical Percentiles/'
 
 ###############################################################################
@@ -22,15 +23,22 @@ EXPORT_DIR = 'P:/PrdDevSharedDB/Cboe Futures Historical Percentiles/'
 DASHBOARD_DOWNLOAD_FILE = f'Unified_Data_Table_data_{USE_DATE}.csv'
 settle_data = pd.read_csv(DOWNLOADS_DIR + DASHBOARD_DOWNLOAD_FILE,
                           parse_dates=['Date', 'Expiry'], thousands=',')
-settle_data['Weekly'] = settle_data['Symbol'].apply(lambda s: s[-5:-3].isnumeric())     # Test for week number (VX)
+# Label Weeklys (VIX futures that start with VX01, VX49, etc. instead of VX; AMW futures)
+WEEKLY_PRODUCTS = ['VX', 'AMW']
+symbol_start = settle_data['Symbol'].apply(lambda s: s.split('/')[0])   # Cut off end, which designates month
+symbol_vx = symbol_start.apply(lambda s: s[:2]) == 'VX'
+symbol_vx_weeknumbers = symbol_start.apply(lambda s: s[-2:]).str.isnumeric()
+symbol_amw = symbol_start.apply(lambda s: s[:3]) == 'AMW'
+settle_data['Weekly'] = (symbol_vx & symbol_vx_weeknumbers) | symbol_amw
+# Remove Tableau tooltip data (more than we need, for now at least)
 settle_data_trim = settle_data.drop(['Block and Standard', 'Block and TAS',
                                      'ECRP and Standard', 'ECRP and TAS'], axis=1)
+# Pivot and clean columns into DataFrame
 INDEX_COLS = ['Product', 'Date', 'Expiry', 'Symbol', 'Term', 'DTE', 'Weekly']
-# settle_data_df = settle_data_trim.pivot(index=INDEX_COLS, columns='Measure Names', values='Measure Values')
-settle_data_df = settle_data_trim.pivot_table(index=INDEX_COLS, columns='Measure Names', values='Measure Values')
-# settle_data_df = settle_data_trim.set_index(INDEX_COLS + ['Measure Names']).squeeze().unstack()
+# .pivot() same as .pivot_table() but strict on unique indexes - if ever there are duplicates in data, data is broken
+settle_data_df = settle_data_trim.pivot(index=INDEX_COLS, columns='Measure Names', values='Measure Values')
 CONTENT_COLS = ['Settle', 'Volume', 'Standard', 'TAS',
-                'Block', 'ECRP', 'Spreads', 'Customer',
+                'Block', 'ECRP', 'Spreads', 'Customer', 'RTH', 'GTH',
                 'OI', 'Open', 'High', 'Low', 'Close']
 settle_data_df = settle_data_df[CONTENT_COLS].copy()    # Enforce column order
 # Create 'Notional' column by combining settle and volume
@@ -40,7 +48,8 @@ for product in PRODUCTS:
          * MULTIPLIER_DICT[product]).values
 # Establish groupings for different analyses
 VOLUME_REFERENCE_COLS = ['Volume', 'Notional', 'OI']    # Most commonly referenced stats
-VOLUME_SUBCAT_COLS = ['Standard', 'TAS', 'Block', 'ECRP', 'Spreads', 'Customer']    # Subcategories; consider % of total
+VOLUME_SUBCAT_COLS = ['Standard', 'TAS', 'Block', 'ECRP',
+                      'Spreads', 'Customer', 'RTH', 'GTH']  # Subcategories; consider % of total
 VOLUME_COLS = VOLUME_REFERENCE_COLS + VOLUME_SUBCAT_COLS
 PRICE_COLS = ['Settle', 'Open', 'High', 'Low', 'Close']
 # Split DataFrame by product
@@ -184,19 +193,25 @@ def generate_volume_percentiles(data, field):
 
 ###############################################################################
 
+# Independently of "volume fields vs. volume subcategory fields vs. price fields", we also must account for
+# "Tableau Order Fill fields vs. Settlement+OI fields", as the latter's data goes back further in history
+# NOTE: must manually make this split because currently code relies on Tableau dashboard download to determine trade
+#       days; where we run into issue is that for VX the code would think since OI goes to 2013, there was 0 volume for
+#       every month from 2013 to 2018. I should patch this so we can take out this clunky manual distinction
+# NOTE: the 9 Order Fill fields - Volume, Standard, TAS, Block, ECRP, Spreads, Customer, RTH, GTH -
+#         only go back to 2018-02-26;
+#       the 6 Settlement+OI fields - Settle, OI, Open, High, Low, Close -
+#         go all the way back to 2013-05-20;
+#       the 1 constructed field - Notional -
+#         uses Volume and Settle so only goes back to 2018-02-26; informationally it is grouped with Volume
+ORDERFILL_FIELDS = ['Volume', 'Standard', 'TAS', 'Block', 'ECRP', 'Spreads', 'Customer', 'RTH', 'GTH']
+SETTLEOI_FIELDS = ['Settle', 'OI', 'Open', 'High', 'Low', 'Close']
+CONSTRUCTED_FIELDS = ['Notional']
+
 product_dict = {}
 for product in PRODUCTS:
     # Select product and run percentiles on each volume-related field
-    # NOTE: the 7 Order Fill fields - Volume, Standard, TAS, Block, ECRP, Spreads, Customer -
-    #         only go back to 2018-02-26;
-    #       the 6 Settlement+OI fields - Settle, OI, Open, High, Low, Close -
-    #         go all the way back to 2013-05-20;
-    #       the 1 constructed field - Notional -
-    #         uses Volume and Settle so only goes back to 2018-02-26; informationally it is grouped with Volume
     product_data = settle_data_dict[product]
-    ORDERFILL_FIELDS = ['Volume', 'Standard', 'TAS', 'Block', 'ECRP', 'Spreads', 'Customer']
-    SETTLEOI_FIELDS = ['Settle', 'OI', 'Open', 'High', 'Low', 'Close']
-    CONSTRUCTED_FIELDS = ['Notional']
     product_orderfill = product_data[ORDERFILL_FIELDS]
     product_settleoi = product_data[SETTLEOI_FIELDS]
     product_constructed = product_data[CONSTRUCTED_FIELDS]
