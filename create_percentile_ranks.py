@@ -64,7 +64,7 @@ def lookback_rank(ser):
     return ser.rank(pct=True, method='min')[-1]
 
 
-def generate_volume_percentiles(data, field):
+def generate_volume_percentiles_for_field(data, field):
     # Extract volume-based field up to daily level - aggregate volume by summing
     daily_field = data.groupby(['Date'])[field].sum()
     if field in VOLUME_SUBCAT_COLS:
@@ -191,6 +191,31 @@ def generate_volume_percentiles(data, field):
     return field_percentile_dict
 
 
+def process_fields_for_product(data):
+    # Treat different data sources' fields differently
+    product_orderfill = data[ORDERFILL_FIELDS]
+    product_settleoi = data[SETTLEOI_FIELDS]
+    product_constructed = data[CONSTRUCTED_FIELDS]
+    # Crop NaNs from legacy data clash
+    modern_start = product_orderfill['Volume'].first_valid_index()[0]  # Volume field used as representative
+    product_orderfill = product_orderfill.loc[modern_start:]
+    product_constructed = product_constructed.loc[modern_start:]  # Constructed field limited by Order Fill history
+
+    # Initialize storage dictionary
+    percentile_dict = {}
+    # Run percentiles on each volume-based field from Order Fill
+    for field in ORDERFILL_FIELDS:
+        percentile_dict[field] = generate_volume_percentiles_for_field(product_orderfill, field)
+    # Run percentiles on OI field from Settlement+OI. OI's aggregation is very specific: it must be summed up to
+    # daily level (since the roll drives OI at expiry-level), then averaged up to monthly/quarterly/yearly
+    percentile_dict['OI'] = generate_volume_percentiles_for_field(product_settleoi, 'OI')
+    for agg in ['Monthly', 'Quarterly', 'Yearly']:
+        percentile_dict['OI'][agg]['Sum'] = None  # This field makes no sense for OI
+    # Run percentiles on constructed Notional field
+    percentile_dict['Notional'] = generate_volume_percentiles_for_field(product_constructed, 'Notional')
+    return percentile_dict
+
+
 ###############################################################################
 
 # Independently of "volume fields vs. volume subcategory fields vs. price fields", we also must account for
@@ -208,54 +233,41 @@ ORDERFILL_FIELDS = ['Volume', 'Standard', 'TAS', 'Block', 'ECRP', 'Spreads', 'Cu
 SETTLEOI_FIELDS = ['Settle', 'OI', 'Open', 'High', 'Low', 'Close']
 CONSTRUCTED_FIELDS = ['Notional']
 
-product_dict = {}
+PRODUCT_DICT = {}
 for product in PRODUCTS:
     # Select product and run percentiles on each volume-related field
     product_data = settle_data_dict[product]
-    product_orderfill = product_data[ORDERFILL_FIELDS]
-    product_settleoi = product_data[SETTLEOI_FIELDS]
-    product_constructed = product_data[CONSTRUCTED_FIELDS]
-    # Crop NaNs from legacy data clash
-    modern_start = product_orderfill['Volume'].first_valid_index()[0]   # Volume field used as representative
-    product_orderfill = product_orderfill.loc[modern_start:]
-    product_constructed = product_constructed.loc[modern_start:]    # Constructed field limited by Order Fill history
-
-    # Initialize storage dictionary
-    percentile_dict = {}
-
-    # Run percentiles on each volume-based field from Order Fill
-    for i_field in ORDERFILL_FIELDS:
-        percentile_dict[i_field] = generate_volume_percentiles(product_orderfill, i_field)
-
-    # Run percentiles on OI field from Settlement+OI. OI's aggregation is very specific: it must be summed up to
-    # daily level (since the roll drives OI at expiry-level), then averaged up to monthly/quarterly/yearly
-    percentile_dict['OI'] = generate_volume_percentiles(product_settleoi, 'OI')
-    for i_agg in ['Monthly', 'Quarterly', 'Yearly']:
-        percentile_dict['OI'][i_agg]['Sum'] = None    # This field makes no sense for OI
-
-    # Run percentiles on constructed Notional field
-    percentile_dict['Notional'] = generate_volume_percentiles(product_constructed, 'Notional')
-
-    # Store in higher level storage dictionary
-    product_dict[product] = percentile_dict
+    if product == 'VX':
+        # Must do 1) Monthly, 2) Weekly, 3) both together
+        vx_monthly_product_data = product_data.xs(False, level='Weekly')
+        vx_weekly_product_data = product_data.xs(True, level='Weekly')
+        # Process separately and store in higher level storage dictionary
+        PRODUCT_DICT[f'{product}_Monthly'] = process_fields_for_product(vx_monthly_product_data)
+        PRODUCT_DICT[f'{product}_Weekly'] = process_fields_for_product(vx_weekly_product_data)
+        PRODUCT_DICT[product] = process_fields_for_product(product_data)
+    elif product == 'AMW':
+        # Different from VIX - AMW is a Weekly-only product
+        PRODUCT_DICT[f'{product}_Weekly'] = process_fields_for_product(product_data)
+    else:
+        PRODUCT_DICT[product] = process_fields_for_product(product_data)
 
 ###############################################################################
 
 # Write to disk for general public access
 # NOTE: optimize for Excel usage - can't open multiple files with same name, so do VX_Volume.xlsx
 export_root_path = Path(EXPORT_DIR) / USE_DATE
-for product in PRODUCTS:
-    export_path = export_root_path / product
+for product_name in PRODUCT_DICT.keys():
+    export_path = export_root_path / product_name
     export_path_sub = export_path / 'Volume Subcategories'
     export_path_sub.mkdir(parents=True, exist_ok=True)
     print(f"{export_path} established as export path.")
     for i_field in VOLUME_REFERENCE_COLS:
-        with pd.ExcelWriter(export_path / f'{product}_{i_field}.xlsx', datetime_format='YYYY-MM-DD') as writer:
+        with pd.ExcelWriter(export_path / f'{product_name}_{i_field}.xlsx', datetime_format='YYYY-MM-DD') as writer:
             for i_agg in ['Daily', 'Monthly', 'Quarterly', 'Yearly']:
-                agg_df = pd.DataFrame(product_dict[product][i_field][i_agg])
+                agg_df = pd.DataFrame(PRODUCT_DICT[product_name][i_field][i_agg])
                 agg_df.to_excel(writer, sheet_name=i_agg, freeze_panes=(1, 1))
     for i_field in VOLUME_SUBCAT_COLS:
-        with pd.ExcelWriter(export_path_sub / f'{product}_{i_field}.xlsx', datetime_format='YYYY-MM-DD') as writer:
+        with pd.ExcelWriter(export_path_sub / f'{product_name}_{i_field}.xlsx', datetime_format='YYYY-MM-DD') as writer:
             for i_agg in ['Daily', 'Monthly', 'Quarterly', 'Yearly']:
-                agg_df = pd.DataFrame(product_dict[product][i_field][i_agg])
+                agg_df = pd.DataFrame(PRODUCT_DICT[product_name][i_field][i_agg])
                 agg_df.to_excel(writer, sheet_name=i_agg, freeze_panes=(1, 1))
