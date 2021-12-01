@@ -33,7 +33,7 @@ iby2.to_csv(DATA_DIR + f"IBY2_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
 ibxxibhy = con.bdh('IBXXIBHY Index', ['PX_LAST'],
                    f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
 ibxxibhy.to_csv(DATA_DIR + f"IBXXIBHY_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
-hyg = con.bdh('HYG US Equity', ['PX_LAST', 'PX_VOLUME', 'TOT_RETURN_INDEX_GROSS_DVDS'],
+hyg = con.bdh('HYG US Equity', ['PX_LAST', 'PX_VOLUME', 'TOT_RETURN_INDEX_GROSS_DVDS', 'FUND_NET_ASSET_VAL'],
               f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
 hyg.to_csv(DATA_DIR + f"HYG_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
 iboxhy = con.bdh('IBOXHY Index', ['PX_LAST'],
@@ -69,7 +69,7 @@ ihb2.to_csv(DATA_DIR + f"IHB2_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
 ibxxibig = con.bdh('IBXXIBIG Index', ['PX_LAST'],
                    f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
 ibxxibig.to_csv(DATA_DIR + f"IBXXIBIG_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
-lqd = con.bdh('LQD US Equity', ['PX_LAST', 'PX_VOLUME', 'TOT_RETURN_INDEX_GROSS_DVDS'],
+lqd = con.bdh('LQD US Equity', ['PX_LAST', 'PX_VOLUME', 'TOT_RETURN_INDEX_GROSS_DVDS', 'FUND_NET_ASSET_VAL'],
               f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}").droplevel(0, axis=1)
 lqd.to_csv(DATA_DIR + f"LQD_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
 iboxig = con.bdh('IBOXIG Index', ['PX_LAST'],
@@ -133,23 +133,23 @@ ihb1.loc[ihb1.index & iboxx_maturities, 'PX_LAST'] = \
 ###############################################################################
 # Calculate bespoke rolled futures
 
-iby_roll_df = stitch_bloomberg_futures(iby1['PX_LAST'], iby2['PX_LAST'], roll_n_before_expiry=3,
+iby_roll_df = stitch_bloomberg_futures(iby1['PX_LAST'], iby2['PX_LAST'], roll_n_before_expiry=ROLL_N_BEFORE_EXPIRY,
                                        start_datelike=START_DATE, end_datelike=END_DATE,
                                        specific_product='iBoxx')
-ihb_roll_df = stitch_bloomberg_futures(ihb1['PX_LAST'], ihb2['PX_LAST'], roll_n_before_expiry=3,
+ihb_roll_df = stitch_bloomberg_futures(ihb1['PX_LAST'], ihb2['PX_LAST'], roll_n_before_expiry=ROLL_N_BEFORE_EXPIRY,
                                        start_datelike=START_DATE, end_datelike=END_DATE,
                                        specific_product='iBoxx')
 
-tu_roll_df = stitch_bloomberg_futures(tu1['PX_LAST'], tu2['PX_LAST'], roll_n_before_expiry=3,
+tu_roll_df = stitch_bloomberg_futures(tu1['PX_LAST'], tu2['PX_LAST'], roll_n_before_expiry=ROLL_N_BEFORE_EXPIRY,
                                       start_datelike=START_DATE, end_datelike=END_DATE,
                                       specific_product='Treasury Futures 2')
-fv_roll_df = stitch_bloomberg_futures(fv1['PX_LAST'], fv2['PX_LAST'], roll_n_before_expiry=3,
+fv_roll_df = stitch_bloomberg_futures(fv1['PX_LAST'], fv2['PX_LAST'], roll_n_before_expiry=ROLL_N_BEFORE_EXPIRY,
                                       start_datelike=START_DATE, end_datelike=END_DATE,
                                       specific_product='Treasury Futures 5')
-ty_roll_df = stitch_bloomberg_futures(ty1['PX_LAST'], ty2['PX_LAST'], roll_n_before_expiry=3,
+ty_roll_df = stitch_bloomberg_futures(ty1['PX_LAST'], ty2['PX_LAST'], roll_n_before_expiry=ROLL_N_BEFORE_EXPIRY,
                                       start_datelike=START_DATE, end_datelike=END_DATE,
                                       specific_product='Treasury Futures 10')
-us_roll_df = stitch_bloomberg_futures(us1['PX_LAST'], us2['PX_LAST'], roll_n_before_expiry=3,
+us_roll_df = stitch_bloomberg_futures(us1['PX_LAST'], us2['PX_LAST'], roll_n_before_expiry=ROLL_N_BEFORE_EXPIRY,
                                       start_datelike=START_DATE, end_datelike=END_DATE,
                                       specific_product='Treasury Futures 30')
 
@@ -162,6 +162,8 @@ CORR_END = None
 ASSET_CHANGE_DICT = {'IBHY': iby_roll_df['Stitched Change'],
                      'IBXXIBHY': ibxxibhy['PX_LAST'].pct_change(),
                      'HYG': hyg['TOT_RETURN_INDEX_GROSS_DVDS'].pct_change(),
+                     'HYG Price': hyg['PX_LAST'].pct_change(),
+                     'HYG NAV': hyg['FUND_NET_ASSET_VAL'].pct_change(),
                      'IBOXHY': iboxhy['PX_LAST'].pct_change(),
                      'IBOXXMJA': iboxxmja['PX_LAST'].pct_change(),
                      'CDX NA HY': scaled_cdx_na_hy.pct_change(),
@@ -178,15 +180,17 @@ ASSET_CHANGE_DICT = {'IBHY': iby_roll_df['Stitched Change'],
                      'IBIG': ihb_roll_df['Stitched Change'],
                      'IBXXIBIG': ibxxibig['PX_LAST'].pct_change(),
                      'LQD': lqd['TOT_RETURN_INDEX_GROSS_DVDS'].pct_change(),
+                     'LQD Price': lqd['PX_LAST'].pct_change(),
+                     'LQD NAV': lqd['FUND_NET_ASSET_VAL'].pct_change(),
                      'IBOXIG': iboxig['PX_LAST'].pct_change(),
                      'CDX NA IG': scaled_cdx_na_ig.pct_change(),
                      'Bloomberg Barclays IG': luactruu['PX_LAST'].pct_change()}
 
 # IBHY
 ibhy1_change = ASSET_CHANGE_DICT['IBHY']
-ibhy_corr_targets = ['IBXXIBHY', 'HYG', 'IBOXHY', 'IBOXXMJA', 'CDX NA HY', 'Bloomberg Barclays HY', 'ICE BofA BB-B',
-                     'JNK', 'SPX', 'VIX', '2-Year Treasury Futures', '5-Year Treasury Futures',
-                     '10-Year Treasury Futures', '30-Year Treasury Futures', 'EUR-USD']
+ibhy_corr_targets = ['IBXXIBHY', 'HYG', 'HYG Price', 'HYG NAV', 'IBOXHY', 'IBOXXMJA', 'CDX NA HY',
+                     'Bloomberg Barclays HY', 'ICE BofA BB-B', 'JNK', 'SPX', 'VIX', '2-Year Treasury Futures',
+                     '5-Year Treasury Futures', '10-Year Treasury Futures', '30-Year Treasury Futures', 'EUR-USD']
 # Overall correlation tables
 ibhy_overall_corr_tables = {}
 for corr_target in ibhy_corr_targets:
@@ -231,7 +235,7 @@ for corr_target in ibhy_corr_targets:
 
 # IBIG
 ibig1_change = ASSET_CHANGE_DICT['IBIG']
-ibig_corr_targets = ['IBXXIBIG', 'LQD', 'IBOXIG', 'CDX NA IG', 'Bloomberg Barclays IG',
+ibig_corr_targets = ['IBXXIBIG', 'LQD', 'LQD Price', 'LQD NAV', 'IBOXIG', 'CDX NA IG', 'Bloomberg Barclays IG',
                      'SPX', 'VIX', '2-Year Treasury Futures', '5-Year Treasury Futures', '10-Year Treasury Futures',
                      '30-Year Treasury Futures', 'EUR-USD']
 # Overall correlation variations
