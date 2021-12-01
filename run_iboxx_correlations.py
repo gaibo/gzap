@@ -124,10 +124,10 @@ eurusd.to_csv(DATA_DIR + f"EURUSD_bbg_{END_DATE.strftime('%Y-%m-%d')}.csv")
 # This is literally insane, but have to fix maturity date settlement values from Bloomberg for iBoxx futures
 # NOTE: only affects maturity date (first of month for iBoxx) on generic 1st term futures
 iboxx_maturities = generate_expiries(START_DATE, END_DATE, specific_product='iBoxx')
-iby1.loc[iby1.index & iboxx_maturities, 'PX_LAST'] = \
-    ibxxibhy.loc[iby1.index & iboxx_maturities, 'PX_LAST'].round(2).values
-ihb1.loc[ihb1.index & iboxx_maturities, 'PX_LAST'] = \
-    ibxxibig.loc[ihb1.index & iboxx_maturities, 'PX_LAST'].round(2).values
+iby1.loc[iby1.index.intersection(iboxx_maturities), 'PX_LAST'] = \
+    ibxxibhy.loc[iby1.index.intersection(iboxx_maturities), 'PX_LAST'].round(2).values
+ihb1.loc[ihb1.index.intersection(iboxx_maturities), 'PX_LAST'] = \
+    ibxxibig.loc[ihb1.index.intersection(iboxx_maturities), 'PX_LAST'].round(2).values
 
 
 ###############################################################################
