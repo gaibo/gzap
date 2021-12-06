@@ -134,23 +134,17 @@ ihb1.loc[ihb1.index.intersection(iboxx_maturities), 'PX_LAST'] = \
 # Calculate bespoke rolled futures
 
 iby_roll_df = stitch_bloomberg_futures(iby1['PX_LAST'], iby2['PX_LAST'], roll_n_before_expiry=ROLL_N_BEFORE_EXPIRY,
-                                       start_datelike=START_DATE, end_datelike=END_DATE,
                                        specific_product='iBoxx')
 ihb_roll_df = stitch_bloomberg_futures(ihb1['PX_LAST'], ihb2['PX_LAST'], roll_n_before_expiry=ROLL_N_BEFORE_EXPIRY,
-                                       start_datelike=START_DATE, end_datelike=END_DATE,
                                        specific_product='iBoxx')
 
 tu_roll_df = stitch_bloomberg_futures(tu1['PX_LAST'], tu2['PX_LAST'], roll_n_before_expiry=ROLL_N_BEFORE_EXPIRY,
-                                      start_datelike=START_DATE, end_datelike=END_DATE,
                                       specific_product='Treasury Futures 2')
 fv_roll_df = stitch_bloomberg_futures(fv1['PX_LAST'], fv2['PX_LAST'], roll_n_before_expiry=ROLL_N_BEFORE_EXPIRY,
-                                      start_datelike=START_DATE, end_datelike=END_DATE,
                                       specific_product='Treasury Futures 5')
 ty_roll_df = stitch_bloomberg_futures(ty1['PX_LAST'], ty2['PX_LAST'], roll_n_before_expiry=ROLL_N_BEFORE_EXPIRY,
-                                      start_datelike=START_DATE, end_datelike=END_DATE,
                                       specific_product='Treasury Futures 10')
 us_roll_df = stitch_bloomberg_futures(us1['PX_LAST'], us2['PX_LAST'], roll_n_before_expiry=ROLL_N_BEFORE_EXPIRY,
-                                      start_datelike=START_DATE, end_datelike=END_DATE,
                                       specific_product='Treasury Futures 30')
 
 
