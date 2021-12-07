@@ -160,7 +160,7 @@ strike_range_progression_df = pd.DataFrame(strike_range_progression_list,
                                                     'Put Strike Low', 'Put Strike High', 'Put # Strikes',
                                                     'Call Strike Low', 'Call Strike High', 'Call # Strikes'])
 strike_range_progression_df = strike_range_progression_df.set_index(['Datetime', 'Term'])
-strike_range_progression_df.to_csv(LOGS_DIR/f'{EVENT_NAME_STR}_strike_range_progression.csv')
+# strike_range_progression_df.to_csv(LOGS_DIR/f'{EVENT_NAME_STR}_strike_range_progression.csv')
 
 # Plot near term, with VIXTLT behavior in separate subplot
 near_strike_range_progression_df = strike_range_progression_df.xs('Near', level='Term')
@@ -207,7 +207,7 @@ axs[1].legend(loc=2)
 # Export 2: progression of prices within each strike
 # Want timeseries of prices in each (term, strike (ATM put vs. call matters, but nowhere else))
 # Deliverable: DataFrame for detail + 100s of plots for visual?
-progression_nncp.to_csv(LOGS_DIR/f'{EVENT_NAME_STR}_price_progression.csv')
+# progression_nncp.to_csv(LOGS_DIR/f'{EVENT_NAME_STR}_price_progression.csv')
 # For each term-cp-strike, calculate volatility of prices to rank prices to look at?
 # NOTE: manually check the sorted price vols for 10cent+ std, especially away from the money!
 near_strike_price_vol = (progression_nncp.reset_index('Expiry').loc['Near']
