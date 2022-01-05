@@ -94,7 +94,7 @@ latest_md_hist_file = sorted([f for f in os.listdir(EXPORT_DIR) if f.startswith(
 md_hist_old = pd.read_csv(EXPORT_DIR + latest_md_hist_file, index_col='Trade Date',
                           parse_dates=['Trade Date', 'As of Date', 'Settlement Date', 'Implied Cash Maturity Date'])
 shared_idx = md_hist.index.intersection(md_hist_old.index)
-# validate_diff = (md_hist.loc[md_hist_old.index] - md_hist_old).sum()    # More strict
+# validate_diff = (md_hist.loc[md_hist_old.index] - md_hist_old).sum()    # More strict - new md_hist must be superset
 validate_diff = (md_hist.loc[shared_idx] - md_hist_old.loc[shared_idx]).abs().sum()     # Less strict
 # Literally graph (md_hist.loc[md_hist_old.index] - md_hist_old)['Yield to Maturity'] to check for problem dates
 assert validate_diff['Yield to Maturity'] < 1e-13
