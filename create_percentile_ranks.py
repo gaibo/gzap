@@ -2,6 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from options_futures_expirations_v3 import month_to_quarter_shifter
 from pathlib import Path
+import numpy as np
 plt.style.use('cboe-fivethirtyeight')
 
 # General workflow:
@@ -11,10 +12,11 @@ plt.style.use('cboe-fivethirtyeight')
 # 2) Run this script and check EXPORT_DIR for folder named USE_DATE which contains XLSXs.
 
 DOWNLOADS_DIR = 'C:/Users/gzhang/OneDrive - CBOE/Downloads/'
-USE_DATE = '2021-10-29'
-# Default: ['IBHY', 'IBIG', 'VX', 'VXM', 'AMW', 'AMB1', 'AMB3', 'AMT1']
-PRODUCTS = ['IBHY', 'IBIG', 'VX', 'VXM', 'AMW', 'AMB1', 'AMB3', 'AMT1']
-MULTIPLIER_DICT = {'IBHY': 1000, 'IBIG': 1000, 'VX': 1000, 'VXM': 100, 'AMW': 35, 'AMB1': 50, 'AMB3': 25, 'AMT1': 25}
+USE_DATE = '2022-02-07'
+# Default: ['IBHY', 'IBIG', 'VX', 'VXM', 'AMW', 'AMB1', 'AMB3', 'AMT1', 'AMT3']
+PRODUCTS = ['IBHY', 'IBIG', 'VX', 'VXM', 'AMW', 'AMB1', 'AMB3', 'AMT1', 'AMT3']
+MULTIPLIER_DICT = {'IBHY': 1000, 'IBIG': 1000, 'VX': 1000, 'VXM': 100,
+                   'AMW': 35, 'AMB1': 50, 'AMB3': 25, 'AMT1': 25, 'AMT3': 25}
 EXPORT_DIR = 'P:/PrdDevSharedDB/Cboe Futures Historical Percentiles/'
 
 ###############################################################################
@@ -75,7 +77,7 @@ def generate_volume_percentiles_for_field(data, field):
     yearmonth_col = pd.to_datetime(daily_field.index.strftime('%Y-%m'))
     yearquarter_col = \
         pd.to_datetime(daily_field.index.to_series()
-                       .apply(lambda ts: f'{ts.year}-{month_to_quarter_shifter(ts.month):02}'))
+                       .apply(lambda ts: f'{ts.year}-{month_to_quarter_shifter(ts.month, left_quarter=True):02}'))
     year_col = pd.to_datetime(daily_field.index.strftime('%Y'))
     daily_field_df = pd.DataFrame({field: daily_field, 'Total Volume': daily_volume,
                                    'Month': yearmonth_col, 'Quarter': yearquarter_col, 'Year': year_col})
@@ -271,3 +273,56 @@ for product_name in PRODUCT_DICT.keys():
             for i_agg in ['Daily', 'Monthly', 'Quarterly', 'Yearly']:
                 agg_df = pd.DataFrame(PRODUCT_DICT[product_name][i_field][i_agg])
                 agg_df.to_excel(writer, sheet_name=i_agg, freeze_panes=(1, 1))
+
+###############################################################################
+
+# Generate Trade Advisory Committee (TAC) style report
+
+# [CONFIGURE] Manually set month of interest
+tac_month = '2022-01'    # Default: '2022-01'
+tac_next_incomplete_month = '2022-02'   # Default: '2022-02'
+
+# Piece together report
+tac_df = pd.DataFrame(columns=['Month Volume', 'ADV', 'Prev Month ADV', 'Month over Month',
+                               'Prev Quarter ADV', 'Month over Quarter', 'Prev Year ADV', 'Month over Year',
+                               'Current (Incomplete) Month ADV'])
+tac_df.index.name = tac_month + ' Stats'
+for product_name in ['VX_Monthly', 'VXM', 'IBHY', 'IBIG', 'VX_Weekly', 'AMW_Weekly', 'AMB1', 'AMB3', 'AMT1', 'AMT3']:
+    prod_monthly_df = pd.DataFrame(PRODUCT_DICT[product_name]['Volume']['Monthly'])
+    prod_quarterly_df = pd.DataFrame(PRODUCT_DICT[product_name]['Volume']['Quarterly'])
+    prod_yearly_df = pd.DataFrame(PRODUCT_DICT[product_name]['Volume']['Yearly'])
+    # Get full stats for month of interest
+    try:
+        month_stats = prod_monthly_df.loc[tac_month].squeeze()  # Must .squeeze() because using approx date indexing
+    except KeyError:
+        raise ValueError(f"Month {tac_month} not found for {product_name}")
+    # Get ADVs for previous peridos
+    try:
+        prev_month_stats = prod_monthly_df.loc[:tac_month].iloc[-2]     # On 2021-12, it will grab 2021-11
+        prev_month_adv = prev_month_stats['ADV']
+    except IndexError:
+        prev_month_adv = np.NaN
+    try:
+        prev_quarter_stats = prod_quarterly_df.loc[:tac_month].iloc[-2]     # On 2021-12, it will grab 2021Q3 (7, 8, 9)
+        prev_quarter_adv = prev_quarter_stats['ADV']
+    except IndexError:
+        prev_quarter_adv = np.NaN
+    try:
+        prev_year_stats = prod_yearly_df.loc[:tac_month].iloc[-2]   # On 2021-12, it will grab 2020
+        prev_year_adv = prev_year_stats['ADV']
+    except IndexError:
+        prev_year_adv = np.NaN
+    moq = (month_stats['ADV']-prev_quarter_adv)/prev_quarter_adv
+    moy = (month_stats['ADV']-prev_year_adv)/prev_year_adv
+    # Get ADV for current, incomplete month for reference
+    try:
+        next_month_stats = prod_monthly_df.loc[tac_next_incomplete_month].squeeze()
+        next_month_adv = next_month_stats['ADV']
+    except KeyError:
+        next_month_adv = np.NaN
+    tac_df.loc[product_name] = (month_stats['Sum'], month_stats['ADV'], prev_month_adv, month_stats['ADV Change'],
+                                prev_quarter_adv, moq, prev_year_adv, moy,
+                                next_month_adv)
+
+# # Export
+# tac_df.to_csv(DOWNLOADS_DIR+f'tac_df_{tac_month}.csv')
