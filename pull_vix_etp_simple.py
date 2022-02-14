@@ -28,7 +28,7 @@ VIX_ETPS = ['XIV US Equity', 'SVXY US Equity',
 # Recreate AUM chart
 
 START_DATE = pd.Timestamp('2015-01-01')
-END_DATE = pd.Timestamp('2021-07-27')
+END_DATE = pd.Timestamp('2022-01-31')
 
 # Get AUM data from Bloomberg
 etps_raw = con.bdh(VIX_ETPS, ['FUND_TOTAL_ASSETS', 'PX_VOLUME'],
