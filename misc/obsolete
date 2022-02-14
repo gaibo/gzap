@@ -1,3 +1,53 @@
+# product_orderfill = product_data[ORDERFILL_FIELDS]
+    # product_settleoi = product_data[SETTLEOI_FIELDS]
+    # product_constructed = product_data[CONSTRUCTED_FIELDS]
+    # # Crop NaNs from legacy data clash
+    # modern_start = product_orderfill['Volume'].first_valid_index()[0]   # Volume field used as representative
+    # product_orderfill = product_orderfill.loc[modern_start:]
+    # product_constructed = product_constructed.loc[modern_start:]    # Constructed field limited by Order Fill history
+    #
+    # # Initialize storage dictionary
+    # percentile_dict = {}
+    #
+    # # Run percentiles on each volume-based field from Order Fill
+    # for i_field in ORDERFILL_FIELDS:
+    #     percentile_dict[i_field] = generate_volume_percentiles(product_orderfill, i_field)
+    #
+    # # Run percentiles on OI field from Settlement+OI. OI's aggregation is very specific: it must be summed up to
+    # # daily level (since the roll drives OI at expiry-level), then averaged up to monthly/quarterly/yearly
+    # percentile_dict['OI'] = generate_volume_percentiles(product_settleoi, 'OI')
+    # for i_agg in ['Monthly', 'Quarterly', 'Yearly']:
+    #     percentile_dict['OI'][i_agg]['Sum'] = None    # This field makes no sense for OI
+    #
+    # # Run percentiles on constructed Notional field
+    # percentile_dict['Notional'] = generate_volume_percentiles(product_constructed, 'Notional')
+    #
+    # # Store in higher level storage dictionary
+    # product_dict[product] = percentile_dict
+
+
+# DASHBOARD_DOWNLOAD_FILE = f'Unified_Data_Table_data_{USE_DATE}_NoWeeklys.csv'
+# DASHBOARD_DOWNLOAD_FILE = f'Unified_Data_Table_data_{USE_DATE}_OnlyWeeklys.csv'
+
+settle_data['Weekly'] = settle_data['Symbol'].apply(lambda s: s[-5:-3].isnumeric())     # Test for week number (VX)
+
+# iboxx_mat_df = pd.DataFrame({'iBoxx Maturity': iboxx_maturities})
+# iboxx_mat_df['Prev iBoxx Maturity'] = iboxx_mat_df['iBoxx Maturity'].shift(1)
+# iboxx_mat_df['Bus Days Since Last Maturity'] = \
+#     iboxx_mat_df.loc[1:].apply(lambda row: days_between(row['Prev iBoxx Maturity'],
+#                                                         row['iBoxx Maturity'], True), axis=1)
+# iboxx_mat_df = iboxx_mat_df.dropna().reset_index(drop=True)
+# day = pd.Timestamp('2021-08-02')
+# day_iboxx_context_idx = iboxx_mat_df['iBoxx Maturity'].searchsorted(day, side='right')
+# day_next_mat, day_prev_mat, n_busdays = iboxx_mat_df.loc[day_iboxx_context_idx]
+# n_days_to_next_mat = days_between(day, day_next_mat, True)
+# nth_day_of_frame = days_between(day_prev_mat, day, True) + 1
+
+reg = LinearRegression(fit_intercept=False).fit(hyg_returns_crop.values.reshape(-1, 1),
+                                                ibxxibhy_returns_crop.values)
+returns_crop_df.rolling(126).apply(lambda segment: print(segment), raw=False)
+
+
 AFX_PRICE_FORMAT_CHANGE = pd.Timestamp('2017-08-18')
 afx_price_format_change_idxs_1 = (afx_data['Trade Date'] < AFX_PRICE_FORMAT_CHANGE)
 afx_price_format_change_idxs_2 = (afx_data['Trade Date'] == AFX_PRICE_FORMAT_CHANGE) & (afx_data['price'] <= 1400)

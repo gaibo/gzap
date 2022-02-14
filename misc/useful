@@ -1,3 +1,25 @@
+df = pd.DataFrame(np.random.randn(5, 10))
+
+git remote add new_cboe https://stash.cboe.com/scm/mas/gaibo_modules.git
+git push -u new_cboe develop
+git branch --set-upstream-to new_cboe/master
+git remote rename cboe deprecated_cboe
+
+git config http.sslVerify false
+conda config --set ssl_verify false
+
+pd.DataFrame(item for item in s)
+
+settle_data_df = settle_data_trim.pivot(index=INDEX_COLS, columns='Measure Names', values='Measure Values')
+# settle_data_df = settle_data_trim.pivot_table(index=INDEX_COLS, columns='Measure Names', values='Measure Values')
+# settle_data_df = settle_data_trim.set_index(INDEX_COLS + ['Measure Names']).squeeze().unstack()
+
+# create_percentile_ranks additional commands
+from functools import reduce
+adv_sum = reduce(lambda x, y: x.add(y, fill_value=0), [pd.DataFrame(product_dict[prod]['Volume']['Monthly']).fillna(0) for prod in PRODUCTS])
+days_in_months = adv_sum.loc['2021']['Sum'] / adv_sum.loc['2021']['ADV']
+ytd_adv = adv_sum.loc['2021']['Sum'].sum() / days_in_months.sum()
+
 # To reload a function from a module
 # 1) If you imported without "import <module>", import module now
 import options_data_tools
