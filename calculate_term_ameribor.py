@@ -13,10 +13,10 @@ OFFICIAL_START = pd.Timestamp('2016-06-01')
 OUR_DATA_FORMAT_TRANSITION = pd.Timestamp('2021-03-19')     # Up to and including this date is dataset 1, then dataset 2
 OUR_START = pd.Timestamp('2016-01-15')  # We have enough DTCC and AFX data to try calculating further than 2016-06-01
 OUR_END = pd.Timestamp('2021-06-08')    # Set this to the latest date for which we have both DTCC and AFX data
-DTCC_DURATION_LOWER_BOUND = 2      # AMBOR30T: 2; AMBOR90T: 41
-DTCC_DURATION_UPPER_BOUND = 40     # AMBOR30T: 40; AMBOR90T: 120
-INCLUDE_AFX = True     # AMBOR30T: True; AMBOR90T: False
-VOLUME_THRESHOLD = 25e9     # AMBOR30T: 25e9; AMBOR90T: 10e9
+DTCC_DURATION_LOWER_BOUND = 41      # AMBOR30T: 2; AMBOR90T: 41
+DTCC_DURATION_UPPER_BOUND = 120     # AMBOR30T: 40; AMBOR90T: 120
+INCLUDE_AFX = False     # AMBOR30T: True; AMBOR90T: False
+VOLUME_THRESHOLD = 10e9     # AMBOR30T: 25e9; AMBOR90T: 10e9
 OUTLIER_TRIMMING_BOUND = 250    # In basis points
 EFFR_SPREAD_LOOKBACK = 252  # In days
 
@@ -513,7 +513,8 @@ daily_values_breakdown.index.name = 'Date'
 # Export results to disk
 
 # Explicitly switch between 'ambor30t' and 'ambor90t' for filename clarity
-export_prefix = f'ambor30t_{OUTLIER_TRIMMING_BOUND}bp'
+export_prefix = f'ambor90t'
+# export_prefix = f'ambor30t_{OUTLIER_TRIMMING_BOUND}bp'
 
 # Export rates and helper calculations
 test_rates.to_csv(DOWNLOADS_DIR / f'{export_prefix}_test_rates.csv', header=True)
@@ -533,7 +534,7 @@ daily_values_breakdown.to_csv(DOWNLOADS_DIR / f'{export_prefix}_test_daily_break
 # CFTC_DIR = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/Ameribor/Term-30 Legal Filing/')
 # cftc_export_dates = ELIGIBLE_TRANSACTIONS_DF.loc[OFFICIAL_START:OUR_END].index.unique()
 # for date in cftc_export_dates:
-#     export_loc = (CFTC_DIR / 'Input Data (Identities Scrubbed)' /
+#     export_loc = (CFTC_DIR / f'{export_prefix.upper()} Input Data (Identities Scrubbed)' /
 #                   f'{date.strftime("%Y-%m-%d")}_dtccafx_{export_prefix}_input.csv')
 #     RATE_INPUT_DF_DICT[date].drop(['borrower_name', 'lender_name'], axis=1).to_csv(export_loc)
 
@@ -572,3 +573,44 @@ daily_values_breakdown.to_csv(DOWNLOADS_DIR / f'{export_prefix}_test_daily_break
 # dur_volume_afx = afx_trans.groupby('Duration (Days)')['Principal Amount'].sum()
 # dur_dbpv_dtcc = dtcc_trans.groupby('Duration (Days)')['DBPV'].sum()
 # dur_dbpv_afx = afx_trans.groupby('Duration (Days)')['DBPV'].sum()
+
+
+###############################################################################
+# Outlier bands analysis - 2018-01-01 to 2021-06-08
+
+# No outlier filtering
+total_dtcc = test[(test['Product Type'] == 'CP') | (test['Product Type'] == 'CD')].loc['2018-01-01':]
+n_trans_total_dtcc = total_dtcc.shape[0]
+volume_trans_total_dtcc = total_dtcc['Principal Amount'].sum()/1e9
+
+# With outlier filtering
+eligible_dtcc = ELIGIBLE_TRANSACTIONS_DF[(ELIGIBLE_TRANSACTIONS_DF['Product Type'] == 'CP')
+                                         | (ELIGIBLE_TRANSACTIONS_DF['Product Type'] == 'CD')].loc['2018-01-01':]
+n_trans_dtcc = eligible_dtcc.shape[0]
+volume_trans_dtcc = eligible_dtcc['Principal Amount'].sum()/1e9
+
+# Filtered outliers
+# NOTE: currently cannot separate rows because we didn't keep transaction IDs field
+n_trans_eliminated = n_trans_total_dtcc - n_trans_dtcc
+volume_eliminated = volume_trans_total_dtcc - volume_trans_dtcc
+print(n_trans_eliminated, volume_eliminated)
+
+
+###############################################################################
+# Analysis of Hilltop and Orbian, for whom we cannot verify investment grade status via Bloomberg
+
+hilltop_orbian = \
+    ELIGIBLE_TRANSACTIONS_DF[(ELIGIBLE_TRANSACTIONS_DF['Issuer Name'] == 'HILLTOP SECURITIES INC')
+                             | (ELIGIBLE_TRANSACTIONS_DF['Issuer Name'] == 'ORBIAN FIN SVS XX LLC ')
+                             | (ELIGIBLE_TRANSACTIONS_DF['Issuer Name'] == 'ORBIAN FINANCIAL      ')
+                             | (ELIGIBLE_TRANSACTIONS_DF['Issuer Name'] == 'ORBIAN FINANCIAL SVRS ')
+                             | (ELIGIBLE_TRANSACTIONS_DF['Issuer Name'] == 'ORBIAN FINL SVCS VII  ')
+                             | (ELIGIBLE_TRANSACTIONS_DF['Issuer Name'] == 'ORBIAN FINL SVS LLC   ')]
+hilltop_orbian_2021 = hilltop_orbian.loc['2021-01-01':]
+eligible_2021 = ELIGIBLE_TRANSACTIONS_DF.loc['2021-01-01':]
+h_o_volume = hilltop_orbian_2021['Principal Amount'].sum()
+eligible_volume = eligible_2021['Principal Amount'].sum()
+h_o_volume_share = h_o_volume/eligible_volume
+h_o_n_trans = hilltop_orbian_2021['Principal Amount'].count()
+eligible_n_trans = eligible_2021['Principal Amount'].count()
+h_o_trans_share = h_o_n_trans/eligible_n_trans
