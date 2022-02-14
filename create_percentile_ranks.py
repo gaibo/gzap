@@ -283,7 +283,8 @@ tac_month = '2022-01'    # Default: '2022-01'
 tac_next_incomplete_month = '2022-02'   # Default: '2022-02'
 
 # Piece together report
-tac_df = pd.DataFrame(columns=['Month Volume', 'ADV', 'Prev Month ADV', 'Month over Month',
+tac_df = pd.DataFrame(columns=['Month Volume', 'ADV', 'Percentile (Last 12)',
+                               'Prev Month ADV', 'Month over Month',
                                'Prev Quarter ADV', 'Month over Quarter', 'Prev Year ADV', 'Month over Year',
                                'Current (Incomplete) Month ADV'])
 tac_df.index.name = tac_month + ' Stats'
@@ -320,7 +321,8 @@ for product_name in ['VX_Monthly', 'VXM', 'IBHY', 'IBIG', 'VX_Weekly', 'AMW_Week
         next_month_adv = next_month_stats['ADV']
     except KeyError:
         next_month_adv = np.NaN
-    tac_df.loc[product_name] = (month_stats['Sum'], month_stats['ADV'], prev_month_adv, month_stats['ADV Change'],
+    tac_df.loc[product_name] = (month_stats['Sum'], month_stats['ADV'], month_stats['Percentile (Last 12)'],
+                                prev_month_adv, month_stats['ADV Change'],
                                 prev_quarter_adv, moq, prev_year_adv, moy,
                                 next_month_adv)
 
