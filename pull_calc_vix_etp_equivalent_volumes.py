@@ -6,12 +6,12 @@ import matplotlib.pyplot as plt
 plt.style.use('cboe-fivethirtyeight')
 
 con = create_bloomberg_connection()
-DOWNLOADS_DIR = 'C:/Users/gzhang/Downloads/'
+DOWNLOADS_DIR = 'C:/Users/gzhang/OneDrive - CBOE/Downloads/'
 
 ###############################################################################
 
 START_DATE = pd.Timestamp('2000-01-01')
-END_DATE = pd.Timestamp('2021-04-26')
+END_DATE = pd.Timestamp('2021-07-30')
 
 # NOTE: 1709583D US Equity is old, matured VXX; VXX US Equity is "series B" and only goes back to 2018-01
 VIX_ETPS = ['XIV US Equity', 'SVXY US Equity',
@@ -42,7 +42,7 @@ TEMP_FIELDS = ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'EQY_SH_OUT', 'FUND_NET_ASSET
 data_raw = con.bdh(VIX_ETPS + VIX_FUTURES + TEMP_TICKERS,
                    TEMP_FIELDS,
                    f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}",
-                   elms=[('currency','USD')])
+                   elms=[('currency', 'USD')])
 data_raw = data_raw[VIX_ETPS + VIX_FUTURES + TEMP_TICKERS].copy()    # Enforce column order
 
 ###############################################################################
@@ -55,8 +55,12 @@ vix_futures_mat_list = [next_expiry(START_DATE, vix_expiries_func, n_terms=i)
 # Create a VIX maturities reference DataFrame independent of data_raw
 vix_mat_df = pd.DataFrame({'VIX Maturity': vix_futures_mat_list})
 vix_mat_df['Prev VIX Maturity'] = vix_mat_df['VIX Maturity'].shift(1)
+
+
 def busday_between(earlier, later):
     return len(pd.date_range(earlier, later, freq=BUSDAY_OFFSET, closed='left'))
+
+
 vix_mat_df['Bus Days Since Last Maturity'] = \
     vix_mat_df.loc[1:].apply(lambda row: busday_between(row['Prev VIX Maturity'], row['VIX Maturity']), axis=1)
 vix_mat_df = vix_mat_df.dropna().reset_index(drop=True)
@@ -142,4 +146,4 @@ export_df['Total VIX Futures Volume'] = \
     export_df[['UX1 Index', 'UX2 Index', 'UX3 Index']].dropna(how='all').abs().sum(axis=1)
 export_df = export_df[['Total VIX ETP Volume (VIX Equivalent)', 'Total VIX Futures Volume']
                       + list(mega_vix_futures_equiv_df.columns)]  # Reorder columns
-# export_df.to_csv(DOWNLOADS_DIR+f"vix_etps_equiv_volume_{END_DATE.strftime('%Y-%m-%d')}.csv")
+export_df.to_csv(DOWNLOADS_DIR+f"vix_etps_equiv_volume_{END_DATE.strftime('%Y-%m-%d')}.csv")
