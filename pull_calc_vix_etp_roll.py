@@ -12,7 +12,7 @@ con = create_bloomberg_connection()
 ###############################################################################
 
 START_DATE = pd.Timestamp('2000-01-01')
-END_DATE = pd.Timestamp('2021-10-21')
+END_DATE = pd.Timestamp('2022-01-31')
 
 # NOTE: 1709583D US Equity is old, matured VXX; VXX US Equity is "series B" and only goes back to 2018-01
 VIX_ETPS = ['XIV US Equity', 'SVXY US Equity',
@@ -121,19 +121,18 @@ for day in data_raw.index:
     vix_futures.loc[day, 'Weighted VIX Fut Price'] = weighted_vix_future
     # Calculate 1) vega per share with the weighted VIX future and 2) daily positions with the weights
     for etp in VIX_ETPS:
-        # 1) Vega per share
+        # 1) Vega per share - 1/VIX (e.g. 4% if VIX is 25) is the proportional ETP price change when vol changes by 1%
         leverage = VIX_ETPS_LEVERAGE_v1[etp] if day < PROSHARES_DELEVERED_DATE else VIX_ETPS_LEVERAGE_v2[etp]
-        vega_per_share = vix_etps.loc[day, (etp, 'PX_LAST')] * leverage / weighted_vix_future
+        vega_per_share = 1/weighted_vix_future * vix_etps.loc[day, (etp, 'PX_LAST')] * leverage
         vix_equiv_volume = vega_per_share * vix_etps.loc[day, (etp, 'PX_VOLUME')] / 1000
-        # Record for posterity
+        # Record for posterity (here ends copy-pasted code from _equivalent_volumes.py!)
         vix_etps.loc[day, (etp, 'Leverage')] = leverage
         vix_etps.loc[day, (etp, 'Weighted VIX Fut Price Used')] = weighted_vix_future
         vix_etps.loc[day, (etp, 'Vega per Share')] = vega_per_share
         vix_etps.loc[day, (etp, 'VIX Fut Equiv Volume')] = vix_equiv_volume
-        # 2) Daily futures positions
+        # 2) Daily futures positions; # of VIX futures contracts to cover current position's dollars vega exposure
         notional = vix_etps.loc[day, (etp, 'FUND_TOTAL_ASSETS')] * 1e6
-        # notional = vix_etps.loc[day, (etp, 'FUND_NET_ASSET_VAL')] * vix_etps.loc[day, (etp, 'EQY_SH_OUT')] * 1e6
-        vega_notional = notional / weighted_vix_future * leverage
+        vega_notional = 1/weighted_vix_future * notional * leverage     # Similar to vega per share - 1/VIX is change
         first_term_position = np.round(first_term_weight * vega_notional / 1000)
         second_term_position = np.round(second_term_weight * vega_notional / 1000)
         total_position = first_term_position + second_term_position
@@ -210,6 +209,12 @@ vixy = vixy.loc[pd.date_range(vixy_start, END_DATE, freq=BUSDAY_OFFSET)]
 vixy.columns.name, vixy.index.name = None, 'Date'
 
 # Kokusai
+kokusai = vix_etps['1552 JP Equity'].copy()
+# Select an inclusive field for cropping the start
+kokusai_start = kokusai['FUND_NET_ASSET_VAL'].first_valid_index()
+kokusai = kokusai.loc[pd.date_range(kokusai_start, END_DATE, freq=BUSDAY_OFFSET)]
+# Pretty format
+kokusai.columns.name, kokusai.index.name = None, 'Date'
 
 # TVIX
 tvix = vix_etps['TVIXF US Equity'].copy()
@@ -228,32 +233,16 @@ xiv = xiv.loc[pd.date_range(xiv_start, END_DATE, freq=BUSDAY_OFFSET)]
 xiv.columns.name, xiv.index.name = None, 'Date'
 
 # Fubon
-
-for etp_data, etp_name in zip([uvxy, vxx_a, vxx_b, svxy, vixy, tvix, xiv],
-                              ['UVXY', 'VXX_A', 'VXX_B', 'SVXY', 'VIXY', 'TVIX', 'XIV']):
-    etp_data.to_csv(DOWNLOADS_DIR + f'{etp_name}_{END_DATE.strftime("%Y-%m-%d")}.csv')
+fubon = vix_etps['00677U TT Equity'].copy()
+# Select an inclusive field for cropping the start
+fubon_start = fubon['FUND_NET_ASSET_VAL'].first_valid_index()
+fubon = fubon.loc[pd.date_range(fubon_start, END_DATE, freq=BUSDAY_OFFSET)]
+# Pretty format
+fubon.columns.name, fubon.index.name = None, 'Date'
 
 ###############################################################################
+# Export
 
-# Clean up for export
-# NOTE: for some reason, VIX futures list 0 volume for MLK 2021 (2021-01-18) instead of NaN; may need to manually clean
-# NOTE: also, need to delete 2018-12-05 manually - Bush Day of Mourning really throws off correlations
-pretty_vix_futures = vix_futures.dropna(how='all')
-pretty_vix_etps = vix_etps.dropna(how='all')
-etp_vix_equiv_volume_df = vix_etps.xs('VIX Fut Equiv Volume', axis=1, level='field').dropna(how='all')
-mega_vix_futures_equiv_df = \
-    etp_vix_equiv_volume_df.join(vix_futures[VIX_FUTURES].xs('PX_VOLUME', axis=1, level='field').dropna(how='all'),
-                                 how='outer')
-export_df = mega_vix_futures_equiv_df.sort_index(ascending=False)
-export_df.index.name = 'Date'
-export_df['Total VIX ETP Volume (VIX Equivalent)'] = \
-    export_df[['XIV US Equity', 'SVXY US Equity',
-               '1709583D US Equity', 'VXX US Equity', 'VIXY US Equity',
-               'UVXY US Equity', 'TVIXF US Equity',
-               '00677U TT Equity', '1552 JP Equity',
-               'PHDG US Equity', 'VQT US Equity', 'ZIVZF US Equity']].dropna(how='all').abs().sum(axis=1)
-export_df['Total VIX Futures Volume'] = \
-    export_df[['UX1 Index', 'UX2 Index', 'UX3 Index']].dropna(how='all').abs().sum(axis=1)
-export_df = export_df[['Total VIX ETP Volume (VIX Equivalent)', 'Total VIX Futures Volume']
-                      + list(mega_vix_futures_equiv_df.columns)]  # Reorder columns
-# export_df.to_csv(DOWNLOADS_DIR+f"vix_etps_equiv_volume_{END_DATE.strftime('%Y-%m-%d')}.csv")
+for etp_data, etp_name in zip([uvxy, vxx_a, vxx_b, svxy, vixy, kokusai, tvix, xiv, fubon],
+                              ['UVXY', 'VXX_A', 'VXX_B', 'SVXY', 'VIXY', 'Kokusai', 'TVIX', 'XIV', 'Fubon']):
+    etp_data.to_csv(DOWNLOADS_DIR + f'{etp_name}_{END_DATE.strftime("%Y-%m-%d")}.csv')
