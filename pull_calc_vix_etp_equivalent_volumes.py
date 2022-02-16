@@ -115,10 +115,13 @@ for day in data_raw.index:
     vix_futures.loc[day, 'Second Term VIX Futures Price'] = second_term_vix_future
     vix_futures.loc[day, 'Second Term BBG Origin'] = second_term_origin
     vix_futures.loc[day, 'Weighted VIX Futures Price'] = weighted_vix_future
-    # Calculate vega per share with the weighted VIX future
+    # Calculate vega per share using the weighted VIX future - 1/VIX (e.g. 4% if VIX is 25) is
+    # the proportional ETP price change when vol changes by 1%
     for etp in VIX_ETPS:
         leverage = VIX_ETPS_LEVERAGE_v1[etp] if day < PROSHARES_DELEVERED_DATE else VIX_ETPS_LEVERAGE_v2[etp]
-        vega_per_share = vix_etps.loc[day, (etp, 'PX_LAST')] * leverage / weighted_vix_future
+        # $ change per ETP share from 1% change in vol
+        vega_per_share = 1/weighted_vix_future * vix_etps.loc[day, (etp, 'PX_LAST')] * leverage
+        # "Perfect hedging" scenario # contracts of VIX futures going opposite way of ETP vega volume, $1000 at a time
         vix_equiv_volume = vega_per_share * vix_etps.loc[day, (etp, 'PX_VOLUME')] / 1000
         # Record for posterity
         vix_etps.loc[day, (etp, 'Leverage')] = leverage
