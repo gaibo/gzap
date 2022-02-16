@@ -6,13 +6,13 @@ from options_futures_expirations_v3 import next_expiry, third_friday, vix_thirty
 import matplotlib.pyplot as plt
 plt.style.use('cboe-fivethirtyeight')
 
-DOWNLOADS_DIR = 'C:/Users/gzhang/Downloads/'
+DOWNLOADS_DIR = 'C:/Users/gzhang/OneDrive - CBOE/Downloads/'
 con = create_bloomberg_connection()
 
 ###############################################################################
 
 START_DATE = pd.Timestamp('2000-01-01')
-END_DATE = pd.Timestamp('2021-04-16')
+END_DATE = pd.Timestamp('2021-10-21')
 
 # NOTE: 1709583D US Equity is old, matured VXX; VXX US Equity is "series B" and only goes back to 2018-01
 VIX_ETPS = ['XIV US Equity', 'SVXY US Equity',
@@ -90,6 +90,7 @@ for day in data_raw.index:
     #   - UX2 has become new UX1, UX3 has become new UX2
     #   - put 100% - 100%/n_busdays_in_new_frame*(busdays_since_maturity+1) in UX1 (where busdays_since_maturity is 1),
     #     complement in UX2
+    print(f"{day.strftime('%Y-%m-%d')}")
     day_vix_context_idx = vix_mat_df['VIX Mat'].searchsorted(day, side='right')
     day_next_mat, day_prev_mat, n_busdays = vix_mat_df.loc[day_vix_context_idx]
     nth_day_of_frame = busday_between(day_prev_mat, day) + 1
@@ -133,8 +134,8 @@ for day in data_raw.index:
         notional = vix_etps.loc[day, (etp, 'FUND_TOTAL_ASSETS')] * 1e6
         # notional = vix_etps.loc[day, (etp, 'FUND_NET_ASSET_VAL')] * vix_etps.loc[day, (etp, 'EQY_SH_OUT')] * 1e6
         vega_notional = notional / weighted_vix_future * leverage
-        first_term_position = round(first_term_weight * vega_notional / 1000)
-        second_term_position = round(second_term_weight * vega_notional / 1000)
+        first_term_position = np.round(first_term_weight * vega_notional / 1000)
+        second_term_position = np.round(second_term_weight * vega_notional / 1000)
         total_position = first_term_position + second_term_position
         try:
             if day == day_prev_mat:
@@ -159,42 +160,80 @@ for day in data_raw.index:
         vix_etps.loc[day, (etp, '2nd Term Volume')] = second_term_volume
         vix_etps.loc[day, (etp, 'Total Volume')] = total_volume
 
+###############################################################################
 # Bespoke cleaning
 # Bloomberg sometimes misses holidays like Hurricane Sandy and Thanksgiving 2018 lol
 # A handful of Saturdays appear probably from the international ETPs - make sure they're filtered
+# In terms of importance (AUM), the ETPs probably go like:
+#   - Active: [UVXY, VXX, SVXY, VIXY, Kokusai]
+#   - Inactive: [TVIX, XIV, Fubon]
+
 # UVXY
-uvxy = vix_etps['UVXY US Equity']
-uvxy.columns.name = None
+uvxy = vix_etps['UVXY US Equity'].copy()
 # Select an inclusive field for cropping the start
 uvxy_start = uvxy['FUND_NET_ASSET_VAL'].first_valid_index()
-uvxy = uvxy.loc[pd.date_range(uvxy_start, END_DATE, freq=BUSDAY_OFFSET)]
+uvxy = uvxy.loc[pd.date_range(uvxy_start, END_DATE, freq=BUSDAY_OFFSET)]    # .reindex() does NaNs instead of error
+# Pretty format
+uvxy.columns.name, uvxy.index.name = None, 'Date'
+
 # VXX
 # NOTE: VXX has the series A and B; subtle, but can't just add them -
 #       if big create in B, then assets goes up and 1st term position could go up not down;
 #       if there's simultaneously big redeem in A, 1st term position could go down;
 #       adding both together would cancel that overlapping volume and undercount
-vxx_a = vix_etps['1709583D US Equity']
-vxx_a.columns.name = None
-vxx_b = vix_etps['VXX US Equity']
-vxx_b.columns.name = None
+vxx_a = vix_etps['1709583D US Equity'].copy()
+vxx_b = vix_etps['VXX US Equity'].copy()
 # Select an inclusive field for cropping the start
 vxx_a_start = vxx_a['FUND_NET_ASSET_VAL'].first_valid_index()
 vxx_a_end = vxx_a['FUND_NET_ASSET_VAL'].last_valid_index()  # Series A ends
 vxx_a = vxx_a.loc[pd.date_range(vxx_a_start, vxx_a_end, freq=BUSDAY_OFFSET)]
 vxx_b_start = vxx_b['FUND_NET_ASSET_VAL'].first_valid_index()
 vxx_b = vxx_b.loc[pd.date_range(vxx_b_start, END_DATE, freq=BUSDAY_OFFSET)]
-# VIXY
-vixy = vix_etps['VIXY US Equity']
-vixy.columns.name = None
-# Select an inclusive field for cropping the start
-vixy_start = vixy['FUND_NET_ASSET_VAL'].first_valid_index()
-vixy = vixy.loc[pd.date_range(vixy_start, END_DATE, freq=BUSDAY_OFFSET)]
+# Pretty format
+vxx_a.columns.name, vxx_a.index.name = None, 'Date'
+vxx_b.columns.name, vxx_b.index.name = None, 'Date'
+
 # SVXY
-svxy = vix_etps['SVXY US Equity']
-svxy.columns.name = None
+svxy = vix_etps['SVXY US Equity'].copy()
 # Select an inclusive field for cropping the start
 svxy_start = svxy['FUND_NET_ASSET_VAL'].first_valid_index()
 svxy = svxy.loc[pd.date_range(svxy_start, END_DATE, freq=BUSDAY_OFFSET)]
+# Pretty format
+svxy.columns.name, svxy.index.name = None, 'Date'
+
+# VIXY
+vixy = vix_etps['VIXY US Equity'].copy()
+# Select an inclusive field for cropping the start
+vixy_start = vixy['FUND_NET_ASSET_VAL'].first_valid_index()
+vixy = vixy.loc[pd.date_range(vixy_start, END_DATE, freq=BUSDAY_OFFSET)]
+# Pretty format
+vixy.columns.name, vixy.index.name = None, 'Date'
+
+# Kokusai
+
+# TVIX
+tvix = vix_etps['TVIXF US Equity'].copy()
+# Select an inclusive field for cropping the start
+tvix_start = tvix['FUND_NET_ASSET_VAL'].first_valid_index()
+tvix = tvix.loc[pd.date_range(tvix_start, END_DATE, freq=BUSDAY_OFFSET)]
+# Pretty format
+tvix.columns.name, tvix.index.name = None, 'Date'
+
+# XIV
+xiv = vix_etps['XIV US Equity'].copy()
+# Select an inclusive field for cropping the start
+xiv_start = xiv['FUND_NET_ASSET_VAL'].first_valid_index()
+xiv = xiv.loc[pd.date_range(xiv_start, END_DATE, freq=BUSDAY_OFFSET)]
+# Pretty format
+xiv.columns.name, xiv.index.name = None, 'Date'
+
+# Fubon
+
+for etp_data, etp_name in zip([uvxy, vxx_a, vxx_b, svxy, vixy, tvix, xiv],
+                              ['UVXY', 'VXX_A', 'VXX_B', 'SVXY', 'VIXY', 'TVIX', 'XIV']):
+    etp_data.to_csv(DOWNLOADS_DIR + f'{etp_name}_{END_DATE.strftime("%Y-%m-%d")}.csv')
+
+###############################################################################
 
 # Clean up for export
 # NOTE: for some reason, VIX futures list 0 volume for MLK 2021 (2021-01-18) instead of NaN; may need to manually clean
