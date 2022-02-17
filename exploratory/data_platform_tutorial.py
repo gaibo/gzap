@@ -17,7 +17,8 @@ TEST_SQL_QUERY = ("SELECT firm, order_id, modify_sequence, side, price, size "
                   "WHERE firm='GSCO' "
                   "LIMIT 10")
 
-#%%#### Method 1: Cursor
+###############################################################################
+# Method 1: Cursor
 
 # Get a connection cursor and use its execute() function
 cursor = conn.cursor()
@@ -35,13 +36,15 @@ cursor.execute(TEST_SQL_QUERY)  # The .fetch methods on cursor expend it, so rel
 cursor_df = as_pandas(cursor)
 print(f"as_pandas(cursor):\n{cursor_df}")
 
-#%%#### Method 2: pandas.read_sql()
+###############################################################################
+# Method 2: pandas.read_sql()
 
 # Directly pass connection object into pandas function
 alt_df = pd.read_sql(con=conn, sql=TEST_SQL_QUERY)
 print(f"pd.read_sql(conn, TEST_SQL_QUERY):\n{alt_df}")
 
-#%%#### Cleanup
+###############################################################################
+# Cleanup
 
 # Close the established connection
 conn.close()    # Empirically we find this doesn't work lol - pd.read_sql() still works
