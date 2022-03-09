@@ -87,11 +87,53 @@ feb_prime_daily_open = \
 feb_daily_open = \
     (feb_quotes.groupby(['dt', 'efid', 'side']).first()
      [['arrival_time', 'termination_time', 'marketability_on_activation', 'price', 'size', 'traded_qty']])
+feb_kcls_quotes = feb_quotes[feb_quotes['efid'] == 'KCLS']
+feb_virtu_daily_open = \
+    (feb_kcls_quotes.groupby(['dt', 'side']).first()
+     [['arrival_time', 'termination_time', 'marketability_on_activation', 'price', 'size', 'traded_qty']])
+# feb_virtu_daily_open.to_csv(DOWNLOADS_DIR/'feb_virtu_daily_open.csv')
 
 unstacked_open_price = feb_prime_daily_open['price'].unstack()
 unstacked_open_size = feb_prime_daily_open['size'].unstack()
-feb_prim_daily_open_ba = unstacked_open_price.join(unstacked_open_size, rsuffix='_size')[['B_size', 'B', 'S', 'S_size']]
-# feb_prim_daily_open_ba.to_csv(DOWNLOADS_DIR/'feb_prim_daily_open_ba.csv')
+feb_prime_daily_open_ba = \
+    unstacked_open_price.join(unstacked_open_size, rsuffix='_size')[['B_size', 'B', 'S', 'S_size']]
+# feb_prime_daily_open_ba.to_csv(DOWNLOADS_DIR/'feb_prime_daily_open_ba.csv')
+
+unstacked_open_price = feb_virtu_daily_open['price'].unstack()
+unstacked_open_size = feb_virtu_daily_open['size'].unstack()
+unstacked_open_time = feb_virtu_daily_open['arrival_time'].unstack()
+unstacked_open_marketability = feb_virtu_daily_open['marketability_on_activation'].unstack()
+feb_virtu_daily_open_ba = \
+    (unstacked_open_price.join(unstacked_open_size, rsuffix='_size')
+                         .join(unstacked_open_time, rsuffix='_time')
+                         .join(unstacked_open_marketability, rsuffix='_marketability')
+     [['B_size', 'B_marketability', 'B_time', 'B', 'S', 'S_time', 'S_marketability', 'S_size']])
+# feb_virtu_daily_open_ba.to_csv(DOWNLOADS_DIR/'feb_virtu_daily_open_ba.csv')
+
+
+def compile_daily_open(raw_quotes_df, contract_symbol='IBHY/G2', efid='KCLS'):
+    # Filter down quotes
+    quotes = raw_quotes_df[raw_quotes_df['marketability_on_activation'] != ' '].sort_values('arrival_time')
+    contract_quotes = quotes[quotes['symbol_name'] == contract_symbol]
+    efid_contract_quotes = contract_quotes[contract_quotes['efid'] == efid]
+
+    # Groupby to get opening quotes
+    daily_open = \
+        (efid_contract_quotes.groupby(['dt', 'side']).first()
+         [['arrival_time', 'termination_time', 'marketability_on_activation', 'price', 'size', 'traded_qty']])
+
+    # Unstack opening quotes for human-readable table
+    unstacked_open_price = daily_open['price'].unstack()
+    unstacked_open_size = daily_open['size'].unstack()
+    unstacked_open_time = daily_open['arrival_time'].unstack()
+    unstacked_open_marketability = daily_open['marketability_on_activation'].unstack()
+    daily_open_table = \
+        (unstacked_open_price.join(unstacked_open_size, rsuffix='_size')
+                             .join(unstacked_open_time, rsuffix='_time')
+                             .join(unstacked_open_marketability, rsuffix='_marketability')
+         [['B_size', 'B_marketability', 'B_time', 'B', 'S', 'S_time', 'S_marketability', 'S_size']])
+    return daily_open_table
+
 
 ###############################################################################
 # Cleanup
