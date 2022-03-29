@@ -11,7 +11,7 @@ DOWNLOADS_DIR = 'C:/Users/gzhang/OneDrive - CBOE/Downloads/'
 ###############################################################################
 
 START_DATE = pd.Timestamp('2000-01-01')
-END_DATE = pd.Timestamp('2022-01-31')
+END_DATE = pd.Timestamp('2022-03-28')
 
 # NOTE: 1709583D US Equity is old, matured VXX; VXX US Equity is "series B" and only goes back to 2018-01
 VIX_ETPS = ['XIV US Equity', 'SVXY US Equity',
@@ -32,10 +32,11 @@ VIX_ETPS_LEVERAGE_v2 = {'XIV US Equity': -1, 'SVXY US Equity': -0.5,
                         '00677U TT Equity': 1, '1552 JP Equity': 1,
                         'PHDG US Equity': 1, 'VQT US Equity': 1, 'ZIVZF US Equity': -1}
 
-VIX_FUTURES = ['UX1 Index', 'UX2 Index', 'UX3 Index']
+VIX_FUTURES = ['UX1 Index', 'UX2 Index', 'UX3 Index', 'VXT1 Index', 'VXT2 Index', 'VXT3 Index']
 
 TEMP_TICKERS = ['SPVXSTR Index', 'SPVXSP Index']
-TEMP_FIELDS = ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'EQY_SH_OUT', 'FUND_NET_ASSET_VAL', 'FUND_TOTAL_ASSETS']
+TEMP_FIELDS = ['PX_LAST', 'PX_VOLUME', 'OPEN_INT', 'EQY_SH_OUT', 'FUND_NET_ASSET_VAL', 'FUND_TOTAL_ASSETS',
+               'FUT_AGGTE_VOL']
 
 ###############################################################################
 
@@ -137,6 +138,8 @@ etp_vix_equiv_volume_df = vix_etps.xs('VIX Futures Equivalent Volume', axis=1, l
 mega_vix_futures_equiv_df = \
     etp_vix_equiv_volume_df.join(vix_futures[VIX_FUTURES].xs('PX_VOLUME', axis=1, level='field').dropna(how='all'),
                                  how='outer')
+mega_vix_futures_equiv_df['Non-TAS VIX Futures Volume'] = vix_futures[('UX1 Index', 'FUT_AGGTE_VOL')]
+mega_vix_futures_equiv_df['TAS VIX Futures Volume'] = vix_futures[('VXT1 Index', 'FUT_AGGTE_VOL')]
 export_df = mega_vix_futures_equiv_df.sort_index(ascending=False)
 export_df.index.name = 'Date'
 export_df['Total VIX ETP Volume (VIX Equivalent)'] = \
@@ -145,8 +148,10 @@ export_df['Total VIX ETP Volume (VIX Equivalent)'] = \
                'UVXY US Equity', 'TVIXF US Equity',
                '00677U TT Equity', '1552 JP Equity',
                'PHDG US Equity', 'VQT US Equity', 'ZIVZF US Equity']].dropna(how='all').abs().sum(axis=1)
+# export_df['Total VIX Futures Volume'] = \
+#     export_df[['UX1 Index', 'UX2 Index', 'UX3 Index']].dropna(how='all').abs().sum(axis=1)
 export_df['Total VIX Futures Volume'] = \
-    export_df[['UX1 Index', 'UX2 Index', 'UX3 Index']].dropna(how='all').abs().sum(axis=1)
+    export_df[['Non-TAS VIX Futures Volume', 'TAS VIX Futures Volume']].dropna(how='all').sum(axis=1)
 export_df = export_df[['Total VIX ETP Volume (VIX Equivalent)', 'Total VIX Futures Volume']
                       + list(mega_vix_futures_equiv_df.columns)]  # Reorder columns
 export_df.to_csv(DOWNLOADS_DIR+f"vix_etps_equiv_volume_{END_DATE.strftime('%Y-%m-%d')}.csv")
