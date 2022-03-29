@@ -12,7 +12,7 @@ con = create_bloomberg_connection()
 ###############################################################################
 
 START_DATE = pd.Timestamp('2000-01-01')
-END_DATE = pd.Timestamp('2022-01-31')
+END_DATE = pd.Timestamp('2022-03-22')
 
 # NOTE: 1709583D US Equity is old, matured VXX; VXX US Equity is "series B" and only goes back to 2018-01
 VIX_ETPS = ['XIV US Equity', 'SVXY US Equity',

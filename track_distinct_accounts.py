@@ -4,7 +4,7 @@ from options_futures_expirations_v3 import days_between
 plt.style.use('cboe-fivethirtyeight')
 
 DOWNLOADS_DIR = 'C:/Users/gzhang/OneDrive - CBOE/Downloads/'
-USE_DATE = '2021-12-31'
+USE_DATE = '2022-02-28'
 PRODUCTS = ['IBHY', 'IBIG', 'VXM']  # Default ['VXM', 'IBHY', 'IBIG']
 
 
