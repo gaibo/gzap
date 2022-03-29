@@ -12,7 +12,7 @@ plt.style.use('cboe-fivethirtyeight')
 # 2) Run this script and check EXPORT_DIR for folder named USE_DATE which contains XLSXs.
 
 DOWNLOADS_DIR = 'C:/Users/gzhang/OneDrive - CBOE/Downloads/'
-USE_DATE = '2022-02-07'
+USE_DATE = '2022-02-28'
 # Default: ['IBHY', 'IBIG', 'VX', 'VXM', 'AMW', 'AMB1', 'AMB3', 'AMT1', 'AMT3']
 PRODUCTS = ['IBHY', 'IBIG', 'VX', 'VXM', 'AMW', 'AMB1', 'AMB3', 'AMT1', 'AMT3']
 MULTIPLIER_DICT = {'IBHY': 1000, 'IBIG': 1000, 'VX': 1000, 'VXM': 100,
@@ -328,3 +328,28 @@ for product_name in ['VX_Monthly', 'VXM', 'IBHY', 'IBIG', 'VX_Weekly', 'AMW_Week
 
 # # Export
 # tac_df.to_csv(DOWNLOADS_DIR+f'tac_df_{tac_month}.csv')
+
+###############################################################################
+
+# Create mega data DF to use as Tableau data source
+data_source_df_list = []    # Collect, then use pd.concat()
+for product_name in PRODUCT_DICT.keys():
+    for i_field in VOLUME_REFERENCE_COLS+VOLUME_SUBCAT_COLS:
+        for i_agg in ['Daily', 'Monthly', 'Quarterly', 'Yearly']:
+            agg_df = pd.DataFrame(PRODUCT_DICT[product_name][i_field][i_agg])
+            agg_df['Product'] = product_name
+            agg_df['Field'] = i_field
+            agg_df['Aggregation'] = i_agg
+            if i_field in VOLUME_SUBCAT_COLS:
+                agg_df['Field Class'] = 'Volume Subcategory Field'
+            else:
+                agg_df['Field Class'] = 'Overview Field'
+            data_source_df_list.append(agg_df)
+data_source_df = pd.concat(data_source_df_list)
+data_source_df.index.name = 'Date/Month/Quarter/Year'
+data_source_df = \
+    data_source_df.reset_index().set_index(['Product', 'Field Class', 'Field', 'Aggregation',
+                                            'Date/Month/Quarter/Year'])
+
+# Export
+data_source_df.to_csv(DOWNLOADS_DIR+f'data_source_df_{USE_DATE}.csv')
