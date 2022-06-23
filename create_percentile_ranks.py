@@ -11,19 +11,20 @@ plt.style.use('cboe-fivethirtyeight')
 #    Save it in DOWNLOADS_DIR as f'Unified_Data_Table_data_{USE_DATE}.csv'.
 # 2) Run this script and check EXPORT_DIR for folder named USE_DATE which contains XLSXs.
 
-DOWNLOADS_DIR = 'C:/Users/gzhang/OneDrive - CBOE/Downloads/'
-USE_DATE = '2022-02-28'
+DOWNLOADS_DIR = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/')
+USE_DATE = '2022-06-22'
 # Default: ['IBHY', 'IBIG', 'VX', 'VXM', 'AMW', 'AMB1', 'AMB3', 'AMT1', 'AMT3']
 PRODUCTS = ['IBHY', 'IBIG', 'VX', 'VXM', 'AMW', 'AMB1', 'AMB3', 'AMT1', 'AMT3']
 MULTIPLIER_DICT = {'IBHY': 1000, 'IBIG': 1000, 'VX': 1000, 'VXM': 100,
                    'AMW': 35, 'AMB1': 50, 'AMB3': 25, 'AMT1': 25, 'AMT3': 25}
-EXPORT_DIR = 'P:/PrdDevSharedDB/Cboe Futures Historical Percentiles/'
+EXPORT_DIR = Path('P:/PrdDevSharedDB/Cboe Futures Historical Percentiles/')
+EXPORT_DIR_ALLCAT = Path('P:/PrdDevSharedDB/Cboe Futures All Categories Tables/')
 
 ###############################################################################
 
 # Load
 DASHBOARD_DOWNLOAD_FILE = f'Unified_Data_Table_data_{USE_DATE}.csv'
-settle_data = pd.read_csv(DOWNLOADS_DIR + DASHBOARD_DOWNLOAD_FILE,
+settle_data = pd.read_csv(DOWNLOADS_DIR / DASHBOARD_DOWNLOAD_FILE,
                           parse_dates=['Date', 'Expiry'], thousands=',')
 # Label Weeklys (VIX futures that start with VX01, VX49, etc. instead of VX; AMW futures)
 WEEKLY_PRODUCTS = ['VX', 'AMW']
@@ -257,7 +258,7 @@ for product in PRODUCTS:
 
 # Write to disk for general public access
 # NOTE: optimize for Excel usage - can't open multiple files with same name, so do VX_Volume.xlsx
-export_root_path = Path(EXPORT_DIR) / USE_DATE
+export_root_path = EXPORT_DIR / USE_DATE
 for product_name in PRODUCT_DICT.keys():
     export_path = export_root_path / product_name
     export_path_sub = export_path / 'Volume Subcategories'
@@ -279,8 +280,8 @@ for product_name in PRODUCT_DICT.keys():
 # Generate Trade Advisory Committee (TAC) style report
 
 # [CONFIGURE] Manually set month of interest
-tac_month = '2022-01'    # Default: '2022-01'
-tac_next_incomplete_month = '2022-02'   # Default: '2022-02'
+tac_month = '2022-03'    # Default: '2022-01'
+tac_next_incomplete_month = '2022-04'   # Default: '2022-02'
 
 # Piece together report
 tac_df = pd.DataFrame(columns=['Month Volume', 'ADV', 'Percentile (Last 12)',
@@ -331,6 +332,130 @@ for product_name in ['VX_Monthly', 'VXM', 'IBHY', 'IBIG', 'VX_Weekly', 'AMW_Week
 
 ###############################################################################
 
+# Generate per-product all-categories report
+
+# [CONFIGURE] Manually set product and month of interest
+allcat_month = USE_DATE[:-3]    # Default: '2022-03'
+
+# Piece together report for each product
+allcat_df_dict = {}
+for allcat_product in ['VX', 'VX_Monthly', 'VX_Weekly', 'VXM',
+                       'IBHY', 'IBIG',
+                       'AMW_Weekly', 'AMB1', 'AMB3', 'AMT1', 'AMT3']:
+    # Format product table
+    allcat_df = \
+        pd.DataFrame(columns=['Month Total', 'Avg Daily (ADV)', 'Last 12 Months Rank', 'Percentile (Since 2018-02)',
+                              'Prev Month', 'MoM', 'Prev Quarter', 'MoQ', 'Prev Year', 'MoY',
+                              '% Total', '% Total Last 12 Months Rank',
+                              '% Total Percentile (Since 2018-02)', '% Total Change'])
+    allcat_df.index.name = f"{allcat_product}: {allcat_month}"
+
+    # Each field will be row in table
+    for i_field in ['Volume', 'Notional', 'OI', 'Customer', 'TAS', 'Spreads', 'Block', 'ECRP', 'GTH']:
+        prod_monthly_df = pd.DataFrame(PRODUCT_DICT[allcat_product][i_field]['Monthly'])
+        prod_quarterly_df = pd.DataFrame(PRODUCT_DICT[allcat_product][i_field]['Quarterly'])
+        prod_yearly_df = pd.DataFrame(PRODUCT_DICT[allcat_product][i_field]['Yearly'])
+        # Get full stats for month of interest
+        try:
+            # Must .squeeze() because using approx date indexing
+            month_stats = prod_monthly_df.loc[allcat_month].squeeze()
+        except KeyError:
+            raise ValueError(f"Month {allcat_month} not found for {allcat_product}")
+        # Get ADVs for previous peridos
+        try:
+            prev_month_stats = prod_monthly_df.loc[:allcat_month].iloc[-2]  # On 2021-12, it will grab 2021-11
+            prev_month_adv = prev_month_stats['ADV']
+        except IndexError:
+            prev_month_adv = np.NaN
+        try:
+            # On 2021-12, it will grab 2021Q3 (7, 8, 9)
+            prev_quarter_stats = prod_quarterly_df.loc[:allcat_month].iloc[-2]
+            prev_quarter_adv = prev_quarter_stats['ADV']
+        except IndexError:
+            prev_quarter_adv = np.NaN
+        try:
+            prev_year_stats = prod_yearly_df.loc[:allcat_month].iloc[-2]    # On 2021-12, it will grab 2020
+            prev_year_adv = prev_year_stats['ADV']
+        except IndexError:
+            prev_year_adv = np.NaN
+        # Set some shorthand names to fill in columns
+        moq = (month_stats['ADV'] - prev_quarter_adv) / prev_quarter_adv if prev_quarter_adv != 0 else np.NaN
+        moy = (month_stats['ADV'] - prev_year_adv) / prev_year_adv if prev_year_adv != 0 else np.NaN
+        last_12_rank = 13 - np.round(month_stats['Percentile (Last 12)']*12)
+        try:
+            perc_total = month_stats['% Total']
+            perc_total_last_12_rank = 13 - np.round(month_stats['% Total Percentile (Last 12)']*12)
+            perc_total_percentile = month_stats['% Total Percentile (All)']
+            perc_total_change = month_stats['% Total Change']
+        except KeyError:
+            perc_total, perc_total_last_12_rank, perc_total_percentile, perc_total_change = (np.NaN,)*4
+
+        # Fill in row by column
+        allcat_df.loc[i_field] = \
+            (month_stats['Sum'], month_stats['ADV'], last_12_rank, month_stats['Percentile (All)'],
+             prev_month_adv, month_stats['ADV Change'], prev_quarter_adv, moq, prev_year_adv, moy,
+             perc_total, perc_total_last_12_rank, perc_total_percentile, perc_total_change)
+
+    # Store completed product table
+    allcat_df_dict[allcat_product] = allcat_df
+
+# Export
+
+
+def get_col_widths(data_df):
+    # Get max width of index (1st column of Excel output)
+    idx_max = max([len(str(s)) for s in data_df.index.values] + [len(str(data_df.index.name))])
+    # Prepend this to the list of max widths of the rest of the columns
+    rest_max_list = [max([len(str(s)) for s in data_df[col_name].values] + [len(col_name)])
+                     for col_name in data_df.columns]
+    return [idx_max] + rest_max_list
+
+
+export_path_allcat = EXPORT_DIR_ALLCAT / USE_DATE
+export_path_allcat.mkdir(parents=True, exist_ok=True)
+print(f"{export_path_allcat} established as export path.")
+for allcat_product in ['VX', 'VX_Monthly', 'VX_Weekly', 'VXM',
+                       'IBHY', 'IBIG',
+                       'AMW_Weekly', 'AMB1', 'AMB3', 'AMT1', 'AMT3']:
+    allcat_df = allcat_df_dict[allcat_product]
+    with pd.ExcelWriter(export_path_allcat / f'allcat_df_{allcat_product}_{allcat_month}.xlsx',
+                        datetime_format='YYYY-MM-DD') as writer:
+        # Create Excel object?
+        allcat_df.to_excel(writer, sheet_name='All-Categories Table', freeze_panes=(1, 1))
+        # Get xlsxwriter objects and create formats
+        workbook = writer.book
+        worksheet = writer.sheets['All-Categories Table']
+        format_roundcomma = workbook.add_format({'num_format': '#,##0'})
+        format_percentile = workbook.add_format({'num_format': '#0%'})
+        format_perc = workbook.add_format({'num_format': '#0.0%'})
+        format_percplusminus = workbook.add_format({'num_format': '+#0.0%;-#0.0%'})     # '+* #0.0%;-* #0.0%' spaced
+        format_money = workbook.add_format({'num_format': '$#,##0_);($#,##0)'})
+        # Set column formats and widths; TODO: 1) fix autofit and 2) add conditional formatting highlights and greys
+        worksheet.set_column(1, 2, None, format_roundcomma)
+        worksheet.set_column(4, 4, None, format_percentile)
+        worksheet.set_column(5, 5, None, format_roundcomma)
+        worksheet.set_column(6, 6, None, format_percplusminus)
+        worksheet.set_column(7, 7, None, format_roundcomma)
+        worksheet.set_column(8, 8, None, format_percplusminus)
+        worksheet.set_column(9, 9, None, format_roundcomma)
+        worksheet.set_column(10, 10, None, format_percplusminus)
+        worksheet.set_column(11, 11, None, format_perc)
+        worksheet.set_column(13, 13, None, format_percentile)
+        worksheet.set_column(14, 14, None, format_percplusminus)
+        # worksheet.set_row(2, None, format_money)    # Can't use because xlsxwriter gives absolute precedence to row
+        # worksheet.conditional_format('B3', {'type': 'no_errors', 'format': format_money})   # Not very clean
+        money_cells_list = [(1, 0), (1, 1), (1, 4), (1, 6), (1, 8)]     # Note it's pandas DF coordinates
+        for row, col in money_cells_list:
+            try:
+                worksheet.write(row+1, col+1, allcat_df.iloc[row, col], format_money)   # +1 for index/header
+            except TypeError:
+                pass    # Just don't write NaN or INF
+        # autofit_widths = get_col_widths(allcat_df)  # Won't work because the formatting changes the widths!
+        # for i, width in enumerate(autofit_widths):
+        #     worksheet.set_column(i, i, width)
+
+###############################################################################
+
 # Create mega data DF to use as Tableau data source
 data_source_df_list = []    # Collect, then use pd.concat()
 for product_name in PRODUCT_DICT.keys():
@@ -352,4 +477,4 @@ data_source_df = \
                                             'Date/Month/Quarter/Year'])
 
 # Export
-data_source_df.to_csv(DOWNLOADS_DIR+f'data_source_df_{USE_DATE}.csv')
+data_source_df.to_csv(DOWNLOADS_DIR / f'data_source_df_{USE_DATE}.csv')
