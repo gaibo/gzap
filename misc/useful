@@ -1,3 +1,9 @@
+eval $(ssh-agent)
+Agent pid 9700
+ssh-add ~/.ssh/<private_key_file> (probably /c/Users/gzhang/.ssh/id_rsa)
+
+ssh -T git@bitbucket.org
+
 # Completely inexplicably - the above for-loop works but the latter does not
 # I'm 99% sure it's literally a race condition - the for-loop is slow enough to let
 # the labels generate in the chart, whereas the bottom is so fast that the labels do not exist yet.
@@ -27,7 +33,10 @@ settle_data_df = settle_data_trim.pivot(index=INDEX_COLS, columns='Measure Names
 
 # create_percentile_ranks additional commands
 from functools import reduce
-adv_sum = reduce(lambda x, y: x.add(y, fill_value=0), [pd.DataFrame(product_dict[prod]['Volume']['Monthly']).fillna(0) for prod in PRODUCTS])
+# adv_sum = reduce(lambda x, y: x.add(y, fill_value=0), [pd.DataFrame(product_dict[prod]['Volume']['Monthly']).fillna(0) for prod in PRODUCTS])
+adv_sum = reduce(lambda x, y: x.add(y, fill_value=0), [pd.DataFrame(PRODUCT_DICT[prod]['Volume']['Monthly']).fillna(0) for prod in PRODUCT_DICT.keys()])
+notional_sum = reduce(lambda x, y: x.add(y, fill_value=0), [pd.DataFrame(PRODUCT_DICT[prod]['Notional']['Monthly']).fillna(0) for prod in PRODUCT_DICT.keys()])
+interest_rate_sum = reduce(lambda x, y: x.add(y, fill_value=0), [pd.DataFrame(PRODUCT_DICT[prod]['Notional']['Monthly']).fillna(0) for prod in ['AMW_Weekly', 'AMB1', 'AMB3', 'AMT1', 'AMT3']])
 days_in_months = adv_sum.loc['2021']['Sum'] / adv_sum.loc['2021']['ADV']
 ytd_adv = adv_sum.loc['2021']['Sum'].sum() / days_in_months.sum()
 

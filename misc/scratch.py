@@ -1,3 +1,111 @@
+from pathlib import Path
+DOWNLOADS_DIR = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/')
+# SPX index options price grab
+import pandas as pd
+from futures_reader import create_bloomberg_connection
+# # Generate ticker list of format "SPX US 12/16/22 C7000 Index"
+# # For expiries 12/16/22 and 12/15/23 | C and P | 1700-7300 by 25
+# ticker_list = [f"SPX US {exp_str} {cp}{strike_str} Index"
+#                for exp_str in ['12/16/22', '12/15/23']
+#                for cp in ['C', 'P']
+#                for strike_str in range(1700, 7325, 25)]
+# Read Danny's options series for exact ticker list
+danny_df = pd.read_csv(DOWNLOADS_DIR/'all_baml_spx.csv')
+
+
+def merge_danny_cols(danny_row):
+    exp_str = pd.Timestamp(danny_row['expiry']).strftime('%m/%d/%y')
+    cp = danny_row['putCall']
+    strike_str = str(round(danny_row['strike']))
+    return f"SPX US {exp_str} {cp}{strike_str} Index"
+
+
+ticker_list = danny_df.apply(merge_danny_cols, axis=1).tolist()
+# Establish connection to Bloomberg API
+con = create_bloomberg_connection()
+# Bloomberg configs
+START_DATE = END_DATE = pd.Timestamp('2022-05-16')  # MODIFY THIS
+# Pull if ticker exists (ValueError otherwise)
+res_list = []
+good_ticker_list = []
+bad_ticker_list = []    # Using Danny's exact series, this should stay empty
+counter = 0     # Print sanity check
+for ticker in ticker_list:
+    try:
+        res = con.bdh(ticker, ['PX_BID', 'PX_ASK', 'PX_MID', 'PX_LAST'],
+                      f"{START_DATE.strftime('%Y%m%d')}", f"{END_DATE.strftime('%Y%m%d')}")
+        if res.empty:
+            # Update 2022-05-12: when options have no HP prices, con.bdh return empty DF instead of a row of NaNs
+            bad_ticker_list.append(ticker)
+            continue
+        res = res.droplevel(0, axis=1)  # Drop column index level containing ticker
+        res_list.append(res)
+        good_ticker_list.append(ticker)
+        counter += 1
+        print(f"Prices pulled: {counter}")
+    except ValueError:
+        bad_ticker_list.append(ticker)
+        continue
+
+
+def split_ticker_into_exp_cp_strike(ticker_in):
+    ticker_split = ticker_in.split()
+    exp_out = pd.Timestamp(ticker_split[2])
+    cp_out = ticker_split[3][0]
+    strike_out = int(ticker_split[3][1:])
+    return exp_out, cp_out, strike_out
+
+
+# Concatenate
+res_df = pd.concat(res_list).reset_index(drop=True)     # Index is useless single date
+context_df = pd.DataFrame(map(split_ticker_into_exp_cp_strike, good_ticker_list),
+                          columns=['Expiry', 'PC', 'Strike'])   # Tuple list into columns
+assert res_df.shape[0] == context_df.shape[0]
+bad_context_df = pd.DataFrame(map(split_ticker_into_exp_cp_strike, bad_ticker_list),
+                              columns=['Expiry', 'PC', 'Strike'])
+good_df = pd.concat([context_df, res_df], axis=1)
+good_bad_df = pd.concat([good_df, bad_context_df])
+spx_df = good_bad_df.set_index(['Expiry', 'PC', 'Strike']).sort_index()
+spx_df = spx_df[['PX_BID', 'PX_ASK', 'PX_MID', 'PX_LAST']]  # Enforce column order
+# Export
+spx_df.to_csv(DOWNLOADS_DIR/f'{END_DATE.strftime("%Y-%m-%d")}_SPX_options_BBG_for_Danny.csv')
+
+####
+
+# Fix 2022-05-12 bug without pulling data again
+# Back up the buggy lists
+false_res_list = res_list
+false_good_ticker_list = good_ticker_list
+false_bad_ticker_list = bad_ticker_list
+false_res_df = res_df.copy()
+false_context_df = context_df.copy()
+false_spx_df = spx_df.copy()
+# Fix them
+true_res_list = [res for res in false_res_list if not res.empty]
+res_list = true_res_list
+empty_bool_col = [res.empty for res in false_res_list]
+empty_bool_df = pd.DataFrame({'Empty_Bool': empty_bool_col, 'Ticker': false_good_ticker_list})
+true_good_ticker_list = empty_bool_df.loc[~empty_bool_df['Empty_Bool'], 'Ticker'].tolist()
+good_ticker_list = true_good_ticker_list
+true_bad_ticker_list = empty_bool_df.loc[empty_bool_df['Empty_Bool'], 'Ticker'].tolist()
+bad_ticker_list = true_bad_ticker_list
+
+# Redo the output
+res_df = pd.concat(res_list).reset_index(drop=True)     # Index is useless single date
+context_df = pd.DataFrame(map(split_ticker_into_exp_cp_strike, good_ticker_list),
+                          columns=['Expiry', 'PC', 'Strike'])   # Tuple list into columns
+assert res_df.shape[0] == context_df.shape[0]
+bad_context_df = pd.DataFrame(map(split_ticker_into_exp_cp_strike, bad_ticker_list),
+                              columns=['Expiry', 'PC', 'Strike'])
+good_df = pd.concat([context_df, res_df], axis=1)
+good_bad_df = pd.concat([good_df, bad_context_df])
+spx_df = good_bad_df.set_index(['Expiry', 'PC', 'Strike']).sort_index()
+spx_df = spx_df[['PX_BID', 'PX_ASK', 'PX_MID', 'PX_LAST']]  # Enforce column order
+# Export
+spx_df.to_csv(DOWNLOADS_DIR/f'{END_DATE.strftime("%Y-%m-%d")}_SPX_options_BBG_for_Danny.csv')
+
+####
+
 # Unique new accounts each day for IBHY
 # Step 1: Aggregate size by date, CTI, firm, account; each row will be unique
 ibhy_new = ibhy.groupby(['Trade Date', 'CTI', 'Name', 'Account '])['Size'].sum()
