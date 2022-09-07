@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from pandas.plotting import register_matplotlib_converters
 from collections.abc import Iterable
 
-from utility.universal_tools import construct_timeseries, share_dateindex, \
+from universal_tools import construct_timeseries, share_dateindex, \
     BUS_DAYS_IN_MONTH, BUS_DAYS_IN_YEAR, BUS_DAYS_IN_SIX_MONTHS, ONE_DAY, ONE_NANOSECOND
 from utility.gaibo_modules.cboe_exchange_holidays_v3 import datelike_to_timestamp
 
@@ -38,12 +38,17 @@ class Instrument(object):
         """
         return self.raw_data_df[index]
 
-    def __str__(self):
-        """ Print a small peek at the raw data wrapped by this class
+    def __repr__(self):
+        """ Show helpful representation of the GZAP object - small peek at raw data wrapped by class
         """
         return (f"\t'{self.name}' raw data:\n"
                 f"{self.raw_data_df.head()}\n"
                 f"...")
+
+    def __str__(self):
+        """ Print a small peek at the raw data wrapped by this class
+        """
+        return self.__repr__()  # Subclasses should do something different
 
 
 class CashInstr(Instrument):
