@@ -12,7 +12,7 @@ plt.style.use('cboe-fivethirtyeight')
 # 2) Run this script and check EXPORT_DIR for folder named USE_DATE which contains XLSXs.
 
 DOWNLOADS_DIR = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/')
-USE_DATE = '2022-06-22'
+USE_DATE = '2022-08-31'
 # Default: ['IBHY', 'IBIG', 'VX', 'VXM', 'AMW', 'AMB1', 'AMB3', 'AMT1', 'AMT3']
 PRODUCTS = ['IBHY', 'IBIG', 'VX', 'VXM', 'AMW', 'AMB1', 'AMB3', 'AMT1', 'AMT3']
 MULTIPLIER_DICT = {'IBHY': 1000, 'IBIG': 1000, 'VX': 1000, 'VXM': 100,
@@ -280,11 +280,11 @@ for product_name in PRODUCT_DICT.keys():
 # Generate Trade Advisory Committee (TAC) style report
 
 # [CONFIGURE] Manually set month of interest
-tac_month = '2022-03'    # Default: '2022-01'
-tac_next_incomplete_month = '2022-04'   # Default: '2022-02'
+tac_month = '2022-07'    # Default: '2022-01'
+tac_next_incomplete_month = '2022-08'   # Default: '2022-02'
 
 # Piece together report
-tac_df = pd.DataFrame(columns=['Month Volume', 'ADV', 'Percentile (Last 12)',
+tac_df = pd.DataFrame(columns=['Month Volume', 'ADV', 'Rank (Last 12)',
                                'Prev Month ADV', 'Month over Month',
                                'Prev Quarter ADV', 'Month over Quarter', 'Prev Year ADV', 'Month over Year',
                                'Current (Incomplete) Month ADV'])
@@ -297,8 +297,11 @@ for product_name in ['VX_Monthly', 'VXM', 'IBHY', 'IBIG', 'VX_Weekly', 'AMW_Week
     try:
         month_stats = prod_monthly_df.loc[tac_month].squeeze()  # Must .squeeze() because using approx date indexing
     except KeyError:
-        raise ValueError(f"Month {tac_month} not found for {product_name}")
-    # Get ADVs for previous peridos
+        # Example: 2022-07 AMB3 futures delisted
+        print(f"WARNING: Month {tac_month} not found for {product_name}... delisted?\n"
+              f"Product excluded from report!")
+        continue
+    # Get ADVs for previous periods
     try:
         prev_month_stats = prod_monthly_df.loc[:tac_month].iloc[-2]     # On 2021-12, it will grab 2021-11
         prev_month_adv = prev_month_stats['ADV']
@@ -314,21 +317,95 @@ for product_name in ['VX_Monthly', 'VXM', 'IBHY', 'IBIG', 'VX_Weekly', 'AMW_Week
         prev_year_adv = prev_year_stats['ADV']
     except IndexError:
         prev_year_adv = np.NaN
-    moq = (month_stats['ADV']-prev_quarter_adv)/prev_quarter_adv
-    moy = (month_stats['ADV']-prev_year_adv)/prev_year_adv
+    moq = (month_stats['ADV']-prev_quarter_adv)/prev_quarter_adv if prev_quarter_adv != 0 else np.NaN
+    moy = (month_stats['ADV']-prev_year_adv)/prev_year_adv if prev_year_adv != 0 else np.NaN
     # Get ADV for current, incomplete month for reference
     try:
         next_month_stats = prod_monthly_df.loc[tac_next_incomplete_month].squeeze()
         next_month_adv = next_month_stats['ADV']
     except KeyError:
+        # Example: 2022-07 AMB3 futures delisted
+        print(f"WARNING: \"Next\" month {tac_next_incomplete_month} not found for {product_name}... delisted?\n"
+              f"Product still included in report, but NaN for \"next\" month ADV!")
         next_month_adv = np.NaN
-    tac_df.loc[product_name] = (month_stats['Sum'], month_stats['ADV'], month_stats['Percentile (Last 12)'],
+    last_12_rank = 13 - np.round(month_stats['Percentile (Last 12)'] * 12)
+    tac_df.loc[product_name] = (month_stats['Sum'], month_stats['ADV'], last_12_rank,
                                 prev_month_adv, month_stats['ADV Change'],
                                 prev_quarter_adv, moq, prev_year_adv, moy,
                                 next_month_adv)
 
-# # Export
-# tac_df.to_csv(DOWNLOADS_DIR+f'tac_df_{tac_month}.csv')
+# Export
+tac_df.to_csv(DOWNLOADS_DIR / f'tac_df_{tac_month}.csv')
+
+# Piece together supplement report for Scott Manziano - YTD, YoY, QoQ, high-level
+tac2_df = pd.DataFrame(columns=['YTD Volume', 'YTD ADV',
+                                'Prev YTD ADV', 'YTD over Prev YTD',
+                                'Prev Year ADV', 'YTD over Prev Y', 'Prev Prev Year ADV', 'YTD over Prev Prev Y',
+                                'QTD Volume', 'QTD ADV',
+                                'Prev Quarter ADV', 'QTD over Prev Q'])
+tac2_df.index.name = tac_month + ' Stats'
+tac_month_ts = pd.to_datetime(tac_month)
+year_start_ts = tac_month_ts.replace(month=1)
+tac_month_prev_year_ts = tac_month_ts - pd.DateOffset(months=12)
+prev_year_start_ts = tac_month_prev_year_ts.replace(month=1)
+for product_name in ['VX_Monthly', 'VXM', 'IBHY', 'IBIG', 'VX_Weekly', 'AMW_Weekly', 'AMB1', 'AMB3', 'AMT1', 'AMT3']:
+    prod_monthly_df = pd.DataFrame(PRODUCT_DICT[product_name]['Volume']['Monthly'])
+    prod_quarterly_df = pd.DataFrame(PRODUCT_DICT[product_name]['Volume']['Quarterly'])
+    prod_yearly_df = pd.DataFrame(PRODUCT_DICT[product_name]['Volume']['Yearly'])
+
+    # Get current year (careful - up to TAC month only, no incomplete month), prev year, prev prev year
+    ytd_df = prod_monthly_df.loc[year_start_ts:tac_month_ts]
+    n_days_ytd = (ytd_df['Sum'] / ytd_df['ADV']).sum()
+    ytd_volume = ytd_df['Sum'].sum()
+    ytd_adv = ytd_volume / n_days_ytd if n_days_ytd != 0 else np.NaN
+    # try:
+    #     curr_year_stats = prod_yearly_df.loc[:tac_month].iloc[-1]   # On 2021-12, it will grab 2021
+    #     ytd_volume, ytd_adv = curr_year_stats['Sum'], curr_year_stats['ADV']
+    # except IndexError:
+    #     ytd_volume = ytd_adv = np.NaN
+    try:
+        prev_year_stats = prod_yearly_df.loc[:tac_month].iloc[-2]  # On 2021-12, it will grab 2020
+        prev_year_adv = prev_year_stats['ADV']
+    except IndexError:
+        prev_year_adv = np.NaN
+    try:
+        prevprev_year_stats = prod_yearly_df.loc[:tac_month].iloc[-3]  # On 2021-12, it will grab 2019
+        prevprev_year_adv = prevprev_year_stats['ADV']
+    except IndexError:
+        prevprev_year_adv = np.NaN
+    # Get YTD of prev year for seasonal comparison
+    # NOTE: this implementation only works for whole months... could improve to be exact to date but shouldn't need
+    prev_ytd_df = prod_monthly_df.loc[prev_year_start_ts:tac_month_prev_year_ts]
+    n_days_prev_ytd = (prev_ytd_df['Sum']/prev_ytd_df['ADV']).sum()
+    prev_ytd_adv = prev_ytd_df['Sum'].sum() / n_days_prev_ytd if n_days_prev_ytd != 0 else np.NaN
+    # Calculate percents up or down
+    ytd_o_prev_ytd = (ytd_adv - prev_ytd_adv) / prev_ytd_adv if prev_ytd_adv != 0 else np.NaN
+    ytd_o_prev_y = (ytd_adv - prev_year_adv) / prev_year_adv if prev_year_adv != 0 else np.NaN
+    ytd_o_prevprev_y = (ytd_adv - prevprev_year_adv) / prevprev_year_adv if prevprev_year_adv != 0 else np.NaN
+
+    # Get current quarter, prev quarter
+    try:
+        curr_quarter_stats = prod_quarterly_df.loc[:tac_month].iloc[-1]     # On 2021-12, it will grab 2021Q4
+        curr_quarter_volume, curr_quarter_adv = curr_quarter_stats['Sum'], curr_quarter_stats['ADV']
+    except IndexError:
+        curr_quarter_volume = curr_quarter_adv = np.NaN
+    try:
+        prev_quarter_stats = prod_quarterly_df.loc[:tac_month].iloc[-2]     # On 2021-12, it will grab 2021Q3 (7, 8, 9)
+        prev_quarter_adv = prev_quarter_stats['ADV']
+    except IndexError:
+        prev_quarter_adv = np.NaN
+    # Calculate percents up or down
+    qtd_o_prev_q = (curr_quarter_adv - prev_quarter_adv) / prev_quarter_adv if prev_quarter_adv != 0 else np.NaN
+
+    # Stitch
+    tac2_df.loc[product_name] = (ytd_volume, ytd_adv,
+                                 prev_ytd_adv, ytd_o_prev_ytd,
+                                 prev_year_adv, ytd_o_prev_y, prevprev_year_adv, ytd_o_prevprev_y,
+                                 curr_quarter_volume, curr_quarter_adv,
+                                 prev_quarter_adv, qtd_o_prev_q)
+
+# Export
+tac2_df.to_csv(DOWNLOADS_DIR / f'tac2_df_{tac_month}.csv')
 
 ###############################################################################
 
@@ -360,7 +437,8 @@ for allcat_product in ['VX', 'VX_Monthly', 'VX_Weekly', 'VXM',
             # Must .squeeze() because using approx date indexing
             month_stats = prod_monthly_df.loc[allcat_month].squeeze()
         except KeyError:
-            raise ValueError(f"Month {allcat_month} not found for {allcat_product}")
+            print(f"WARNING, All-Categories Report: {allcat_product} {allcat_month} {i_field} not found")
+            continue
         # Get ADVs for previous peridos
         try:
             prev_month_stats = prod_monthly_df.loc[:allcat_month].iloc[-2]  # On 2021-12, it will grab 2021-11
@@ -450,6 +528,8 @@ for allcat_product in ['VX', 'VX_Monthly', 'VX_Weekly', 'VXM',
                 worksheet.write(row+1, col+1, allcat_df.iloc[row, col], format_money)   # +1 for index/header
             except TypeError:
                 pass    # Just don't write NaN or INF
+            except IndexError:
+                break   # allcat_df is empty, i.e. product did not trade!
         # autofit_widths = get_col_widths(allcat_df)  # Won't work because the formatting changes the widths!
         # for i, width in enumerate(autofit_widths):
         #     worksheet.set_column(i, i, width)

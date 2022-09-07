@@ -12,26 +12,29 @@ con = create_bloomberg_connection()
 ###############################################################################
 
 START_DATE = pd.Timestamp('2000-01-01')
-END_DATE = pd.Timestamp('2022-03-22')
+END_DATE = pd.Timestamp('2022-08-23')
 
 # NOTE: 1709583D US Equity is old, matured VXX; VXX US Equity is "series B" and only goes back to 2018-01
 VIX_ETPS = ['XIV US Equity', 'SVXY US Equity',
             '1709583D US Equity', 'VXX US Equity', 'VIXY US Equity',
             'UVXY US Equity', 'TVIXF US Equity',
             '00677U TT Equity', '1552 JP Equity',
-            'PHDG US Equity', 'VQT US Equity', 'ZIVZF US Equity']
+            'PHDG US Equity', 'VQT US Equity', 'ZIVZF US Equity',
+            'SVIX US Equity', 'UVIX US Equity']
 
 PROSHARES_DELEVERED_DATE = pd.Timestamp('2018-02-28')   # First date of v2
 VIX_ETPS_LEVERAGE_v1 = {'XIV US Equity': -1, 'SVXY US Equity': -1,
                         '1709583D US Equity': 1, 'VXX US Equity': 1, 'VIXY US Equity': 1,
                         'UVXY US Equity': 2, 'TVIXF US Equity': 2,
                         '00677U TT Equity': 1, '1552 JP Equity': 1,
-                        'PHDG US Equity': 1, 'VQT US Equity': 1, 'ZIVZF US Equity': -1}
+                        'PHDG US Equity': 1, 'VQT US Equity': 1, 'ZIVZF US Equity': -1,
+                        'SVIX US Equity': -1, 'UVIX US Equity': 2}
 VIX_ETPS_LEVERAGE_v2 = {'XIV US Equity': -1, 'SVXY US Equity': -0.5,
                         '1709583D US Equity': 1, 'VXX US Equity': 1, 'VIXY US Equity': 1,
                         'UVXY US Equity': 1.5, 'TVIXF US Equity': 2,
                         '00677U TT Equity': 1, '1552 JP Equity': 1,
-                        'PHDG US Equity': 1, 'VQT US Equity': 1, 'ZIVZF US Equity': -1}
+                        'PHDG US Equity': 1, 'VQT US Equity': 1, 'ZIVZF US Equity': -1,
+                        'SVIX US Equity': -1, 'UVIX US Equity': 2}
 
 VIX_FUTURES = ['UX1 Index', 'UX2 Index', 'UX3 Index']
 
@@ -240,9 +243,26 @@ fubon = fubon.loc[pd.date_range(fubon_start, END_DATE, freq=BUSDAY_OFFSET)]
 # Pretty format
 fubon.columns.name, fubon.index.name = None, 'Date'
 
+# SVIX
+svix = vix_etps['SVIX US Equity'].copy()
+# Select an inclusive field for cropping the start
+svix_start = svix['FUND_NET_ASSET_VAL'].first_valid_index()
+svix = svix.loc[pd.date_range(svix_start, END_DATE, freq=BUSDAY_OFFSET)]    # .reindex() does NaNs instead of error
+# Pretty format
+svix.columns.name, svix.index.name = None, 'Date'
+
+# UVIX
+uvix = vix_etps['UVIX US Equity'].copy()
+# Select an inclusive field for cropping the start
+uvix_start = uvix['FUND_NET_ASSET_VAL'].first_valid_index()
+uvix = uvix.loc[pd.date_range(uvix_start, END_DATE, freq=BUSDAY_OFFSET)]    # .reindex() does NaNs instead of error
+# Pretty format
+uvix.columns.name, uvix.index.name = None, 'Date'
+
 ###############################################################################
 # Export
 
-for etp_data, etp_name in zip([uvxy, vxx_a, vxx_b, svxy, vixy, kokusai, tvix, xiv, fubon],
-                              ['UVXY', 'VXX_A', 'VXX_B', 'SVXY', 'VIXY', 'Kokusai', 'TVIX', 'XIV', 'Fubon']):
+for etp_data, etp_name in zip([uvxy, vxx_a, vxx_b, svxy, vixy, kokusai, tvix, xiv, fubon, svix, uvix],
+                              ['UVXY', 'VXX_A', 'VXX_B', 'SVXY', 'VIXY', 'Kokusai', 'TVIX', 'XIV', 'Fubon',
+                               'SVIX', 'UVIX']):
     etp_data.to_csv(DOWNLOADS_DIR + f'{etp_name}_{END_DATE.strftime("%Y-%m-%d")}.csv')

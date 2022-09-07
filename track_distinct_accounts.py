@@ -4,7 +4,7 @@ from options_futures_expirations_v3 import days_between
 plt.style.use('cboe-fivethirtyeight')
 
 DOWNLOADS_DIR = 'C:/Users/gzhang/OneDrive - CBOE/Downloads/'
-USE_DATE = '2022-02-28'
+USE_DATE = '2022-07-29'
 PRODUCTS = ['IBHY', 'IBIG', 'VXM']  # Default ['VXM', 'IBHY', 'IBIG']
 
 
@@ -25,7 +25,7 @@ PRODUCTS = ['IBHY', 'IBIG', 'VXM']  # Default ['VXM', 'IBHY', 'IBIG']
 def evaluate_new_accounts(data):
     """ Track new accounts through DataFrame history and return separately-formatted DataFrame
     :param data: DataFrame with columns:
-                 ['Trade Date', 'Session', 'CTI', 'Account', 'Operator', 'User Name', 'Complex', 'Size']
+                 ['Trade Date', 'Session', 'CTI', 'Account', 'Operator', 'Member Name', 'Complex', 'Size']
     :return: DataFrame with columns:
              ['Trade Date', 'CTI', 'Name', 'Account', 'Size', 'New Account']
     """
@@ -35,7 +35,7 @@ def evaluate_new_accounts(data):
         print(f"Accounts that switch CTI: {ctiswitch_set}")
 
     # Step 1: Aggregate size by date, CTI, firm, account; each row will be unique
-    data_agg = data.groupby(['Trade Date', 'CTI', 'User Name', 'Account'])['Size'].sum()
+    data_agg = data.groupby(['Trade Date', 'CTI', 'Member Name', 'Account'])['Size'].sum()
 
     # Step 2: Generate "known" set of accounts for each day
     # Step 2+: Track join date for each account
@@ -72,7 +72,7 @@ def evaluate_new_accounts(data):
     concat_df = pd.DataFrame(tuple_result.to_list(),
                              columns=['Account Join Date', 'Trade Days Since Join'])
     data_agg_reindexed = (pd.concat([data_agg_full_reset, concat_df], axis=1)
-                          .set_index(['Trade Date', 'CTI', 'User Name']))
+                          .set_index(['Trade Date', 'CTI', 'Member Name']))
 
     return data_agg_reindexed
 

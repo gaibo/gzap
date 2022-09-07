@@ -9,7 +9,8 @@ con = create_bloomberg_connection()
 VIX_ETPS = ['XIV US Equity', 'SVXY US Equity',
             '1709583D US Equity', 'VXX US Equity', 'VIXY US Equity',
             'UVXY US Equity', 'TVIXF US Equity',
-            '00677U TT Equity', '1552 JP Equity']
+            '00677U TT Equity', '1552 JP Equity',
+            'SVIX US Equity', 'UVIX US Equity']
 
 # ETP_LEVERAGE = {'XIV US Equity': -1, 'SVXY US Equity': -0.5,
 #                 '1709583D US Equity': 1, 'VXX US Equity': 1, 'VIXY US Equity': 1,
@@ -28,7 +29,7 @@ VIX_ETPS = ['XIV US Equity', 'SVXY US Equity',
 # Recreate AUM chart
 
 START_DATE = pd.Timestamp('2015-01-01')
-END_DATE = pd.Timestamp('2022-01-31')
+END_DATE = pd.Timestamp('2022-04-29')
 
 # Get AUM data from Bloomberg
 etps_raw = con.bdh(VIX_ETPS, ['FUND_TOTAL_ASSETS', 'PX_VOLUME'],
@@ -73,15 +74,17 @@ for yearmonth in unique_yearmonths:
 # Group into bigger categories
 BIGGER_CATEGORIES = ['Inverse', 'Long Vol', 'Levered', 'Asian Long']
 # AUMs - good for export
-aum_means['Inverse'] = aum_means[['XIV US Equity', 'SVXY US Equity']].dropna(how='all').sum(axis=1)
+aum_means['Inverse'] = aum_means[['XIV US Equity', 'SVXY US Equity', 'SVIX US Equity']].dropna(how='all').sum(axis=1)
 aum_means['Long Vol'] = aum_means[['VXX US Equity', 'VIXY US Equity']].dropna(how='all').sum(axis=1)
-aum_means['Levered'] = aum_means[['UVXY US Equity', 'TVIXF US Equity']].dropna(how='all').sum(axis=1)
+aum_means['Levered'] = aum_means[['UVXY US Equity', 'TVIXF US Equity', 'UVIX US Equity']].dropna(how='all').sum(axis=1)
 aum_means['Asian Long'] = aum_means[['00677U TT Equity', '1552 JP Equity']].dropna(how='all').sum(axis=1)
 aum_means['Total'] = aum_means[BIGGER_CATEGORIES].dropna(how='all').sum(axis=1)
 # Volumes - good for export
-volume_means['Inverse'] = volume_means[['XIV US Equity', 'SVXY US Equity']].dropna(how='all').sum(axis=1)
+volume_means['Inverse'] = \
+    volume_means[['XIV US Equity', 'SVXY US Equity', 'SVIX US Equity']].dropna(how='all').sum(axis=1)
 volume_means['Long Vol'] = volume_means[['VXX US Equity', 'VIXY US Equity']].dropna(how='all').sum(axis=1)
-volume_means['Levered'] = volume_means[['UVXY US Equity', 'TVIXF US Equity']].dropna(how='all').sum(axis=1)
+volume_means['Levered'] = \
+    volume_means[['UVXY US Equity', 'TVIXF US Equity', 'UVIX US Equity']].dropna(how='all').sum(axis=1)
 volume_means['Asian Long'] = volume_means[['00677U TT Equity', '1552 JP Equity']].dropna(how='all').sum(axis=1)
 volume_means['Total'] = volume_means[BIGGER_CATEGORIES].dropna(how='all').sum(axis=1)
 
