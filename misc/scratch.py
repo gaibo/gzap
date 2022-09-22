@@ -1,3 +1,108 @@
+# Simplified way to get email attachment
+# Specify mail server
+conn = imaplib.IMAP4_SSL("outlook.office365.com")
+# Log in
+conn.login("gzhang@cboe.com", "better with you up")
+# Select mailbox (default Inbox)
+conn.select("\"Bulk/Dennis BlackRock iShares Daily Values\"")
+# Search messages
+check_search, msg_nums_list = conn.search(None, 'ALL')
+# Get a message
+latest_msg_num = msg_nums_list[0].split()[-1]   # Note this is byte encoded
+check_fetch, data = conn.fetch(latest_msg_num, '(RFC822)')
+msg = email.message_from_string(data[0][1].decode())    # Decode from byte
+# Export attachment to disk
+download_folder = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/')
+att_path = "No attachment found."
+for part in msg.walk():
+    if part.get_content_maintype() == 'multipart':
+        continue
+    if part.get('Content-Disposition') is None:
+        continue
+    filename = part.get_filename()
+    att_path = os.path.join(download_folder, filename)
+    if not os.path.isfile(att_path):
+        fp = open(att_path, 'wb')
+        fp.write(part.get_payload(decode=True))
+        fp.close()
+print(att_path)
+
+
+# TODO: future Gaibo, please read all about classes and their built-ins, like __init__, etc. Then thoroughly explore
+# TODO: the imaplib/email options for how messages are structured - make class able to deal with text and attachments,
+# TODO: login and logout, close and stuff
+
+import email
+import imaplib
+import os
+
+class FetchEmail:
+    connection = None
+    error = None
+    mail_server = "host_name"
+    username = "outlook_username"
+    password = "password"
+
+    def __init__(self, mail_server, username, password):
+        self.connection = imaplib.IMAP4_SSL(mail_server)
+        self.connection.login(username, password)
+        self.connection.select(readonly=False) # so we can mark mails as read
+
+    def close_connection(self):
+        """
+        Close the connection to the IMAP server
+        """
+        self.connection.close()
+
+    def save_attachment(self, msg, download_folder="/tmp"):
+        """
+        Given a message, save its attachments to the specified
+        download folder (default is /tmp)
+
+        return: file path to attachment
+        """
+        att_path = "No attachment found."
+        for part in msg.walk():
+            if part.get_content_maintype() == 'multipart':
+                continue
+            if part.get('Content-Disposition') is None:
+                continue
+
+            filename = part.get_filename()
+            att_path = os.path.join(download_folder, filename)
+
+            if not os.path.isfile(att_path):
+                fp = open(att_path, 'wb')
+                fp.write(part.get_payload(decode=True))
+                fp.close()
+        return att_path
+
+    def fetch_unread_messages(self):
+        """
+        Retrieve unread messages
+        """
+        emails = []
+        (result, messages) = self.connection.search(None, 'UnSeen')
+        if result == "OK":
+            for message in messages[0].split(' '):
+                try:
+                    ret, data = self.connection.fetch(message,'(RFC822)')
+                except:
+                    print "No new emails to read."
+                    self.close_connection()
+                    exit()
+
+                msg = email.message_from_string(data[0][1])
+                if isinstance(msg, str) == False:
+                    emails.append(msg)
+                response, data = self.connection.store(message, '+FLAGS','\\Seen')
+
+            return emails
+
+        self.error = "Failed to retrieve emails."
+        return emails
+
+
 from pathlib import Path
 DOWNLOADS_DIR = Path('C:/Users/gzhang/OneDrive - CBOE/Downloads/')
 # SPX index options price grab
