@@ -1,3 +1,10 @@
+# After Git 2.23, to checkout remote branch and work on it locally
+git switch remote_branch_name
+git switch -c remote_branch_name remote_name/remote_branch_name  # If multiple remotes
+# Before Git 2.23
+git checkout remote_branch_name
+git checkout -b remote_branch_name remote_name/remote_branch_name   # If multiple remotes
+
 eval $(ssh-agent)
 Agent pid 9700
 ssh-add ~/.ssh/<private_key_file> (probably /c/Users/gzhang/.ssh/id_rsa)
