@@ -1,3 +1,38 @@
+# How SSH for Bitbucket works
+Install OpenSSH and run ssh-agent:
+Do "ps -a | grep ssh-agent" in Bash terminal to check if SSH is running, do "eval $(ssh-agent)" if it's not.
+For the record, $() is a "command substitution" in Bash, so that command evals the result of ssh-agent command, which is:
+SSH_AUTH_SOCK=/tmp/ssh-b3KLV3gaQDKT/agent.1760; export SSH_AUTH_SOCK;
+SSH_AGENT_PID=1761; export SSH_AGENT_PID;
+echo Agent pid 1761;
+This is because SSH needs to know via environment variable the socket to reach the newly created agent I think.
+To kill the created agent (the quotes are optional syntax to remember command substitution):
+eval "$(ssh-agent -k)"
+
+Use ssh-keygen to generate SSH key pair:
+ssh-keygen -t ed25519 -b 4096 -C "gaibozhang@yahoo.com" -f bitbucket_gaibo
+Apparently the password is optional - set one if you don't want someone with your device to make commits.
+Keep in mind that you will be prompted for password every time you do git push/pull/fetch.
+ssh-keygen outputs 2 files - private and public keys literally raw in directory.
+
+Add key to SSH agent:
+ssh-add ~/bitbucket_gaibo
+"To ensure the correct SSH key is used when connecting to Bitbucket, update or create your SSH configuration file (~/.ssh/config)
+with the following settings:
+Host bitbucket.org
+  AddKeysToAgent yes
+  IdentityFile ~/.ssh/bitbucket_gaibo"
+Honestly I don't understand that one.
+
+Add public key to Bitbucket Cloud:
+Security->SSH Keys->Add Key
+Label key with physical machine it's attached to so you remember which to disable.
+Paste public key text.
+
+Check SSH authentication:
+ssh -T git@bitbucket.org
+
+
 # After Git 2.23, to checkout remote branch and work on it locally
 git switch remote_branch_name
 git switch -c remote_branch_name remote_name/remote_branch_name  # If multiple remotes
