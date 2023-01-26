@@ -1,3 +1,5 @@
 [submodule "utility/gaibo_modules"]
 	path = utility/gaibo_modules
-	url = https://stash.cboe.com/scm/mas/gaibo_modules.git
+	# url = https://stash.cboe.com/scm/mas/gaibo_modules.git
+	# url = https://gaibo@bitbucket.org/gaibo/gaibo_modules.git
+    url = git@bitbucket.org:gaibo/gaibo_modules.git
