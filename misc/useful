@@ -1,3 +1,20 @@
+For the record, Bitbucket SSH format is EITHER:
+git@bitbucket.org:<workspace_ID>/<repo_name>.git
+or
+ssh://git@bitbucket.org/<workspace_ID>/<repo_name>.git
+
+
+# Restore submodule function
+Manually update url in .gitmodules (SSH url works fine, but should be careful to leave out username??).
+git submodule sync --recursive
+git submodule update --recursive
+Then go in and do "git checkout master" so it's tracking and not a detached head.
+But in the future should probably do initial clone with:
+git submodule update --init --recursive
+To update to latest tips of remote branches:
+git submodule update --recursive --remote
+
+
 # How SSH for Bitbucket works
 Install OpenSSH and run ssh-agent:
 Do "ps -a | grep ssh-agent" in Bash terminal to check if SSH is running, do "eval $(ssh-agent)" if it's not.
