@@ -1,3 +1,12 @@
+apparently you need plt.show() if using terminal or script, as opposed to IPython shell or Jupyter or interactive mode
+
+In Python Console, check "add source root to PYTHONPATH"
+Then in Project Structure, add utility AND utility/gaibo_modules as sources
+
+Inspections -> PEP 8 has a ton of sub-rules - look at small right pane for ignored rules
+Can use filter to look at only modified Inspections to undo accidents
+PyCharm settings -> Integrated Python Tools -> Docstrings -> reStructuredText
+
 For the record, Bitbucket SSH format is EITHER:
 git@bitbucket.org:<workspace_ID>/<repo_name>.git
 or
