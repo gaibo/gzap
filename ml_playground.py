@@ -48,8 +48,8 @@ def train_model(model, df, feature, label, batch_size, epochs):
                         epochs=epochs)
 
     # Gather the trained model's weight and bias
-    trained_weight = model.get_weights()[0]
-    trained_bias = model.get_weights()[1]
+    trained_weight = model.get_weights()[0].item()
+    trained_bias = model.get_weights()[1].item()
 
     # Gather snapshot of each epoch
     hist_df = pd.DataFrame(history.history)
@@ -139,8 +139,10 @@ if __name__ == '__main__':
     my_model = build_model(my_learning_rate)
     weight, bias, epochs_hist, rmse_hist = train_model(my_model, training_df, my_feature, my_label,
                                                        my_batch_size, my_n_epochs)
-    print(f"\nThe learned weight for your model is {weight:.4f}"
-          f"\nThe learned bias for your model is {bias:%.4f}")
+    print(f"\nYour feature: {my_feature}"
+          f"\nYour label: {my_label}"
+          f"\nThe learned weight for your model is {weight:.4f}"
+          f"\nThe learned bias for your model is {bias:.4f}")
 
     # Use our visualization functions
     plot_the_model(weight, bias, training_df, my_feature, my_label)
@@ -156,7 +158,7 @@ if __name__ == '__main__':
         print("          in thousand$   in thousand$")
         print("--------------------------------------")
         for i in range(n):
-            print("%5.0f %6.0f %15.0f" % (training_df[feature][10000 + i],
+            print("%5.2f %6.1f %15.1f" % (training_df[feature][10000 + i],
                                           training_df[label][10000 + i],
                                           predicted_values[i][0]))
     predict_house_values(15, my_feature, my_label)
