@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
 
@@ -29,14 +30,15 @@ def build_model(learning_rate):
     return model
 
 
-def train_model(model, df, feature, label, batch_size, epochs):
+def train_model(model, df, feature, label, epochs, batch_size=None, validation_split=0.2):
     """ Train model by feeding it data
     :param model: compiled Tensorflow Keras model
     :param df:
     :param feature:
     :param label:
-    :param batch_size:
     :param epochs:
+    :param batch_size:
+    :param validation_split:
     :return:
     """
     # Feed feature values and label values to model;
@@ -44,21 +46,23 @@ def train_model(model, df, feature, label, batch_size, epochs):
     # feature values relate to label values
     history = model.fit(x=df[feature],
                         y=df[label],
+                        epochs=epochs,
                         batch_size=batch_size,
-                        epochs=epochs)
+                        validation_split=validation_split)
 
     # Gather the trained model's weight and bias
     trained_weight = model.get_weights()[0].item()
     trained_bias = model.get_weights()[1].item()
 
     # Gather snapshot of each epoch
-    hist_df = pd.DataFrame(history.history)
+    history_df = pd.DataFrame(history.history)
     epochs = history.epoch  # list of epochs, stored separately from rest of history
 
     # Specifically gather model's root mean squared error at each epoch
-    rmse = hist_df["root_mean_squared_error"]
+    rmse_training = history_df["root_mean_squared_error"]
+    rmse_validation = history_df["val_root_mean_squared_error"]
 
-    return trained_weight, trained_bias, epochs, rmse
+    return epochs, rmse_training, rmse_validation, history_df, trained_weight, trained_bias
 
 
 def plot_the_model(trained_weight, trained_bias, df, feature, label):
@@ -91,10 +95,11 @@ def plot_the_model(trained_weight, trained_bias, df, feature, label):
     plt.show()
 
 
-def plot_the_loss_curve(epochs, rmse):
+def plot_the_loss_curve(epochs, training_loss, validation_loss):
     """ Plot the loss curve, which shows loss vs. epoch
     :param epochs:
-    :param rmse:
+    :param training_loss:
+    :param validation_loss:
     :return:
     """
     # Initialize figure
@@ -104,10 +109,14 @@ def plot_the_loss_curve(epochs, rmse):
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Root Mean Squared Error")
 
-    # Create line of x-axis number of epoch vs. y-axis loss
-    ax.plot(epochs, rmse, label="Loss")
+    # Create line of x-axis number of epoch vs. y-axis loss; omit first epoch which is distractingly bad
+    ax.plot(epochs[1:], training_loss[1:], label="Training Loss")
+    ax.plot(epochs[1:], validation_loss[1:], label="Validation Loss")
     ax.legend()
-    ax.set_ylim([rmse.min()*0.97, rmse.max()])
+    merged_loss_values = pd.concat([training_loss, validation_loss])
+    highest_loss, lowest_loss = max(merged_loss_values), min(merged_loss_values)
+    delta = highest_loss - lowest_loss
+    ax.set_ylim([lowest_loss-delta*0.05, highest_loss+delta*0.05])
 
     # Render figure
     plt.show()
@@ -117,48 +126,59 @@ def plot_the_loss_curve(epochs, rmse):
 
 if __name__ == '__main__':
     # Import California Housing Dataset
-    training_df = pd.read_csv(
+    train_df = pd.read_csv(
         filepath_or_buffer="https://download.mlcc.google.com/mledu-datasets/california_housing_train.csv")
-    training_df["median_house_value"] /= 1000.0     # Scale the label
-    training_df.head()  # Print first rows
-    training_df.describe()  # Print stats
-    training_df["rooms_per_person"] = training_df["total_rooms"] / training_df["population"]    # Synthetic feature
-    training_df.corr()  # Print correlation matrix
+    test_df = pd.read_csv(
+        filepath_or_buffer="https://download.mlcc.google.com/mledu-datasets/california_housing_test.csv")
+    DOLLAR_SCALE_FACTOR = 1000.0    # Scale house value label to be more readable/usable
+    train_df["median_house_value"] /= DOLLAR_SCALE_FACTOR
+    test_df["median_house_value"] /= DOLLAR_SCALE_FACTOR
+    train_df.head()  # Print first rows
+    train_df.describe()  # Print stats
+    train_df.corr()  # Print correlation matrix
+    # Manually shuffle data in training set so validation set isn't biased
+    train_df = train_df.sample(frac=1)
+    # Set proportion of training set to split off as validation set
+    my_validation_split = 0.2
 
     # Specify our chosen feature and label
-    my_feature = "median_income"
-    my_label = "median_house_value"  # Median value of a house on a specific city block
-    # my_synthetic_feature = "rooms_per_person"
+    my_feature = "median_income"    # Median income on a specific city block
+    my_label = "median_house_value"     # Median value of a house on a specific city block
 
     # Tune the hyperparameters
     my_learning_rate = 0.06
-    my_batch_size = 30
     my_n_epochs = 24
+    my_batch_size = 30
 
     # Use our modeling functions
     my_model = build_model(my_learning_rate)
-    weight, bias, epochs_hist, rmse_hist = train_model(my_model, training_df, my_feature, my_label,
-                                                       my_batch_size, my_n_epochs)
+    epochs_list, rmse_train, rmse_val, hist_df, weight, bias = \
+        train_model(my_model, train_df, my_feature, my_label, my_n_epochs, my_batch_size, my_validation_split)
     print(f"\nYour feature: {my_feature}"
           f"\nYour label: {my_label}"
           f"\nThe learned weight for your model is {weight:.4f}"
           f"\nThe learned bias for your model is {bias:.4f}")
 
     # Use our visualization functions
-    plot_the_model(weight, bias, training_df, my_feature, my_label)
-    plot_the_loss_curve(epochs_hist, rmse_hist)
+    plot_the_model(weight, bias, train_df, my_feature, my_label)
+    plot_the_loss_curve(epochs_list, rmse_train, rmse_val)
 
     # House prediction function
-    def predict_house_values(n, feature, label):
+    def predict_house_values(n_samples, feature, label):
         """Predict house values based on a feature."""
-        batch = training_df[feature][10000:10000 + n]
+        selected_samples = train_df.sample(n_samples)
+        batch = selected_samples[feature]
         predicted_values = my_model.predict_on_batch(x=batch)
         print("feature   label          predicted")
         print("  value   value          value")
         print("          in thousand$   in thousand$")
         print("--------------------------------------")
-        for i in range(n):
-            print("%5.2f %6.1f %15.1f" % (training_df[feature][10000 + i],
-                                          training_df[label][10000 + i],
+        for i in range(n_samples):
+            print("%5.2f %6.1f %15.1f" % (selected_samples[feature].iloc[i],
+                                          selected_samples[label].iloc[i],
                                           predicted_values[i][0]))
     predict_house_values(15, my_feature, my_label)
+
+    # Ultimate judgment: use test set to evaluate the model
+    x_test, y_test = test_df[my_feature], test_df[my_label]
+    results = my_model.evaluate(x_test, y_test, batch_size=my_batch_size)
