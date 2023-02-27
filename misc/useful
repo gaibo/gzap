@@ -1,3 +1,16 @@
+Tensorflow model.fit() does not just accept pandas DataFrame as input. Sometimes
+you can convert DataFrame to Tensor, but Tensors require all elements to have same
+dtype, so that often won't work. In that case, do dictionary of columns (you can cast
+DataFrame to dict - df.items() makes a generator of tuples as well).
+tf.convert_to_tensor(numeric_features)
+normalizer = tf.keras.layers.Normalization(axis=-1)
+normalizer.adapt(numeric_features)
+or
+numeric_dict_ds = tf.data.Dataset.from_tensor_slices((dict(numeric_features), target))
+https://www.tensorflow.org/tutorials/load_data/pandas_dataframe
+
+Apparently you can do .items() on a pandas DataFrame and get a generator of (column_name, series) tuples.
+
 $ python3 -m memory_profiler .\test.py
 proves that Python/pandas is smart enough to not do another malloc for assigning
 something back to itself, e.g. df = df.sample(frac=1).reset_index(drop=True).

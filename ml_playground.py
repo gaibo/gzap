@@ -1,12 +1,14 @@
 import pandas as pd
-import numpy as np
-import tensorflow as tf
+# import numpy as np
 from matplotlib import pyplot as plt
+import tensorflow as tf
+tf.keras.backend.set_floatx('float32')
 
 
-def build_model(learning_rate):
+def build_model(learning_rate, feature_layer=None):
     """ Create and compile a simple linear regression model
     :param learning_rate: chosen learning rate to pass into Keras optimizer
+    :param feature_layer: tf.keras.layers.DenseFeatures()
     :return: compiled TensorFlow Keras model
     """
     # Most simple Keras models are sequential;
@@ -15,6 +17,10 @@ def build_model(learning_rate):
 
     # Describe topography of model
     #   - Simple linear regression model: single node in a single layer
+    #   - For multiple features, use feature layer
+    if feature_layer is not None:
+        model.add(feature_layer)    # Add layer containing feature columns
+    # Add one linear layer to yield simple linear regressor
     one_node_layer = tf.keras.layers.Dense(units=1, input_shape=(1,))
     model.add(one_node_layer)
 
@@ -22,21 +28,22 @@ def build_model(learning_rate):
     # Configure training to minimize model's mean squared error
     #   - RMSprop is gradient descent method based on rprop and similar to Adagrad
     rmsprop_optimizer = tf.keras.optimizers.experimental.RMSprop(learning_rate=learning_rate)
-    mse_metric = tf.keras.metrics.RootMeanSquaredError()
+    rmse_metric = tf.keras.metrics.RootMeanSquaredError()
     model.compile(optimizer=rmsprop_optimizer,
                   loss="mean_squared_error",
-                  metrics=[mse_metric])
+                  metrics=[rmse_metric])
 
     return model
 
 
-def train_model(model, df, feature, label, epochs, batch_size=None, validation_split=0.2):
+def train_model(model, dataset_df, label_name, n_epochs, batch_size=None, validation_split=0.2):
     """ Train model by feeding it data
     :param model: compiled Tensorflow Keras model
-    :param df:
-    :param feature:
-    :param label:
-    :param epochs:
+    :param dataset_df:
+    :param label_name: string name of column in dataset_df to use as label;
+                       don't need feature names because we pass rest of dataset_df to model, and
+                       we assume model has feature columns which already define their names
+    :param n_epochs:
     :param batch_size:
     :param validation_split:
     :return:
@@ -44,14 +51,17 @@ def train_model(model, df, feature, label, epochs, batch_size=None, validation_s
     # Feed feature values and label values to model;
     # Model will train for specified number of epochs, gradually learning how
     # feature values relate to label values
-    history = model.fit(x=df[feature],
-                        y=df[label],
-                        epochs=epochs,
+    features_df = dataset_df.copy()     # Will modify copy to become just features
+    label_ser = features_df.pop(label_name)
+    history = model.fit(x=dict(features_df),
+                        y=label_ser,
+                        epochs=n_epochs,
                         batch_size=batch_size,
                         validation_split=validation_split)
 
     # Gather the trained model's weight and bias
-    trained_weight = model.get_weights()[0].item()
+    # NOTE: .item() can extract number from np.array wrapper
+    trained_weight = model.get_weights()[0]     # Can be multiple weights with multiple features
     trained_bias = model.get_weights()[1].item()
 
     # Gather snapshot of each epoch
@@ -122,6 +132,20 @@ def plot_the_loss_curve(epochs, training_loss, validation_loss):
     plt.show()
 
 
+def predict_random_batch(model, dataset_df, label_name, n_samples):
+    """ TODO: not in readable format with multiple features
+    Predict house values based on a feature."""
+    selected_features_df = dataset_df.sample(n_samples)     # Will modify copy to become just features batch
+    selected_label_ser = selected_features_df.pop(label_name)
+    predicted_values = model.predict_on_batch(x=dict(selected_features_df))
+    print("feature value\tlabel value\tpredicted value\n"
+          "-------------------------------------------\n")
+    for i in range(n_samples):
+        print(f"{selected_features_df.iloc[i]}\t"
+              f"{selected_label_ser.iloc[i]:.1f}\t"
+              f"{predicted_values[i][0]:.1f}\n")
+
+
 ###############################################################################
 
 if __name__ == '__main__':
@@ -142,43 +166,37 @@ if __name__ == '__main__':
     my_validation_split = 0.2
 
     # Specify our chosen feature and label
-    my_feature = "median_income"    # Median income on a specific city block
-    my_label = "median_house_value"     # Median value of a house on a specific city block
+    # my_feature = "median_income"    # Median income on a specific city block
+    # my_label = "median_house_value"     # Median value of a house on a specific city block
+    feature_columns = []    # Initialize list of feature columns
+    latitude_feat = tf.feature_column.numeric_column('latitude')    # Numerical feature
+    feature_columns.append(latitude_feat)
+    longitude_feat = tf.feature_column.numeric_column('longitude')  # Numerical feature
+    feature_columns.append(longitude_feat)
+    fp_feature_layer = tf.keras.layers.DenseFeatures(feature_columns)   # Floating point feature layer
 
     # Tune the hyperparameters
-    my_learning_rate = 0.06
-    my_n_epochs = 24
-    my_batch_size = 30
+    my_learning_rate = 0.05
+    my_n_epochs = 30
+    my_batch_size = 100
+    my_label_name = 'median_house_value'
 
     # Use our modeling functions
-    my_model = build_model(my_learning_rate)
+    my_model = build_model(my_learning_rate, fp_feature_layer)
     epochs_list, rmse_train, rmse_val, hist_df, weight, bias = \
-        train_model(my_model, train_df, my_feature, my_label, my_n_epochs, my_batch_size, my_validation_split)
-    print(f"\nYour feature: {my_feature}"
-          f"\nYour label: {my_label}"
-          f"\nThe learned weight for your model is {weight:.4f}"
-          f"\nThe learned bias for your model is {bias:.4f}")
+        train_model(my_model, train_df, my_label_name, my_n_epochs, my_batch_size, my_validation_split)
+    print(f"\nYour feature: DISABLED FOR MULTIPLE FEATURES"
+          f"\nYour label: {my_label_name}"
+          f"\nThe learned weight(s) for your model: {weight}"
+          f"\nThe learned bias for your model: {bias}")
 
     # Use our visualization functions
-    plot_the_model(weight, bias, train_df, my_feature, my_label)
+    # plot_the_model(weight, bias, train_df, my_feature, my_label)
     plot_the_loss_curve(epochs_list, rmse_train, rmse_val)
 
-    # House prediction function
-    def predict_house_values(n_samples, feature, label):
-        """Predict house values based on a feature."""
-        selected_samples = train_df.sample(n_samples)
-        batch = selected_samples[feature]
-        predicted_values = my_model.predict_on_batch(x=batch)
-        print("feature   label          predicted")
-        print("  value   value          value")
-        print("          in thousand$   in thousand$")
-        print("--------------------------------------")
-        for i in range(n_samples):
-            print("%5.2f %6.1f %15.1f" % (selected_samples[feature].iloc[i],
-                                          selected_samples[label].iloc[i],
-                                          predicted_values[i][0]))
-    predict_house_values(15, my_feature, my_label)
+    # Sanity check a random batch of predictions
+    predict_random_batch(my_model, train_df, my_label_name, 15)
 
-    # Ultimate judgment: use test set to evaluate the model
-    x_test, y_test = test_df[my_feature], test_df[my_label]
-    results = my_model.evaluate(x_test, y_test, batch_size=my_batch_size)
+    # # Ultimate judgment: use test set to evaluate the model
+    # x_test, y_test = test_df[my_feature], test_df[my_label]
+    # results = my_model.evaluate(x_test, y_test, batch_size=my_batch_size)
