@@ -1,5 +1,5 @@
 import pandas as pd
-# import numpy as np
+import numpy as np
 from matplotlib import pyplot as plt
 import tensorflow as tf
 tf.keras.backend.set_floatx('float32')
@@ -168,21 +168,36 @@ if __name__ == '__main__':
     # Specify our chosen feature and label
     # my_feature = "median_income"    # Median income on a specific city block
     # my_label = "median_house_value"     # Median value of a house on a specific city block
+    resolution_in_degrees = 0.4
     feature_columns = []    # Initialize list of feature columns
-    latitude_feat = tf.feature_column.numeric_column('latitude')    # Numerical feature
-    feature_columns.append(latitude_feat)
-    longitude_feat = tf.feature_column.numeric_column('longitude')  # Numerical feature
-    feature_columns.append(longitude_feat)
-    fp_feature_layer = tf.keras.layers.DenseFeatures(feature_columns)   # Floating point feature layer
+    # Create bucketized feature column for latitude
+    latitude_num_col = tf.feature_column.numeric_column('latitude')    # Numerical feature
+    latitude_boundaries = list(np.arange(int(min(train_df['latitude'])),
+                                         int(max(train_df['latitude'])),
+                                         resolution_in_degrees))
+    latitude_bucket_col = tf.feature_column.bucketized_column(latitude_num_col, latitude_boundaries)    # Bucket feature
+    # Create bucketized feature column for longitude
+    longitude_num_col = tf.feature_column.numeric_column('longitude')  # Numerical feature
+    longitude_boundaries = list(np.arange(int(min(train_df['longitude'])),
+                                          int(max(train_df['longitude'])),
+                                          resolution_in_degrees))
+    longitude_bucket_col = tf.feature_column.bucketized_column(longitude_num_col, longitude_boundaries)     # Bucket
+    # Create a feature cross (one-hot indicator, not just multiplication) of latitude and longitude
+    latitude_x_longitude_col = tf.feature_column.crossed_column([latitude_bucket_col, longitude_bucket_col],
+                                                                hash_bucket_size=100)
+    latitude_x_longitude_indicator_col = tf.feature_column.indicator_column(latitude_x_longitude_col)   # One-hot
+    feature_columns.append(latitude_x_longitude_indicator_col)
+    # Add feature cross to feature layer
+    feature_cross_feature_layer = tf.keras.layers.DenseFeatures(feature_columns)
 
     # Tune the hyperparameters
-    my_learning_rate = 0.05
-    my_n_epochs = 30
+    my_learning_rate = 0.04
+    my_n_epochs = 35
     my_batch_size = 100
     my_label_name = 'median_house_value'
 
     # Use our modeling functions
-    my_model = build_model(my_learning_rate, fp_feature_layer)
+    my_model = build_model(my_learning_rate, feature_cross_feature_layer)
     epochs_list, rmse_train, rmse_val, hist_df, weight, bias = \
         train_model(my_model, train_df, my_label_name, my_n_epochs, my_batch_size, my_validation_split)
     print(f"\nYour feature: DISABLED FOR MULTIPLE FEATURES"
@@ -197,6 +212,7 @@ if __name__ == '__main__':
     # Sanity check a random batch of predictions
     predict_random_batch(my_model, train_df, my_label_name, 15)
 
-    # # Ultimate judgment: use test set to evaluate the model
-    # x_test, y_test = test_df[my_feature], test_df[my_label]
-    # results = my_model.evaluate(x_test, y_test, batch_size=my_batch_size)
+    # Ultimate judgment: use test set to evaluate the model
+    test_features_df = test_df.copy()
+    test_label_ser = test_features_df.pop(my_label_name)
+    results = my_model.evaluate(dict(test_features_df), test_label_ser, batch_size=my_batch_size)
