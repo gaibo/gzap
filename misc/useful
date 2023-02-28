@@ -1,3 +1,14 @@
+You know the columns we get from
+history_df = pd.DataFrame(history.history)
+? Well it's actually the metrics you put in, and it gives you training AND
+validation versions, i.e. 'root_mean_squared_error' and 'val_root_mean_squared_error'
+
+feature_layer(dict(train_df_norm))
+Feature layer can be used as a function like that with the featres as input.
+
+(train_df_norm['median_house_value'] > threshold_z).astype(float) triggers unresolved attribute
+issues because it could end up as Bool; use .gt() to get around this.
+
 Tensorflow model.fit() does not just accept pandas DataFrame as input. Sometimes
 you can convert DataFrame to Tensor, but Tensors require all elements to have same
 dtype, so that often won't work. In that case, do dictionary of columns (you can cast
@@ -23,9 +34,13 @@ sys.path.extend([WORKING_DIR_AND_PYTHON_PATHS])
 import pandas as pd
 pd.set_option('display.max_rows', 60)   # Unintuitive - means don't truncate until more than 60 rows
 pd.set_option('display.min_rows', 30)   # Unintuitive - means iff surpasses max_rows, truncate to this many rows
-pd.set_option('display.width', None)  # Iff python/IPython running in terminal, set None to auto-detect width; IPython notebook, etc. do not run in terminal so can't auto-detect
-pd.set_option('display.max_columns', 25)  # Iff in termainl, set 0 to auto-detect; I prefer to hard set
-pd.set_option('display.expand_frame_repr', True)    # Set True to wrap-around with extra columns
+pd.set_option('display.expand_frame_repr', False)    # Set True to wrap-around with extra columns; respects max_columns, wraps if width exceeds display.width
+pd.set_option('display.width', 120)  # Iff python/IPython running in terminal, set None to auto-detect width; IPython notebook, etc. do not run in terminal so can't auto-detect
+pd.set_option('display.max_columns', 20)  # Iff in termainl, set 0 to auto-detect; I prefer to hard set
+
+# This type of format can also adjust pandas options
+pd.options.display.max_rows = 10
+pd.options.display.float_format = "{:.1f}".format
 
 import numpy as np
 n_rows = 100

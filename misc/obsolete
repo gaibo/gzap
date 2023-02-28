@@ -1,3 +1,14 @@
+    # Specifically gather model's root mean squared error at each epoch
+    rmse_training = history_df["root_mean_squared_error"]
+    rmse_validation = history_df["val_root_mean_squared_error"]
+
+# my_feature = "median_income"    # Median income on a specific city block
+    # my_label = "median_house_value"     # Median value of a house on a specific city block
+
+DOLLAR_SCALE_FACTOR = 1000.0    # Scale house value label to be more readable/usable
+    train_df["median_house_value"] /= DOLLAR_SCALE_FACTOR
+    test_df["median_house_value"] /= DOLLAR_SCALE_FACTOR
+
 # product_orderfill = product_data[ORDERFILL_FIELDS]
     # product_settleoi = product_data[SETTLEOI_FIELDS]
     # product_constructed = product_data[CONSTRUCTED_FIELDS]
