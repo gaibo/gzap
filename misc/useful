@@ -1,3 +1,6 @@
+Fun fact: when you activate regularization, "loss" and "mse" metric will no longer
+be equal, presumably because loss is now augmented the regularization factor.
+
 You know the columns we get from
 history_df = pd.DataFrame(history.history)
 ? Well it's actually the metrics you put in, and it gives you training AND

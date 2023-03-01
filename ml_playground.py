@@ -1,30 +1,68 @@
 import pandas as pd
-# import numpy as np
+import numpy as np
 from matplotlib import pyplot as plt
 import tensorflow as tf
+from collections.abc import Iterable
 
-# Keras model metrics, mostly from:
-# https://www.tensorflow.org/tutorials/structured_data/imbalanced_data#define_the_model_and_metrics
-# NOTE: many of these are not usable without filling in the "thresholds" arg,
-#       so this dictionary is mainly for copy-pasting reference at the moment
-KERAS_METRICS_DICT = {
-    'root_mean_squared_error': tf.keras.metrics.RootMeanSquaredError(name='root_mean_squared_error'),
-    'tp': tf.keras.metrics.TruePositives(name='tp'),
-    'fp': tf.keras.metrics.FalsePositives(name='fp'),
-    'tn': tf.keras.metrics.TrueNegatives(name='tn'),
-    'fn': tf.keras.metrics.FalseNegatives(name='fn'),
-    'accuracy': tf.keras.metrics.BinaryAccuracy(name='accuracy'),
-    'precision': tf.keras.metrics.Precision(name='precision'),
-    'recall': tf.keras.metrics.Recall(name='recall'),
-    'auc': tf.keras.metrics.AUC(name='auc'),
-    'prc': tf.keras.metrics.AUC(name='prc', curve='PR')
+# Keras model optimizers
+# NOTE: these are not usable without filling in the "learning_rate" arg; use with function interface
+#   - RMSprop is gradient descent method based on rprop and like Adagrad with decay rate
+#   - Adam is combo of Momentum and RMSprop, empirically great and go-to choice for deep learning
+KERAS_OPTIMIZERS_DICT = {
+    'rmsprop': tf.keras.optimizers.experimental.RMSprop,
+    'adam': tf.keras.optimizers.Adam
 }
 
 
-def build_model(learning_rate, feature_layer=None, binary=False, metrics=None):
+def get_optimizer(optimizer_name, *optimizer_args, **optimizer_kwargs):
+    """ Function interface for creating Keras optimizers, since they often need specific arguments
+        NOTE: optimizers usually take learning_rate arg
+    :param optimizer_name: string name by which we reference the optimizer
+    :param optimizer_args: args to pass onto optimizer constructor
+    :param optimizer_kwargs: kwargs to pass onto optimizer constructor
+    :return: tf.keras.optimizers object
+    """
+    optimizer_name = optimizer_name.lower()
+    return KERAS_OPTIMIZERS_DICT[optimizer_name](*optimizer_args, **optimizer_kwargs)
+
+
+# Keras model metrics, mostly from:
+# https://www.tensorflow.org/tutorials/structured_data/imbalanced_data#define_the_model_and_metrics
+# NOTE: many of these are not usable without filling in the "thresholds" arg; use with function interface
+KERAS_METRICS_DICT = {
+    'mse': tf.keras.metrics.MeanSquaredError,
+    'rmse': tf.keras.metrics.RootMeanSquaredError,
+    'tp': tf.keras.metrics.TruePositives,
+    'fp': tf.keras.metrics.FalsePositives,
+    'tn': tf.keras.metrics.TrueNegatives,
+    'fn': tf.keras.metrics.FalseNegatives,
+    'accuracy': tf.keras.metrics.BinaryAccuracy,
+    'precision': tf.keras.metrics.Precision,
+    'recall': tf.keras.metrics.Recall,
+    'auc': tf.keras.metrics.AUC
+}
+
+
+def get_metric(metric_name, *metric_args, **metric_kwargs):
+    """ Function interface for creating Keras metrics, since they often need specific arguments
+        NOTE: metrics usually take (classification) threshold arg
+    :param metric_name: string name by which we reference the metric
+    :param metric_args: args to pass onto metric constructor
+    :param metric_kwargs: kwargs to pass onto metric constructor
+    :return: tf.keras.metrics object
+    """
+    metric_name = metric_name.lower()
+    if metric_name == 'prc':
+        return tf.keras.metrics.AUC(name='prc', curve='PR')     # Precision-Recall curve
+    else:
+        return KERAS_METRICS_DICT[metric_name](*metric_args, **metric_kwargs)
+
+
+def build_model(learning_rate, feature_layer=None, hidden_layers=None, binary=False, metrics=None):
     """ Create and compile a simple linear regression model
     :param learning_rate: chosen learning rate to pass into Keras optimizer
     :param feature_layer: tf.keras.layers.DenseFeatures()
+    :param hidden_layers:
     :param binary:
     :param metrics:
     :return: compiled TensorFlow Keras model
@@ -34,30 +72,41 @@ def build_model(learning_rate, feature_layer=None, binary=False, metrics=None):
     model = tf.keras.models.Sequential()
 
     # Describe topography of model
-    #   - Simple linear regression model: single node in a single layer
-    #   - For multiple features, use feature layer
+    #   - Simple linear regression: single node in a single layer
+    #   - For multiple features, use feature layer (specifically constructed elsewhere)
+    #   - For neural nets, add hidden layers (specifically constructed elsewhere)
+    #   - For binary class classification, pipe through final sigmoid instead of single-node output layer
     if feature_layer is not None:
-        model.add(feature_layer)    # Add layer containing feature columns
+        # Add (bespoke constructed) layer containing feature columns
+        model.add(feature_layer)
+    if hidden_layers is not None:
+        # Add (bespoke constructed) hidden layers for a deep neural net
+        if isinstance(hidden_layers, Iterable):
+            # Add each of many hidden layers
+            for hidden_layer in hidden_layers:
+                model.add(hidden_layer)
+        else:
+            # Input is likely a single layer object - add it
+            model.add(hidden_layers)
+    # Finish with output layer
     if binary:
         # Funnel regression value through sigmoid function for binary classification
-        sigmoid_layer = tf.keras.layers.Dense(units=1, input_shape=(1,), activation=tf.sigmoid)
+        sigmoid_layer = tf.keras.layers.Dense(units=1, input_shape=(1,), activation=tf.sigmoid, name='Output')
         model.add(sigmoid_layer)
     else:
         # Add one linear layer to yield simple linear regressor
-        one_node_layer = tf.keras.layers.Dense(units=1, input_shape=(1,))
+        one_node_layer = tf.keras.layers.Dense(units=1, input_shape=(1,), name='Output')
         model.add(one_node_layer)
 
     # Compile model topography into efficient TF code
-    # Configure training to minimize model's mean squared error
-    #   - RMSprop is gradient descent method based on rprop and similar to Adagrad
-    rmsprop_optimizer = tf.keras.optimizers.experimental.RMSprop(learning_rate=learning_rate)
-    mse_loss = 'mean_squared_error'     # String shortcut
-    binary_crossentropy_loss = tf.keras.losses.BinaryCrossentropy()
+    # Configure training to minimize model's loss - whether its mean squared error or other
     if binary:
-        loss = binary_crossentropy_loss
+        loss = tf.keras.losses.BinaryCrossentropy()     # Binary cross-entropy loss
     else:
-        loss = mse_loss
-    model.compile(optimizer=rmsprop_optimizer,
+        loss = 'mean_squared_error'     # String shortcut for MSE loss
+    if metrics is None:
+        metrics = [get_metric('rmse', name='rmse')]
+    model.compile(optimizer=get_optimizer('Adam', learning_rate=learning_rate),
                   loss=loss,
                   metrics=metrics)
 
@@ -93,7 +142,7 @@ def train_model(model, dataset_df, label_name, n_epochs, batch_size=None, valida
     # Gather the trained model's weight and bias
     # NOTE: .item() can extract number from np.array wrapper
     trained_weight = model.get_weights()[0]     # Can be multiple weights with multiple features
-    trained_bias = model.get_weights()[1].item()
+    trained_bias = model.get_weights()[1]   # Can be multiple biases with hidden layers (apparently)
 
     # Gather snapshot of each epoch
     history_df = pd.DataFrame(history.history)
@@ -159,7 +208,7 @@ def plot_the_loss_curve(epochs_list, training_loss, validation_loss):
     plt.show()
 
 
-def plot_metrics_curve(epochs_list, history_df, metrics):
+def plot_metrics_curve(epochs_list, history_df, metrics=None):
     """ Plot curve of one or more classification metrics vs. epoch
     :param epochs_list:
     :param history_df:
@@ -172,6 +221,8 @@ def plot_metrics_curve(epochs_list, history_df, metrics):
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Metric Value")
     # Create line of x-axis epochs vs. y-axis metric for each metric
+    if metrics is None:
+        metrics = [get_metric('rmse', name='rmse')]
     metric_names = [metric.name for metric in metrics]  # Extract string names
     for metric_name in metric_names:
         metric_hist = history_df[metric_name]
@@ -217,51 +268,68 @@ if __name__ == '__main__':
     test_df = pd.read_csv(
         filepath_or_buffer="https://download.mlcc.google.com/mledu-datasets/california_housing_test.csv")
     train_df = train_df.sample(frac=1)  # Shuffle to remove validation set bias, but don't reset index
-    train_df.head()  # Print first rows
-    train_df.describe()  # Print stats
-    train_df.corr()  # Print correlation matrix
+    train_df.head()  # PRINT first rows
+    train_df.describe()  # PRINT stats
+    train_df.corr()  # PRINT correlation matrix
 
     # Normalize values to Z-score (except lat/long coordinates, preserve those for one-hot)
     train_df_norm = normalize_columns(train_df)
-    train_df_norm['latitude'], train_df_norm['longitude'] = train_df['latitude'], train_df['longitude']
-    train_df_norm.head()    # Print normalized to sanity check
+    # train_df_norm['latitude'], train_df_norm['longitude'] = train_df['latitude'], train_df['longitude']
+    train_df_norm.head()    # PRINT for sanity check of normalized numbers
     test_df_norm = normalize_columns(test_df)
-    test_df_norm['latitude'], test_df_norm['longitude'] = test_df['latitude'], test_df['longitude']
+    # test_df_norm['latitude'], test_df_norm['longitude'] = test_df['latitude'], test_df['longitude']
 
     # Create binary label for "is median house value higher than 75th percentile?"
-    threshold_Z = train_df_norm['median_house_value'].quantile(0.75)    # 265,000 in non-Z-score
+    threshold_Z = train_df_norm['median_house_value'].quantile(0.75)    # $265,000 in non-Z-score
     train_df_norm['median_house_value_is_high'] = train_df_norm['median_house_value'].gt(threshold_Z).astype(float)
     test_df_norm['median_house_value_is_high'] = test_df_norm['median_house_value'].gt(threshold_Z).astype(float)
 
-    # Specify our chosen feature(s) and label
+    # Choose label
+    my_label_name = 'median_house_value'
+
+    # Specify our chosen feature(s)
     feature_columns = []    # Initialize list of feature columns
-    # 1) Numerical feature column for median_income
+    # 1) Feature cross for latitude X longitude
+    resolution_in_Z = 0.3   # 3/10 of a standard deviation in degrees - yes it's weird
+    # Create bucketized feature column for latitude
+    latitude_num_col = tf.feature_column.numeric_column('latitude')    # Numerical feature
+    latitude_boundaries = list(np.arange(int(min(train_df_norm['latitude'])),
+                                         int(max(train_df_norm['latitude'])),
+                                         resolution_in_Z))
+    latitude_bucket_col = tf.feature_column.bucketized_column(latitude_num_col, latitude_boundaries)    # Bucket
+    # Create bucketized feature column for longitude
+    longitude_num_col = tf.feature_column.numeric_column('longitude')  # Numerical feature
+    longitude_boundaries = list(np.arange(int(min(train_df_norm['longitude'])),
+                                          int(max(train_df_norm['longitude'])),
+                                          resolution_in_Z))
+    longitude_bucket_col = tf.feature_column.bucketized_column(longitude_num_col, longitude_boundaries)     # Bucket
+    # Create a feature cross (one-hot indicator, not just multiplication) of latitude and longitude
+    latitude_x_longitude_col = tf.feature_column.crossed_column([latitude_bucket_col, longitude_bucket_col],
+                                                                hash_bucket_size=100)
+    latitude_x_longitude_indicator_col = tf.feature_column.indicator_column(latitude_x_longitude_col)   # One-hot
+    feature_columns.append(latitude_x_longitude_indicator_col)
+    # 2) Numerical feature column for median_income
     median_income_num_col = tf.feature_column.numeric_column('median_income')
     feature_columns.append(median_income_num_col)
-    # 2) Numerical feature column for total_rooms
-    tr_num_col = tf.feature_column.numeric_column('total_rooms')
-    feature_columns.append(tr_num_col)
-    # # 3) Feature cross for latitude X longitude
-    # resolution_in_degrees = 0.4
-    # # Create bucketized feature column for latitude
-    # latitude_num_col = tf.feature_column.numeric_column('latitude')    # Numerical feature
-    # latitude_boundaries = list(np.arange(int(min(train_df['latitude'])),
-    #                                      int(max(train_df['latitude'])),
-    #                                      resolution_in_degrees))
-    # latitude_bucket_col = tf.feature_column.bucketized_column(latitude_num_col, latitude_boundaries)    # Bucket
-    # # Create bucketized feature column for longitude
-    # longitude_num_col = tf.feature_column.numeric_column('longitude')  # Numerical feature
-    # longitude_boundaries = list(np.arange(int(min(train_df['longitude'])),
-    #                                       int(max(train_df['longitude'])),
-    #                                       resolution_in_degrees))
-    # longitude_bucket_col = tf.feature_column.bucketized_column(longitude_num_col, longitude_boundaries)     # Bucket
-    # # Create a feature cross (one-hot indicator, not just multiplication) of latitude and longitude
-    # latitude_x_longitude_col = tf.feature_column.crossed_column([latitude_bucket_col, longitude_bucket_col],
-    #                                                             hash_bucket_size=100)
-    # latitude_x_longitude_indicator_col = tf.feature_column.indicator_column(latitude_x_longitude_col)   # One-hot
-    # feature_columns.append(latitude_x_longitude_indicator_col)
+    # 3) Numerical feature column for population
+    population_num_col = tf.feature_column.numeric_column('population')
+    feature_columns.append(population_num_col)
     # Convert list of feature columns into a layer for model
     my_feature_layer = tf.keras.layers.DenseFeatures(feature_columns)
+
+    # Specify our hidden layers
+    my_hidden_layers = []
+    # First hidden layer with 20 nodes
+    hidden_layer_1 = tf.keras.layers.Dense(units=20, activation='relu', name='Hidden1',
+                                           kernel_regularizer=tf.keras.regularizers.l2(l=0.04))
+    my_hidden_layers.append(hidden_layer_1)
+    # # Add dropout regularization as a separate layer
+    # dropout_regularization_layer = tf.keras.layers.Dropout(rate=0.25)
+    # my_hidden_layers.append(dropout_regularization_layer)
+    # Second hidden layer with 12 nodes
+    hidden_layer_2 = tf.keras.layers.Dense(units=12, activation='relu', name='Hidden2',
+                                           kernel_regularizer=tf.keras.regularizers.l2(l=0.04))
+    my_hidden_layers.append(hidden_layer_2)
 
     ############################################################################
     # Following section will be re-run empirically and tuned
@@ -269,33 +337,33 @@ if __name__ == '__main__':
     # Set proportion of training set to split off as validation set
     my_validation_split = 0.2
     # Tune the hyperparameters
-    my_learning_rate = 0.001
-    my_n_epochs = 20
-    my_batch_size = 100
-    my_label_name = 'median_house_value_is_high'
-    my_classification_threshold = 0.52
+    my_learning_rate = 0.007
+    my_n_epochs = 140
+    my_batch_size = 1000
+    # my_classification_threshold = 0.52
 
-    # Establish the metrics the model will measure.
-    my_metrics = [
-        tf.keras.metrics.BinaryAccuracy(name='accuracy', threshold=my_classification_threshold),
-        tf.keras.metrics.Precision(name='precision', thresholds=my_classification_threshold),
-        tf.keras.metrics.Recall(name="recall", thresholds=my_classification_threshold),
-        tf.keras.metrics.AUC(name='auc', num_thresholds=100)
-    ]
+    # # Establish the binary class classifcation metrics the model will measure
+    # my_metrics = [
+    #     tf.keras.metrics.BinaryAccuracy(name='accuracy', threshold=my_classification_threshold),
+    #     tf.keras.metrics.Precision(name='precision', thresholds=my_classification_threshold),
+    #     tf.keras.metrics.Recall(name="recall", thresholds=my_classification_threshold),
+    #     tf.keras.metrics.AUC(name='auc', num_thresholds=100)
+    # ]
 
     # Use our modeling functions
-    my_model = build_model(my_learning_rate, my_feature_layer, binary=True, metrics=my_metrics)
+    my_model = build_model(my_learning_rate, my_feature_layer, my_hidden_layers,
+                           binary=False, metrics=[get_metric('mse', name='mse')])
     epochs, hist_df, weight, bias = \
         train_model(my_model, train_df_norm, my_label_name, my_n_epochs, my_batch_size, my_validation_split)
     print(f"\nYour feature: DISABLED FOR MULTIPLE FEATURES"
           f"\nYour label: {my_label_name}"
           f"\nThe learned weight(s) for your model: {weight}"
-          f"\nThe learned bias for your model: {bias}")
+          f"\nThe learned bias for your model: {bias}\n")
 
     # Use our visualization functions
     # plot_the_model(weight, bias, train_df, my_feature, my_label)
     # plot_the_loss_curve(epochs, rmse_train, rmse_val)
-    plot_metrics_curve(epochs, hist_df, my_metrics)
+    plot_metrics_curve(epochs, hist_df, metrics=[get_metric('mse', name='mse')])
 
     # Sanity check a random batch of predictions
     # predict_random_batch(my_model, train_df_norm, my_label_name, 15)
