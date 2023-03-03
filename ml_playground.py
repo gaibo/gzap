@@ -58,12 +58,30 @@ def get_metric(metric_name, *metric_args, **metric_kwargs):
         return KERAS_METRICS_DICT[metric_name](*metric_args, **metric_kwargs)
 
 
-def build_model(learning_rate, feature_layer=None, hidden_layers=None, binary=False, metrics=None):
+# Linear layer to yield simple linear regressor
+ONE_NODE_OUTPUT_LAYER = tf.keras.layers.Dense(units=1, name='Output')  # input_shape=(1,) may be useful?
+# Funnel regression value through sigmoid function for binary classification
+SIGMOID_OUTPUT_LAYER = tf.keras.layers.Dense(units=1, activation=tf.sigmoid, name='Output')
+
+
+def build_model(learning_rate, feature_layer=None, hidden_layers=None, output_layer=ONE_NODE_OUTPUT_LAYER,
+                optimizer='RMSprop', loss='mean_squared_error', metrics=None):
     """ Create and compile a simple linear regression model
+        Example 1 - simple linear regression model:
+          output_layer=ONE_NODE_OUTPUT_LAYER, optimizer='RMSprop', loss='mean_squared_error',
+          metrics=[get_metric('rmse')]
+        Example 2 - binary class classification model:
+          output_layer=SIGMOID_OUTPUT_LAYER, optimizer='Adam', loss=tf.keras.losses.BinaryCrossentropy(),
+          metrics=[tf.keras.metrics.BinaryAccuracy(name='accuracy', threshold=my_classification_threshold),
+                   tf.keras.metrics.Precision(name='precision', thresholds=my_classification_threshold),
+                   tf.keras.metrics.Recall(name="recall", thresholds=my_classification_threshold),
+                   tf.keras.metrics.AUC(name='auc', num_thresholds=100)]
     :param learning_rate: chosen learning rate to pass into Keras optimizer
     :param feature_layer: tf.keras.layers.DenseFeatures()
     :param hidden_layers:
-    :param binary:
+    :param output_layer:
+    :param optimizer:
+    :param loss:
     :param metrics:
     :return: compiled TensorFlow Keras model
     """
@@ -89,35 +107,28 @@ def build_model(learning_rate, feature_layer=None, hidden_layers=None, binary=Fa
             # Input is likely a single layer object - add it
             model.add(hidden_layers)
     # Finish with output layer
-    if binary:
-        # Funnel regression value through sigmoid function for binary classification
-        sigmoid_layer = tf.keras.layers.Dense(units=1, input_shape=(1,), activation=tf.sigmoid, name='Output')
-        model.add(sigmoid_layer)
-    else:
-        # Add one linear layer to yield simple linear regressor
-        one_node_layer = tf.keras.layers.Dense(units=1, input_shape=(1,), name='Output')
-        model.add(one_node_layer)
+    if output_layer is not None:
+        model.add(output_layer)
 
     # Compile model topography into efficient TF code
     # Configure training to minimize model's loss - whether its mean squared error or other
-    if binary:
-        loss = tf.keras.losses.BinaryCrossentropy()     # Binary cross-entropy loss
-    else:
-        loss = 'mean_squared_error'     # String shortcut for MSE loss
+    if isinstance(optimizer, str):
+        # If string, assume user wants to convert to object via constructor
+        optimizer = get_optimizer(optimizer, learning_rate=learning_rate)
     if metrics is None:
-        metrics = [get_metric('rmse', name='rmse')]
-    model.compile(optimizer=get_optimizer('Adam', learning_rate=learning_rate),
+        metrics = [get_metric('rmse')]
+    model.compile(optimizer=optimizer,
                   loss=loss,
                   metrics=metrics)
 
     return model
 
 
-def train_model(model, dataset_df, label_name, n_epochs, batch_size=None, validation_split=0.2, shuffle=True):
+def train_model(model, feature_data, label_data, n_epochs, batch_size=None, validation_split=0.2, shuffle=True):
     """ Train model by feeding it data
     :param model: compiled Tensorflow Keras model
-    :param dataset_df:
-    :param label_name: string name of column in dataset_df to use as label;
+    :param feature_data:
+    :param label_data: string name of column in dataset_df to use as label;
                        don't need feature names because we pass rest of dataset_df to model, and
                        we assume model has feature columns which already define their names
     :param n_epochs:
@@ -130,10 +141,10 @@ def train_model(model, dataset_df, label_name, n_epochs, batch_size=None, valida
     # Model will train for specified number of epochs, gradually learning how
     # feature values relate to label values
     # NOTE: model.fit() can take dict of arrays and filter away columns based on model feature layer
-    features_df = dataset_df.copy()     # Will modify copy to become just features
-    label_ser = features_df.pop(label_name)
-    history = model.fit(x=dict(features_df),
-                        y=label_ser,
+    if isinstance(feature_data, pd.DataFrame):
+        feature_data = dict(feature_data)   # model.fit() is particular about this
+    history = model.fit(x=feature_data,
+                        y=label_data,
                         epochs=n_epochs,
                         batch_size=batch_size,
                         validation_split=validation_split,
@@ -223,10 +234,14 @@ def plot_metrics_curve(epochs_list, history_df, metrics=None):
     # Create line of x-axis epochs vs. y-axis metric for each metric
     if metrics is None:
         metrics = [get_metric('rmse', name='rmse')]
-    metric_names = [metric.name for metric in metrics]  # Extract string names
-    for metric_name in metric_names:
-        metric_hist = history_df[metric_name]
-        ax.plot(epochs_list[1:], metric_hist[1:], label=metric_name)
+    for metric in metrics:
+        if isinstance(metric, str):
+            ax.plot(epochs_list[1:], history_df[metric][1:], label=metric)
+        elif isinstance(metric, tf.keras.metrics.Metric):
+            metric_hist = history_df[metric.name]
+            ax.plot(epochs_list[1:], metric_hist[1:], label=metric.name)
+        else:
+            print(f"WARNING: metric not in usable format: {metric}")
     ax.legend()
     # Render figure
     plt.show()
@@ -286,8 +301,11 @@ if __name__ == '__main__':
 
     # Choose label
     my_label_name = 'median_house_value'
+    # Create separate label and feature datasets
+    train_feature_df = train_df_norm.copy()   # Will modify copy to become just features
+    train_label_ser = train_feature_df.pop(my_label_name)
 
-    # Specify our chosen feature(s)
+    # Specify our chosen feature(s) for the model
     feature_columns = []    # Initialize list of feature columns
     # 1) Feature cross for latitude X longitude
     resolution_in_Z = 0.3   # 3/10 of a standard deviation in degrees - yes it's weird
@@ -352,9 +370,9 @@ if __name__ == '__main__':
 
     # Use our modeling functions
     my_model = build_model(my_learning_rate, my_feature_layer, my_hidden_layers,
-                           binary=False, metrics=[get_metric('mse', name='mse')])
+                           optimizer='Adam', metrics=[get_metric('mse', name='mse')])
     epochs, hist_df, weight, bias = \
-        train_model(my_model, train_df_norm, my_label_name, my_n_epochs, my_batch_size, my_validation_split)
+        train_model(my_model, train_feature_df, train_label_ser, my_n_epochs, my_batch_size, my_validation_split)
     print(f"\nYour feature: DISABLED FOR MULTIPLE FEATURES"
           f"\nYour label: {my_label_name}"
           f"\nThe learned weight(s) for your model: {weight}"

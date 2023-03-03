@@ -1,3 +1,13 @@
+In Keras model layers, input_size is apparently not even necessary. You can do it
+in the very first layer (or dedicated input layer), but if you don't, model will
+infer it when you build for first time (call .fit or .eval or .predict) on some data.
+
+Fun fact, you can disable Python from writing bytecode (.pyc) files by
+export PYTHONDONTWRITEBYTECODE=1
+can set that in ~/.profile; in .gitignore, can do
+*.py[cod]     # Will match .pyc, .pyo and .pyd files
+__pycache__/  # Exclude the whole folder
+
 Fun fact: when you activate regularization, "loss" and "mse" metric will no longer
 be equal, presumably because loss is now augmented the regularization factor.
 

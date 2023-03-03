@@ -1,3 +1,5 @@
+one_node_layer = tf.keras.layers.Dense(units=1, input_shape=(1,), name='Output')
+
     # Specifically gather model's root mean squared error at each epoch
     rmse_training = history_df["root_mean_squared_error"]
     rmse_validation = history_df["val_root_mean_squared_error"]
