@@ -1,3 +1,35 @@
+As of 2019, pandas advises use of .to_numpy() instead of .values
+
+Seaborn color palettes
+sns.color_palette('GnBu_d')
+https://matplotlib.org/stable/gallery/color/colormap_reference.html
+_d is trick for "dark" palette
+_r is trick for reversed lightness ramp
+Seaborn has an sns.xkcd_rgb[] with 954 named colors.
+Computers usually use RGB values (3 channels), but humans think of:
+Hue: "different colors"
+Saturation: colorfulness - 2 colors look more distinct with more saturation
+Luminance: lightness - how much light is emitted/reflected, range from black to white
+Vary hue to distinguish categories, vary luminance to represent numbers.
+
+np.array() vs. np.asarray()
+They are the exact same except asarray() has copy=False and array() has copy=True,
+i.e. asarray() can save a bit of work sometimes. If the input is a Python list, etc.,
+there is no difference because that must be copied to create an ndarray.
+
+rcParams.update({
+    'font.family':'sans-serif',
+    'font.sans-serif':['Liberation Sans'],
+})
+
+HTML Editing
+- can use open()
+- codecs.open() plays nicer with UTF-8, etc.
+
+After all this time, I didn't know backslashes at the end of a line serve a purpose:
+if you're in a Python """ block comment, backslash negates the newline, which means
+you can format your code inside the block without affecting what you write to file.
+
 In Keras model layers, input_size is apparently not even necessary. You can do it
 in the very first layer (or dedicated input layer), but if you don't, model will
 infer it when you build for first time (call .fit or .eval or .predict) on some data.

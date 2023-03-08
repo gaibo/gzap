@@ -333,7 +333,7 @@ if __name__ == '__main__':
     population_num_col = tf.feature_column.numeric_column('population')
     feature_columns.append(population_num_col)
     # Convert list of feature columns into a layer for model
-    my_feature_layer = tf.keras.layers.DenseFeatures(feature_columns)
+    my_feature_layer = tf.keras.layers.DenseFeatures(feature_columns)   # TODO: add smart feature to build_model to create DenseFeatures layer if it's just a list of features
 
     # Specify our hidden layers
     my_hidden_layers = []
