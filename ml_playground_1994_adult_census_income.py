@@ -64,7 +64,7 @@ census_sample_json = train_df.sample(SAMPLE_SIZE).to_json(orient='records')     
 DIVE_HTML_TEMPLATE = """\
 <script src="https://cdnjs.cloudflare.com/ajax/libs/webcomponentsjs/1.3.3/webcomponents-lite.js"></script>
 <link rel="import" href="https://raw.githubusercontent.com/PAIR-code/facets/1.0.0/facets-dist/facets-jupyter.html">
-<facets-dive id="elem" height="600"></facets-dive>
+<facets-dive id="elem"></facets-dive>
 <script>
     var data = {jsonstr};
     document.querySelector("#elem").data = data;
