@@ -1,3 +1,10 @@
+getattr or hasattr
+callable to check if the attribute is function
+
+# Reload import module
+import importlib
+importlib.reload(my_changed_module)
+
 As of 2019, pandas advises use of .to_numpy() instead of .values
 
 Seaborn color palettes

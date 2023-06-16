@@ -8,6 +8,8 @@ import base64
 # from IPython.display import display, HTML
 import webbrowser
 import seaborn as sns
+import matplotlib as mpl
+mpl.use('Qt5Agg')   # matplotlib 3.5 changed default backend and PyCharm freezes
 
 # Download data to local .keras/datasets/ cache (returns file path)
 train_csv = tf.keras.utils.get_file('adult.data',
