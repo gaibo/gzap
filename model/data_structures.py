@@ -11,10 +11,10 @@ from utility.gaibo_modules.cboe_exchange_holidays_v3 import datelike_to_timestam
 register_matplotlib_converters()
 
 
-class Instrument(object):
+class Instrument:
     """
     Financial instrument base class
-    Defined by: 1) a raw DataFrame/Series including all relevant stats (e.g. dates and times, prices)
+    Defined by: 1) a pandas DataFrame/Series including all relevant stats (e.g. dates and times, prices)
                 2) a name
     """
     def __init__(self, raw_data_df, name=None):
@@ -22,15 +22,24 @@ class Instrument(object):
         :param raw_data_df: DataFrame/Series containing reasonably formatted financial data
         :param name: name of the financial instrument
         """
-        if isinstance(raw_data_df, pd.DataFrame) or isinstance(raw_data_df, pd.Series):
-            self.raw_data_df = raw_data_df.copy()   # Prevent DataFrame state confusion by cloning new one
-        else:
-            self.raw_data_df = raw_data_df  # raw_data_df should never be None, but it would go through here
-        try:
-            self.loc = self.raw_data_df.loc     # Allow for native use of DataFrame/Series .loc[] indexing
-        except AttributeError:
-            self.loc = None     # In case raw_data_df is not DataFrame/Series; again, shouldn't really happen
+        self.raw_data_df = raw_data_df  # Property-based managed attribute
         self.name = name
+
+    @property
+    def raw_data_df(self):
+        """ Property-based managed attribute - getter """
+        return self._raw_data_df
+
+    @raw_data_df.setter
+    def raw_data_df(self, value):
+        """ Property-based managed attribute - setter """
+        if isinstance(value, pd.DataFrame) or isinstance(value, pd.Series):
+            self._raw_data_df = value.copy()    # Prevent DataFrame state confusion by deep copying
+        else:
+            print(f"WARNING: Instrument input data is not DataFrame/Series - things may not work "
+                  f"until you re-set the 'raw_data_df' attribute:\n{value}")
+            self._raw_data_df = value   # None passes here; I'm leaving in flexibility to change input later
+        self.loc = getattr(value, 'loc', None)  # Allow native use of DataFrame/Series .loc[] indexing (if available)
 
     def __getitem__(self, index):
         """ Allow for native use of DataFrame/Series indexing
@@ -38,33 +47,45 @@ class Instrument(object):
         """
         return self.raw_data_df[index]
 
-    def __repr__(self):
-        """ Show helpful representation of the GZAP object - small peek at raw data wrapped by class
-        """
-        return (f"\t'{self.name}' raw data:\n"
-                f"{self.raw_data_df.head()}\n"
-                f"...")
-
     def __str__(self):
-        """ Print a small peek at the raw data wrapped by this class
-        """
-        return self.__repr__()  # Subclasses should do something different
+        """ Show helpful summary of the Instrument object - small peek at raw data wrapped by class """
+        if hasattr(self.raw_data_df, 'shape') and self.raw_data_df.shape[0] > 10:
+            data_peek = (
+                f"{self.raw_data_df.head()}\n"
+                f"...\n"
+                f"{self.raw_data_df.tail()}"
+            )
+        else:
+            data_peek = f"{self.raw_data_df}"
+        return (f"\t'{self.name}' raw data:\n"
+                f"{data_peek}")
+
+    def __repr__(self):
+        """ Return a string that can reconstruct this object """
+        return (
+            f"{type(self).__name__}("
+            f"raw_data_df=<{self.name}_df>, "
+            f"name={self.name})"
+        )
 
 
 class CashInstr(Instrument):
     """
-    Cash instrument, derived from financial instrument
-    Defined by: 1) extracting a price time-series from Instrument through column names
+    Cash instrument, derived from financial instrument; think of as archetype of index, stock, ETF, etc.
+    Defined by: 1) extracting a price timeseries from Instrument through column names
     """
     def __init__(self, raw_data_df, time_col=None, price_col=None, index_is_time=False, **super_kwargs):
         """
         :param raw_data_df: DataFrame/Series containing reasonably formatted financial data
-        :param time_col: name of DataFrame column that represents time (in a time-series)
-        :param price_col: name of DataFrame column that represents price (value in a time-series)
+        :param time_col: name of DataFrame column that represents time (in a timeseries)
+        :param price_col: name of DataFrame column that represents price (value in a timeseries)
         :param index_is_time: set True if index of raw_data_df is time
         :param super_kwargs: kwargs for passing to superclass init()
         """
         super().__init__(raw_data_df, **super_kwargs)
+        # TODO: generalize raw_data_df and levels into descriptor class instead of property
+        # TODO: i.e, "linked" DataFrame data where each segment can be replaced and the others "down the line"
+        # TODO: will refresh, e.g. .loc and __getitem__ should update to use the chosen version
         self.levels = construct_timeseries(self.raw_data_df, time_col, price_col, index_is_time)    # Drop NaNs and sort
         self.loc = self.levels.loc  # Allow for native use of DataFrame/Series .loc[] indexing
 
