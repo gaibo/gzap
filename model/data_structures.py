@@ -1,14 +1,45 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from pandas.plotting import register_matplotlib_converters
 from collections.abc import Iterable
 
 from universal_tools import construct_timeseries, share_dateindex, \
     BUS_DAYS_IN_MONTH, BUS_DAYS_IN_YEAR, BUS_DAYS_IN_SIX_MONTHS, ONE_DAY, ONE_NANOSECOND
 from utility.gaibo_modules.cboe_exchange_holidays_v3 import datelike_to_timestamp
 
-register_matplotlib_converters()
+pd.plotting.register_matplotlib_converters()
+
+
+class ManagedPandas:
+    """ Descriptor class to manage pandas DataFrame/Series type attributes. Features:
+          - setter prints warning if input is not pandas DataFrame/Series
+          - setter auto-updates associated object's .loc[] functionality to match that of recently set DF/Series
+            NOTE: I'm doing this here rather than in object's methods because pandas .loc is an object with
+                  __getitem__ indexing rather than a method, so I can't just forward the arguments
+        The thinking here is we want GZAP objects to be "resilient" even after re-setting data.
+    """
+    def __set_name__(self, owner, name):
+        self._name = name   # Make small effort to distinguish managed attribute's text name
+
+    def __get__(self, instance, owner=None):
+        return instance.__dict__[self._name]    # Note we store and retrieve from associated object's __dict__
+
+    def __set__(self, instance, value):
+        if isinstance(value, pd.DataFrame) or isinstance(value, pd.Series):
+            instance.__dict__[self._name] = value.copy()    # Deep copy to avoid DataFrame state confusion
+        else:
+            print(f"WARNING: {type(instance).__name__} input data is not DataFrame/Series!\n"
+                  f"Things may not work until you re-set the '{self._name}' attribute:\n"
+                  f"{value}")
+            instance.__dict__[self._name] = value   # None passes here; leaving in flexibility to change input later
+        # Allow native use of DataFrame/Series .loc[] indexing if available
+        try:
+            instance.__dict__['loc'] = instance.__dict__[self._name].loc    # Passes in most cases
+            instance.__dict__['iloc'] = instance.__dict__[self._name].iloc
+        except AttributeError:
+            if hasattr(instance, 'loc'):
+                delattr(instance, 'loc')    # Preserve AttributeError if new input doesn't have .loc
+                delattr(instance, 'iloc')
 
 
 class Instrument:
@@ -17,29 +48,15 @@ class Instrument:
     Defined by: 1) a pandas DataFrame/Series including all relevant stats (e.g. dates and times, prices)
                 2) a name
     """
+    raw_data_df = ManagedPandas()   # Descriptor-based managed attribute
+
     def __init__(self, raw_data_df, name=None):
         """
         :param raw_data_df: DataFrame/Series containing reasonably formatted financial data
         :param name: name of the financial instrument
         """
-        self.raw_data_df = raw_data_df  # Property-based managed attribute
+        self.raw_data_df = raw_data_df
         self.name = name
-
-    @property
-    def raw_data_df(self):
-        """ Property-based managed attribute - getter """
-        return self._raw_data_df
-
-    @raw_data_df.setter
-    def raw_data_df(self, value):
-        """ Property-based managed attribute - setter """
-        if isinstance(value, pd.DataFrame) or isinstance(value, pd.Series):
-            self._raw_data_df = value.copy()    # Prevent DataFrame state confusion by deep copying
-        else:
-            print(f"WARNING: Instrument input data is not DataFrame/Series - things may not work "
-                  f"until you re-set the 'raw_data_df' attribute:\n{value}")
-            self._raw_data_df = value   # None passes here; I'm leaving in flexibility to change input later
-        self.loc = getattr(value, 'loc', None)  # Allow native use of DataFrame/Series .loc[] indexing (if available)
 
     def __getitem__(self, index):
         """ Allow for native use of DataFrame/Series indexing
@@ -48,7 +65,7 @@ class Instrument:
         return self.raw_data_df[index]
 
     def __str__(self):
-        """ Show helpful summary of the Instrument object - small peek at raw data wrapped by class """
+        """ Print helpful summary of the Instrument object - small peek at raw data wrapped by class """
         if hasattr(self.raw_data_df, 'shape') and self.raw_data_df.shape[0] > 10:
             data_peek = (
                 f"{self.raw_data_df.head()}\n"
@@ -57,7 +74,7 @@ class Instrument:
             )
         else:
             data_peek = f"{self.raw_data_df}"
-        return (f"\t'{self.name}' raw data:\n"
+        return (f"'{self.name}' raw data:\n"
                 f"{data_peek}")
 
     def __repr__(self):
@@ -65,29 +82,55 @@ class Instrument:
         return (
             f"{type(self).__name__}("
             f"raw_data_df=<{self.name}_df>, "
-            f"name={self.name})"
+            f"name='{self.name}')"
         )
 
 
 class CashInstr(Instrument):
     """
     Cash instrument, derived from financial instrument; think of as archetype of index, stock, ETF, etc.
-    Defined by: 1) extracting a price timeseries from Instrument through column names
+    Defined by: 1) extracting a price time-series from Instrument through column names
     """
+    raw_data_df = ManagedPandas()   # Descriptor-based managed attribute
+    levels = ManagedPandas()    # Descriptor-based managed attribute; priority - .loc will link to levels
+
     def __init__(self, raw_data_df, time_col=None, price_col=None, index_is_time=False, **super_kwargs):
         """
         :param raw_data_df: DataFrame/Series containing reasonably formatted financial data
-        :param time_col: name of DataFrame column that represents time (in a timeseries)
-        :param price_col: name of DataFrame column that represents price (value in a timeseries)
+        :param time_col: name of DataFrame column that represents time (in a time-series)
+        :param price_col: name of DataFrame column that represents price (value in a time-series)
         :param index_is_time: set True if index of raw_data_df is time
         :param super_kwargs: kwargs for passing to superclass init()
         """
         super().__init__(raw_data_df, **super_kwargs)
-        # TODO: generalize raw_data_df and levels into descriptor class instead of property
-        # TODO: i.e, "linked" DataFrame data where each segment can be replaced and the others "down the line"
-        # TODO: will refresh, e.g. .loc and __getitem__ should update to use the chosen version
-        self.levels = construct_timeseries(self.raw_data_df, time_col, price_col, index_is_time)    # Drop NaNs and sort
-        self.loc = self.levels.loc  # Allow for native use of DataFrame/Series .loc[] indexing
+        self.time_col = time_col    # I'm still on the fence about whether to keep these in state
+        self.price_col = price_col
+        self.index_is_time = index_is_time
+        self.levels = construct_timeseries(self.raw_data_df, time_col, price_col, index_is_time)  # Drop NaNs and sort
+
+    def refresh_levels(self, persist_cols=True, time_col=None, price_col=None, index_is_time=False):
+        """ Manually refresh self.levels in edge case of self.raw_data_df being modified.
+            Yes, at the moment this is duplicate code from init. But want extensibility and ways to "correct" state.
+        """
+        print(f"Refreshing...\n\n"
+              f"'raw_data_df' (head):\n{self.raw_data_df.head()}\n")
+        if persist_cols:
+            print(f"PRESERVING column info:\n"
+                  f"'time_col': {self.time_col}\n"
+                  f"'price_col': {self.price_col}\n"
+                  f"'index_is_time': {self.index_is_time}\n")
+        else:
+            print(f"CHANGING column info:\n"
+                  f"'time_col': {self.time_col} -> {time_col}\n"
+                  f"'price_col': {self.price_col} -> {price_col}\n"
+                  f"'index_is_time': {self.index_is_time} -> {index_is_time}\n")
+            self.time_col = time_col
+            self.price_col = price_col
+            self.index_is_time = index_is_time
+        self.levels = construct_timeseries(self.raw_data_df, self.time_col,
+                                           self.price_col, self.index_is_time)
+        print(f" ... Done! Levels refreshed (head):\n"
+              f"{self.levels.head()}")
 
     def __getitem__(self, index):
         """ Allow for native use of DataFrame/Series indexing
@@ -99,7 +142,7 @@ class CashInstr(Instrument):
     def price(self, granularity='daily', time_start=None, time_end=None,
               intraday_interval='5T', multiday_interval='M'):
         """ Output price levels with custom granularity
-        :param granularity: 'daily', 'intraday', 'multiday', or None
+        :param granularity: 'daily', 'intraday', or 'multiday'
         :param time_start: start of time-series to use
         :param time_end: end of time-series to use
         :param intraday_interval: interval to use with 'intraday'; '5T' is 5 minutes, etc.
@@ -126,6 +169,7 @@ class CashInstr(Instrument):
             # Warning: day-by-day processing for intraday granularity change is pretty inefficient
             # but needed to prevent padding from going beyond end of trade hours
             days = truncd_levels.index.normalize().unique()
+
             def change_day_granularity_intraday(day):
                 # NOTE: currently performing upsample (pad()) then downsample (mean()); arbitrary methodology
                 intraday_day = truncd_levels[day:day+ONE_DAY-ONE_NANOSECOND]
@@ -133,6 +177,7 @@ class CashInstr(Instrument):
                 day_downsample_mean = \
                     day_upsample_pad.resample(intraday_interval, label='right', closed='right').mean()
                 return day_downsample_mean
+
             return pd.concat([change_day_granularity_intraday(day) for day in days])
         elif granularity == 'multiday':
             # NOTE: very similar to 'intraday', but exclusively to downsample
@@ -165,11 +210,15 @@ class CashInstr(Instrument):
         :return: pd.Series with 'time' and 'value', with window of NaNs at beginning (~20 if monthly)
         """
         if not bps:
-            # Price return vol
-            result = np.sqrt(self.price_return().rolling(window).var(ddof=0)
-                             * BUS_DAYS_IN_YEAR)
+            # Price return vol (formula is like population standard deviation but asserting 0 as population mean)
+            # TODO: oooh I think this is actually wrong - it's not variance (diff from mean), it's diff from 0
+            # result = np.sqrt(self.price_return().rolling(window).var(ddof=0)
+            #                  * BUS_DAYS_IN_YEAR)
+            result = self.price_return().rolling(window).apply(
+                         lambda returns: (np.mean(returns**2) * BUS_DAYS_IN_YEAR)**0.5) * 100
         else:
             # Basis point return vol
+            # TODO: I should probably check this math - look in Applied Academics Credit VIX code
             if price_in_bps:
                 to_bps_multiplier = 1
             else:

@@ -1,3 +1,36 @@
+foo = pd.read_csv('C:/Users/gaibo/PycharmProjects/gzap/data/vix_ohlc.csv', index_col='Date', parse_dates=True)
+foo = foo.sort_index().dropna()
+vix_test = foo['VIX Close']
+from model.data_structures import CashInstr
+vix = CashInstr(vix_test, name='VIX')
+
+from models.data_structures import Instrument
+burr = pd.DataFrame([[1,2,3,],[4,5,6],[7,8,9]])
+test = Instrument(burr, 'burr')
+
+        try:
+            instance.__dict__['loc'] = instance.__dict__[self._name].loc
+            setattr(instance, 'loc', getattr(getattr(instance, self._name), 'loc'))     # Ooh that is ugly
+        except AttributeError:
+            if hasattr(instance, 'loc'):
+                delattr(instance, 'loc')    # Preserve AttributeError if new input doesn't have .loc
+
+@property
+def raw_data_df(self):
+    """ Property-based managed attribute - getter """
+    return self._raw_data_df
+
+@raw_data_df.setter
+def raw_data_df(self, value):
+    """ Property-based managed attribute - setter """
+    if isinstance(value, pd.DataFrame) or isinstance(value, pd.Series):
+        self._raw_data_df = value.copy()    # Prevent DataFrame state confusion by deep copying
+    else:
+        print(f"WARNING: Instrument input data is not DataFrame/Series - things may not work "
+              f"until you re-set the 'raw_data_df' attribute:\n{value}")
+        self._raw_data_df = value   # None passes here; I'm leaving in flexibility to change input later
+    self.loc = getattr(value, 'loc', None)  # Allow native use of DataFrame/Series .loc[] indexing (if available)
+
 one_node_layer = tf.keras.layers.Dense(units=1, input_shape=(1,), name='Output')
 
     # Specifically gather model's root mean squared error at each epoch
