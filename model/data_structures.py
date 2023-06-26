@@ -91,7 +91,6 @@ class CashInstr(Instrument):
     Cash instrument, derived from financial instrument; think of as archetype of index, stock, ETF, etc.
     Defined by: 1) extracting a price time-series from Instrument through column names
     """
-    raw_data_df = ManagedPandas()   # Descriptor-based managed attribute
     levels = ManagedPandas()    # Descriptor-based managed attribute; priority - .loc will link to levels
 
     def __init__(self, raw_data_df, time_col=None, price_col=None, index_is_time=False, **super_kwargs):
@@ -198,34 +197,31 @@ class CashInstr(Instrument):
             return prices.pct_change().iloc[1:]
 
     def realized_vol(self, shift_backwards=False, window=BUS_DAYS_IN_MONTH, bps=False, price_in_bps=False):
-        """ Calculate (annualized) realized vol with rolling window
+        """ Calculate (annualized) realized vol with rolling window;
+            formula is like rolling population standard deviation but asserting 0 as population mean
         :param shift_backwards: set True to shift data back to beginning of window, to compare to implied vol
-        :param window: rolling window, also used as days to shift; default a business month
+        :param window: rolling window, also used as days to shift; default one business month
         :param bps: set True to calculate basis point return vol instead of percent return vol
                     (e.g. if calculating on time-series of annual percent yields, as opposed to prices)
                     NOTE: by default, this mode assumes price time-series holds percent yields
         :param price_in_bps: set True when bps=True and price time-series is in basis point (spreads)
                              instead of percent (yields) (e.g. if calculating on time-series of
                              spreads over Treasury rates, as opposed to the rates themselves)
-        :return: pd.Series with 'time' and 'value', with window of NaNs at beginning (~20 if monthly)
+        :return: pd.Series with 'time' and 'value', with window (~20 if monthly) of NaNs at beginning (end if shifting)
         """
         if not bps:
-            # Price return vol (formula is like population standard deviation but asserting 0 as population mean)
-            # TODO: oooh I think this is actually wrong - it's not variance (diff from mean), it's diff from 0
-            # result = np.sqrt(self.price_return().rolling(window).var(ddof=0)
-            #                  * BUS_DAYS_IN_YEAR)
+            # Price return vol - done on log returns (% of change) of prices
             result = self.price_return().rolling(window).apply(
-                         lambda returns: (np.mean(returns**2) * BUS_DAYS_IN_YEAR)**0.5) * 100
+                         lambda returns: (np.mean(returns**2) * BUS_DAYS_IN_YEAR)**0.5, raw=True) * 100
         else:
-            # Basis point return vol
-            # TODO: I should probably check this math - look in Applied Academics Credit VIX code
-            if price_in_bps:
-                to_bps_multiplier = 1
+            # Basis point return vol - done on differences (amount of change) of rates (which happen to be percents)
+            if not price_in_bps:
+                to_bps_multiplier = 100     # Scale up to basis points - looks silly small otherwise
             else:
-                to_bps_multiplier = 100
-            result = (self.price().rolling(window).apply(
-                          lambda yields: (np.mean(np.diff(yields)**2) * BUS_DAYS_IN_YEAR)**0.5,
-                          raw=True)) * to_bps_multiplier
+                to_bps_multiplier = 1
+            # Note the following .iloc to ensure np.mean() always receives constant # of non-NaN elements
+            result = self.price().diff().iloc[1:].rolling(window).apply(
+                         lambda changes: (np.mean(changes**2) * BUS_DAYS_IN_YEAR)**0.5, raw=True) * to_bps_multiplier
         if shift_backwards:
             return result.shift(-window)
         else:
@@ -237,17 +233,18 @@ class Derivative(Instrument):
     Derivative instrument, derived from financial instrument
     Defined by: 1) an underlying instrument
     """
+    data_df = ManagedPandas()   # Descriptor-based managed attribute
+
     def __init__(self, raw_data_df, underlying, **super_kwargs):
         """
         :param raw_data_df: DataFrame/Series containing reasonably formatted financial data
         :param underlying: underlying Instrument
-        :param super_kwargs: kwargs for passing to superclass init()
+        :param super_kwargs: kwargs for passing to superclass (Instrument) init()
         """
-        super().__init__(raw_data_df, **super_kwargs)
+        super().__init__(raw_data_df, **super_kwargs)   # Note we don't get Levels functionality, but we do get .loc
         self.underlying = underlying
-        self.data_df = None     # Declare for subclasses
-        self.data_cols = None   # Declare for subclasses
-        self.loc = self.data_df.loc     # Allow for native use of DataFrame/Series .loc[] indexing
+        self.data_df = None     # Declare for subclasses; "clean" version of raw_data_df
+        self.data_cols = None   # Declare for subclasses; mapping of standardized financial attributes to data_df's cols
 
     def __getitem__(self, index):
         """ Allow for native use of DataFrame/Series indexing
@@ -275,9 +272,11 @@ class Derivative(Instrument):
             obj_renamed_data_df = other.data_df.rename(obj_to_self_rename_map, axis=1)
             # Merge object's relevant columns into self's, but don't overwrite anything non-NaN
             self.data_df = self.data_df.combine_first(obj_renamed_data_df).sort_index()
-            # Replace self's None cols if merged object had them filled
+            # Replace self's "None cols" if merged object had them filled
+            # NOTE: "None cols" is the concept of an expected data_cols key that doesn't have a mapping yet
             self.data_cols = {**other.data_cols, **self.data_cols}  # Covering other with self
         if isinstance(objs, Iterable):
+            # TODO: this type of logic could be a decorator
             for obj in objs:
                 _single_merge(obj)
         else:
