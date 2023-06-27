@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from collections.abc import Iterable
 
@@ -7,7 +8,8 @@ from universal_tools import construct_timeseries, share_dateindex, \
     BUS_DAYS_IN_MONTH, BUS_DAYS_IN_YEAR, BUS_DAYS_IN_SIX_MONTHS, ONE_DAY, ONE_NANOSECOND
 from utility.gaibo_modules.cboe_exchange_holidays_v3 import datelike_to_timestamp
 
-pd.plotting.register_matplotlib_converters()
+mpl.use('Qt5Agg')   # matplotlib 3.5 changed default backend and PyCharm freezes; revert to avoid problem
+pd.plotting.register_matplotlib_converters()    # Register pandas plotting with matplotlib
 
 
 class ManagedPandas:
@@ -243,8 +245,8 @@ class Derivative(Instrument):
         """
         super().__init__(raw_data_df, **super_kwargs)   # Note we don't get Levels functionality, but we do get .loc
         self.underlying = underlying
-        self.data_df = None     # Declare for subclasses; "clean" version of raw_data_df
-        self.data_cols = None   # Declare for subclasses; mapping of standardized financial attributes to data_df's cols
+        # self.data_df = None     # Declare for subclasses; "clean" version of raw_data_df
+        # self.data_cols = None   # Declare for subclasses; mapping of standard financial attributes to data_df's cols
 
     def __getitem__(self, index):
         """ Allow for native use of DataFrame/Series indexing
@@ -359,6 +361,7 @@ class Futures(Derivative):
         else:
             self.data_cols['trade_date'] = trade_date_col   # Includes dangerous case of None
         self.data_cols = {k: v for k, v in self.data_cols.items() if v is not None}     # Filter out None
+        # TODO: should add tracker to let you know in future which data_cols have not been filled out - flexibility!
         # Drop NaNs, index, and sort raw_data_df
         self.data_df = (self.data_df.dropna(how='all')
                         .set_index([self.data_cols['trade_date'], self.data_cols['maturity_date']])
@@ -433,12 +436,14 @@ class Options(Derivative):
         else:
             self.data_cols['trade_date'] = trade_date_col   # Includes dangerous case of None
         self.data_cols = {k: v for k, v in self.data_cols.items() if v is not None}     # Filter out None
+        # TODO: should add tracker to let you know in future which data_cols have not been filled out - flexibility!
         # Format call-put indicator column
-        cp_ser = self.data_df[self.data_cols['call_put']].copy()
+        cp_ser = self.data_df[self.data_cols['call_put']].copy()    # TODO: needs to be deep copy?
         if cp_ser.dtypes == bool:
             # Convert True to 'C' and False to 'P' for clarity
             self.data_df.loc[cp_ser, self.data_cols['call_put']] = 'C'
             self.data_df.loc[~cp_ser, self.data_cols['call_put']] = 'P'
+        # TODO: do same for all cases of "call" or "put" - basically check for Bool, check for not set of {'C', 'P'}
         # Drop NaNs, index, and sort raw_data_df
         self.data_df = (self.data_df.dropna(how='all')
                         .set_index([self.data_cols['trade_date'], self.data_cols['expiry_date'],
@@ -446,22 +451,19 @@ class Options(Derivative):
                         .sort_index())
 
 
-class VolatilityIndex(Index):
+class VolatilityIndex(Index, Derivative):
     def __init__(self, ts_df, underlying, **super_kwargs):
-        """
+        """ Volatility index, derived from index but also has a loosely associated "underlying"
+            Defined by: 1) an underlying instrument
+            NOTE: we inherit undl_realized_vol() method from Derivative class!
         :param ts_df: time-series DataFrame with time and value
         :param underlying: the underlying instrument whose volatility is being gauged
         :param super_kwargs: kwargs for passing to superclass
         """
-        super().__init__(ts_df, **super_kwargs)
-        self.underlying = underlying
+        super().__init__(ts_df, underlying=underlying, **super_kwargs)  # Regardless of MRO, need to pass underlying
 
-    def undl_realized_vol(self, **kwargs):
-        """ Calculate realized vol for underlying asset (by calling underlying's realized_vol)
-        :return: pd.Series with 'time' and 'value', with ~20 NaNs at beginning
-        """
-        return self.underlying.realized_vol(**kwargs)
-
+    # TODO: maybe alias this as "regime" for more general classes
+    #       should maybe do realized vol regimes too... or does it make more sense for user to create separate object?
     def vol_regime(self, low_threshold=0.1, high_threshold=0.9, window=BUS_DAYS_IN_SIX_MONTHS,
                    time_start=None, time_end=None):
         """ Produce a label of 'high' or 'low' volatility regime for each day
@@ -512,21 +514,19 @@ class VolatilityIndex(Index):
 
 def main():
     # Load example data
-    vix_df = pd.read_csv('../data/vix_ohlc.csv', index_col='Date', parse_dates=True)
-    bbg_data = pd.read_csv('../data/bbg_automated_pull.csv',
-                           index_col=0, parse_dates=True, header=[0, 1])
+    vix_ohlc = pd.read_csv('../data/vix_ohlc.csv', index_col='Date', parse_dates=True)
+    bbg_data = pd.read_csv('../data/bbg_automated_pull.csv', index_col=0, parse_dates=True, header=[0, 1])
 
     # Create objects
     spx = Index(bbg_data[('SPX Index', 'PX_LAST')], name='SPX')
-    vix = VolatilityIndex(vix_df['VIX Close'], spx, name='VIX')
+    vix = VolatilityIndex(vix_ohlc['VIX Close'], spx, name='VIX')
 
-    # Look at implied volatility vs realized volatility
-    start = pd.Timestamp('2015-01-01')
-    end = pd.Timestamp('2018-01-01')
+    # Compare implied volatility (VIX) vs underlying (SPX) realized volatility
+    start, end = pd.Timestamp('2015-01-01'), pd.Timestamp('2018-01-01')
     truncd_vix = vix.price().truncate(start, end)
-    truncd_realized_vol = vix.undl_realized_vol().truncate(start, end) * 100
-    truncd_shifted_realized_vol = vix.undl_realized_vol(do_shift=True).truncate(start, end) * 100
-
+    truncd_realized_vol = vix.undl_realized_vol().truncate(start, end)
+    truncd_shifted_realized_vol = vix.undl_realized_vol(shift_backwards=True).truncate(start, end)
+    # Chart it
     fig, ax = plt.subplots()
     ax.plot(truncd_vix, label='VIX', linewidth=3)
     ax.plot(truncd_realized_vol, label='SPX Realized Vol')
