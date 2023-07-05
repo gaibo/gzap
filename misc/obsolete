@@ -1,3 +1,19 @@
+        else:
+            raise ValueError(f"split_insideoutside must be 'inside' or 'outside', not '{split_insideoutside}'")
+    if prev_leftright == 'right':
+        if split_insideoutside == 'inside':
+            # Put split from left to right
+            pivot_left = left_bound + split_floor_int
+            pivot_right = pivot_left + 1
+        if split_insideoutside == 'outside':
+            # Put split from right to left
+            pivot_right = right_bound - split_floor_int
+            pivot_left = pivot_right - 1
+        else:
+            raise ValueError(f"split_insideoutside must be 'inside' or 'outside', not '{split_insideoutside}'")
+    else:
+        raise ValueError(f"prev_leftright must be 'left' or 'right', not '{prev_leftright}'")
+
             # TODO: oooh I think this is actually wrong - it's not variance (diff from mean), it's diff from 0
             # result = np.sqrt(self.price_return().rolling(window).var(ddof=0)
             #                  * BUS_DAYS_IN_YEAR)
