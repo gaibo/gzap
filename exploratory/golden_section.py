@@ -6,14 +6,14 @@ mpl.use('Qt5Agg')   # matplotlib 3.5 changed default backend and PyCharm freezes
 
 # [MANUAL] CONFIGURATIONS ######################################################
 
-MAX_INTEGER = 1_000_000     # Implicit MIN_INTEGER = 0
+MAX_INTEGER = 1_000     # Implicit MIN_INTEGER = 0
 N_SIMULATIONS = 1_000_000
 
 
 # Generate random numbers for the simulation ###################################
 
 # Constants
-GOLDEN_RATIO = (1 + 5**0.5) / 2     # 1.618...; note that 1/GR == GR-1
+GOLDEN_RATIO = (1 + 5**0.5) / 2     # 1.618...; note that 1/GR == GR-1 == 0.618
 # As of numpy 1.17, Generator is preferable function for doing random numbers
 rng = np.random.default_rng()   # Random float uniformly distributed over [0, 1)
 
@@ -27,8 +27,8 @@ normal_random = rng.normal(mu, sigma, size=N_SIMULATIONS).clip(0, MAX_INTEGER).r
 
 # Visualize integer distributions
 fig, ax = plt.subplots()
-ax.hist(uniform_random, alpha=0.5, label='Uniform Distribution')    # Should look like a rectangle block
-ax.hist(normal_random, alpha=0.5, label='Normal Distribution (with clamping and rounding)')     # Bell curve
+ax.hist(uniform_random, color='C3', alpha=0.5, label='Uniform Distribution')    # Should look like a rectangle block
+ax.hist(normal_random, color='C4', alpha=0.5, label='Normal Distribution (with clamping and rounding)')     # Bell curve
 ax.xaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
 ax.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
 ax.set_xlabel('Random Number from Generator')
@@ -37,6 +37,7 @@ ax.set_title(f"Sanity Check: Here are the numbers we will try to locate via\n"
              f"recursive search algos on range [0, {MAX_INTEGER:,.0f}]")
 ax.legend()
 fig.tight_layout()
+plt.show()  # First figure of script may not show without this
 
 
 # Functions ####################################################################
@@ -151,53 +152,78 @@ normal_golden_outside_cuts = golden_search_outside_apply(normal_random)
 # Table
 means_table = \
     pd.DataFrame({'Binary': [uniform_binary_cuts.mean(), normal_binary_cuts.mean()],
-                  'Golden ("Inside")': [uniform_golden_inside_cuts.mean(), normal_golden_inside_cuts.mean()],
-                  'Golden ("Outside")': [uniform_golden_outside_cuts.mean(), normal_golden_outside_cuts.mean()]},
+                  'Golden (Inside)': [uniform_golden_inside_cuts.mean(), normal_golden_inside_cuts.mean()],
+                  'Golden (Outside)': [uniform_golden_outside_cuts.mean(), normal_golden_outside_cuts.mean()]},
                  index=['Uniform', 'Normal'])
+print(means_table)
 
-# Visualize # splits distributions - histogram
+# Visualize # splits distributions - histogram, control for integer bins
+
+
+def aesthetic_integer_bins(int_arr):
+    """ Generate numpy array of bin boundaries given a numpy array of integers to be binned.
+        This is surprisingly tricky in default np.histogram() because
+        1) final bin is inclusive of final bin boundary rather than exclusive like every other bin right bound
+        2) graphically "centering" bin on the integer involves left and right bounds fractionally around integer
+    :param int_arr: numpy array of integers to be binned
+    :return: numpy array of bin boundaries (usually float, as it includes fractional bounds around integers)
+    """
+    unique_ints = np.unique(int_arr)
+    step = np.min(np.diff(unique_ints))     # Usually 1 when dealing with consecutive integers
+    # From half a step below min to half a step above max, allowing each integer to be "centered"
+    # Note extra step added to right bound because np.arange() excludes rightmost step
+    return np.arange(np.min(unique_ints)-step/2, np.max(unique_ints)+step/2+step, step)
+
+
 # Uniform
 fig, ax = plt.subplots()
-ax.hist(uniform_binary_cuts, alpha=0.5, label='Binary 0.5')
-ax.hist(uniform_golden_inside_cuts, alpha=0.5, label='Golden 0.618 ("Inside")')
-ax.hist(uniform_golden_outside_cuts, alpha=0.5, label='Golden 0.618 ("Outside")')
+ax.hist(uniform_binary_cuts, bins=aesthetic_integer_bins(uniform_binary_cuts), alpha=0.5,
+        label=f"Binary (0.5); Mean {means_table.loc[('Uniform', 'Binary')]:.2f}")
+ax.hist(uniform_golden_inside_cuts, bins=aesthetic_integer_bins(uniform_golden_inside_cuts), alpha=0.5,
+        label=f"Golden (0.618) \"Inside\"; Mean {means_table.loc[('Uniform', 'Golden (Inside)')]:.2f}")
+ax.hist(uniform_golden_outside_cuts, bins=aesthetic_integer_bins(uniform_golden_outside_cuts), alpha=0.5,
+        label=f"Golden (0.618) \"Outside\"; Mean {means_table.loc[('Uniform', 'Golden (Outside)')]:.2f}")
 ax.xaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
 ax.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
 ax.set_xlabel('# of Splits to Arrive at Number')
 ax.set_ylabel('Frequency (# of Occurrences)')
-ax.set_title(f"Results: Uniform Distribution, {N_SIMULATIONS} Samples\n"
+ax.set_title(f"Results: Uniform Distribution, {N_SIMULATIONS:,.0f} Samples\n"
              f"Ratio splits of [0, {MAX_INTEGER:,.0f}] needed to arrive at random number")
 ax.legend()
 fig.tight_layout()
 # Normal
 fig, ax = plt.subplots()
-ax.hist(normal_binary_cuts, alpha=0.5, label='Binary 0.5')
-ax.hist(normal_golden_inside_cuts, alpha=0.5, label='Golden 0.618 ("Inside")')
-ax.hist(normal_golden_outside_cuts, alpha=0.5, label='Golden 0.618 ("Outside")')
+ax.hist(normal_binary_cuts, bins=aesthetic_integer_bins(normal_binary_cuts), alpha=0.5,
+        label=f"Binary (0.5); Mean {means_table.loc[('Normal', 'Binary')]:.2f}")
+ax.hist(normal_golden_inside_cuts, bins=aesthetic_integer_bins(normal_golden_inside_cuts), alpha=0.5,
+        label=f"Golden (0.618) \"Inside\"; Mean {means_table.loc[('Normal', 'Golden (Inside)')]:.2f}")
+ax.hist(normal_golden_outside_cuts, bins=aesthetic_integer_bins(normal_golden_outside_cuts), alpha=0.5,
+        label=f"Golden (0.618) \"Outside\"; Mean {means_table.loc[('Normal', 'Golden (Outside)')]:.2f}")
 ax.xaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
 ax.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
 ax.set_xlabel('# of Splits to Arrive at Number')
 ax.set_ylabel('Frequency (# of Occurrences)')
-ax.set_title(f"Results: Normal Distribution, {N_SIMULATIONS} Samples\n"
+ax.set_title(f"Results: Normal Distribution, {N_SIMULATIONS:,.0f} Samples\n"
              f"Ratio splits of [0, {MAX_INTEGER:,.0f}] needed to arrive at random number")
 ax.legend()
 fig.tight_layout()
 
 # Print statement
 binary_supremacy_uniform = \
-    (means_table.loc[('Uniform', 'Golden ("Outside")')] - means_table.loc[('Uniform', 'Binary')]) \
+    (means_table.loc[('Uniform', 'Golden (Outside)')] - means_table.loc[('Uniform', 'Binary')]) \
     / means_table.loc[('Uniform', 'Binary')]
 binary_supremacy_normal = \
-    (means_table.loc[('Normal', 'Golden ("Outside")')] - means_table.loc[('Normal', 'Binary')]) \
+    (means_table.loc[('Normal', 'Golden (Outside)')] - means_table.loc[('Normal', 'Binary')]) \
     / means_table.loc[('Normal', 'Binary')]
 print(f"Under uniform distribution,\n"
-      f"  binary search is {binary_supremacy_uniform:.2f}% more efficient\n"
-      f"  than Fibonacci search over [0, {MAX_INTEGER}], {N_SIMULATIONS} simulations.")
+      f"  binary search is {binary_supremacy_uniform*100:.2f}% more efficient\n"
+      f"  than Fibonacci search over [0, {MAX_INTEGER:,.0f}], {N_SIMULATIONS:,.0f} simulations.")
 print(f"Under normal distribution,\n"
-      f"  binary search is {binary_supremacy_normal:.2f}% more efficient\n"
-      f"  than Fibonacci search over [0, {MAX_INTEGER}], {N_SIMULATIONS} simulations.")
+      f"  binary search is {binary_supremacy_normal*100:.2f}% more efficient\n"
+      f"  than Fibonacci search over [0, {MAX_INTEGER:,.0f}], {N_SIMULATIONS:,.0f} simulations.")
 
 # It is at this point that I went and actually looked up Golden section search/Fibonacci search.
 # I believe the actual Fibonacci search "intelligently" chooses between "inside" and "outside"
 # at each step, so it is somehow even more complicated than my version at the moment.
 # I will need to check this and fully understand how it works!
+# TODO: I think Fibonacci is actually dumber than that - it's just my thing but without consistent inside/outside

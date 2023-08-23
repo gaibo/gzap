@@ -1,3 +1,22 @@
+def aesthetic_integer_bins(int_arr):
+    unique_ints = np.unique(int_arr)
+    return np.arange(unique_ints.min()-0.5, unique_ints.max()+1, 0.5)   # Go 0.5 below min and 0.5 above max
+
+fig, ax = plt.subplots()
+ax.hist(uniform_binary_cuts, bins=uniform_binary_cuts,alpha=0.5, label=f"Binary (0.5); Mean {means_table.loc[('Uniform', 'Binary')]:.2f}")
+ax.hist(uniform_golden_inside_cuts, alpha=0.5,
+        label=f"Golden (0.618) \"Inside\"; Mean {means_table.loc[('Uniform', 'Golden (Inside)')]:.2f}")
+ax.hist(uniform_golden_outside_cuts, alpha=0.5,
+        label=f"Golden (0.618) \"Outside\"; Mean {means_table.loc[('Uniform', 'Golden (Outside)')]:.2f}")
+ax.xaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
+ax.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
+ax.set_xlabel('# of Splits to Arrive at Number')
+ax.set_ylabel('Frequency (# of Occurrences)')
+ax.set_title(f"Results: Uniform Distribution, {N_SIMULATIONS:,.0f} Samples\n"
+             f"Ratio splits of [0, {MAX_INTEGER:,.0f}] needed to arrive at random number")
+ax.legend()
+fig.tight_layout()
+
 getattr or hasattr
 callable to check if the attribute is function
 
