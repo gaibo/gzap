@@ -16,12 +16,12 @@ coding interview question, only for them to simultaneously recite "0.618" before
 late-2000s American education), I went on some tirade about how binary search is the end-all in any scenario 
 involving search. They suggested I prove it by writing code.
     It was a great idea - I'd knock out a Monte Carlo-type experiment in half an hour and get some coding
-practice. In an hour, I had a result saying binary search was about 4% more efficent than doing the same 
-with "0.618", and by the end of the night I had added in nice documentation and pretty charts. I wouldn't 
-realize until a couple months later - when I revisited the code for a write-up - how nonsensically contextless 
-the "it" was that I proved.
+practice. In an hour, I had a result saying binary search was about 4% more efficent (fewer average "splits") 
+than doing the same with "0.618", and by the end of the night I had added nice documentation and pretty charts. 
+I wouldn't realize until a couple months later - when I revisited the code for a write-up - how nonsensically 
+contextless the "it" was that I proved.
 
-    This function/script/experiment is my attempt to explain my misunderstanding in the way golden-section 
+    This function/script/experiment is my attempt to explain my misunderstanding of the way golden-section 
 search works. Because, well first of all, it's not remotely comparable to binary search. Skipping right over
 the dozens of hours it took me to piece it together: golden-section search makes perfect sense in the context 
 of finding local extrema in functions, a process that requires COMPARING 2 VALUES IN THE SAMPLE to determine
@@ -54,10 +54,12 @@ exist a ratio to split the range where one more taste perfectly maintains the pr
 Yeah so golden ratio is that ratio. The math is pretty straightforward:
 
 a + c = b; a/b = c/(b-c)
-we have particular interest in relative ratio of a/b, so let's name it n, and then let's get rid of c
+let's get rid of c and try to distill a and b into a ratio - it's 3 variables with 2 equations, 
+but we can still get a ratio
 a/b = (b-a)/(b-(b-a))
 a/b = (b-a)/a
 a/b = b/a - 1
+we have particular interest in relative ratio of a/b, so let's name it n
 n + 1 = 1/n     # Remember how 0.618 + 1 = 1/0.618 = 1.618? What a cool property
 n^2 + n - 1 = 0
 quadratic formula: n = (-1 + sqrt(5))/2 = 0.618
@@ -81,14 +83,14 @@ or:
 In a uniform distribution (certainly not accurate for sugar tasting), these range reductions of 0.5 and 0.75
 (750g tasting better or worse) have the same chance, so on average this is a 0.625, which beats trisection
 (0.667) but still loses to golden (0.618). Note also something interesting if we still care about number of
-tastes - you could naturally alternate between "bisection" and "trisection" (the very first example with 333g 
-and 667g) based on whether you wind up left or right. Though these patterns are cool, math generally favors 
-the load balancing solution, i.e. the stable golden ratio.
+tastes - you could naturally alternate between "bisection" and "trisection" (what I'm calling the very first 
+example with 333g and 667g) based on whether you wind up left or right. Though these patterns are cool, math 
+generally favors the load balancing solution, i.e. the stable golden ratio.
 
     Anyway, what does relate golden-section search to binary search is a derivative called Fibonacci search. 
 This is a confusing hack to do something akin to binary search but without division, because computers sucked 
-in the 1950s. It uses the fact that the ratio of a Fibonacci number to the next approaches the golden ratio, 
-and that you can get from one Fib number to another with addition/subtraction.
+in the 1950s. It exploits the fact that the ratio of a Fibonacci number to the next approaches the golden ratio, 
+and that you can get from one Fib number to another with only addition/subtraction.
 Fibonacci numbers: 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987...
 [-------------------------------------------------------------|--------------------------------------]
          89  144       233            377                    610                                    987
@@ -100,21 +102,34 @@ when it goes right:
  -------------------------------------------------------------[-----------------------|---------------]
          89  144       233            377                    610                     *843            987
            55     89           144                233                    233                 144
-It is (perhaps obviously) a "worse" version of binary search that was practical on archaic machines because
-it avoided division and had possible cache or non-uniform storage access efficiencies. Though I didn't code 
-the Fibonacci numbers, this type of "variation on binary search" is what my first hour of code that initial 
-afternoon set out to test!
+It is (perhaps obviously) a "worse" version of binary search that was practical on ancient machines because
+it avoided multiplication/division and had possible cache or non-uniform storage access efficiencies. Though 
+I jumped straight to the golden ratio instead of coding for the Fibonacci numbers, this type of "variation on
+binary search" is what my first hour result that initial afternoon tried to explain. Emphasis on "tried".
 
     Here lay the next major problem with my quick project - I, uh, maybe didn't fully understand binary search. 
 We already had an inkling of that when I revealed it took me hours to understand why golden-section can do 
-extrema while binary can't. Basically I was stuck thinking that binary search just places a target number into 
-a list of numbers... which is kind of true, but NOT ENTIRELY, BECAUSE THAT'S TRIVIAL. Technically, it finds 
-sorted values by narrowing the range of indexes - I didn't even think about array values BEYOND THE INDEXES. 
-    Prior to this, I hadn't really mapped out in my head that x and f(x) in math can correspond to indexes and 
-array values at those indexes, i.e. i and a[i]. This matters because I had coded my Monte Carlo experiment to 
+extrema while binary can't. Specifically, I was stuck thinking that binary search just places a target number
+within a domain... which is kind of true, but NOT ENTIRELY, BECAUSE THAT'S TRIVIAL. Technically, it tries 
+to find a target value among sorted values by narrowing the range of indexes - I didn't even think about 
+distribution of array values BEYOND THE INDEXES; I also didn't code for not finding the value (i.e. I used a 
+questionable break condition), and I overengineered the logic by trying to have two pivots.
+    Prior to this, I hadn't mapped out in my head that x and f(x) in math can correspond to indexes and array 
+values at those indexes, i.e. i and a[i]. This matters because I had written my Monte Carlo experiment to 
 just find target values (drawn from a distribution)... in a linear index between 0 and 1,000,000. Ignoring that 
-that's a trivial task, I hadn't thought about how we can map a second distribution to those a[i] - search 
-is going to have very different when the values mapped to the indexes increase exponentially vs. linearly!
+that's a trivial task, I hadn't thought about how we can and should map a second distribution to that array a[] 
+- search performs very differently when the values mapped to the indexes increase exponentially vs. linearly! 
+
+The new mission statement as I committed to re-writing the code looked something like this:
+1) Fix basic binary search algo to use array instead of just domain; simplify logic and fix break condition
+  - test all the variations of
+    "inserting uniformly distributed targets into sorted values with uniformly distributed frequency"
+               normally                                              normally
+  - consider effect of duplicates and missing values; could minimize "collisions" by making integer range 
+    much larger than array size, but then we get a lot of missing target values, which affects our average 
+    number of splits metric for efficiency
+2) Add functinoality for Fibonacci search - I had all this complicated logic for "inside" and "outside" 
+   (see function for concept explanation) but it couldn't replicate the static 1.618:1 left:right setup
 """
 
 # [MANUAL] CONFIGURATIONS ######################################################
