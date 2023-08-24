@@ -1,3 +1,37 @@
+# Complicated cases describing how someone might use a ratio split in relation to "center" of range
+    split_size_floor = int(split * (right_bound - left_bound))  # Account for possibility of non-int via 2 pivots later
+    if ((split_insideoutside == 'inside' and prev_leftright == 'right')
+            or (split_insideoutside == 'outside' and prev_leftright == 'left')):
+        # Put split from left to right - e.g. split=0.7 -> [-------|---]
+        pivot_left = left_bound + split_size_floor
+        pivot_right = pivot_left + 1    # Next int
+    elif ((split_insideoutside == 'inside' and prev_leftright == 'left')
+            or (split_insideoutside == 'outside' and prev_leftright == 'right')):
+        # Put split from right to left - e.g. split=0.7 -> [---|-------]
+        pivot_right = right_bound - split_size_floor
+        pivot_left = pivot_right - 1    # Previous int
+    else:
+        raise ValueError(f"IMPOSSIBLE: ratio split case ('{split_insideoutside}', '{prev_leftright}')")
+
+    # Split towards number's appropriate bounds
+    if verbose:
+        print(f"Evaluation {completed_sections+1}:")
+        print(f"[{left_bound}, {pivot_left}] | [{pivot_right}, {right_bound}]")
+    if number <= pivot_left:
+        if verbose:
+            print(f"Went LEFT!")
+        return _section_search(number, left_bound, pivot_left, split, split_insideoutside,
+                               'left', completed_sections+1, verbose)
+    elif number >= pivot_right:
+        if verbose:
+            print(f"Went RIGHT!")
+        return _section_search(number, pivot_right, right_bound, split, split_insideoutside,
+                               'right', completed_sections+1, verbose)
+    else:
+        raise ValueError(f"IMPOSSIBLE: number ({number}) could not split using "
+                         f"the 2 integer pivots: ...{pivot_left}][{pivot_right}...")
+
+
         else:
             raise ValueError(f"split_insideoutside must be 'inside' or 'outside', not '{split_insideoutside}'")
     if prev_leftright == 'right':
