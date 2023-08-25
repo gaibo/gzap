@@ -172,8 +172,7 @@ plt.show()  # First figure of script may not show without this
 
 # Functions ####################################################################
 
-def _section_search(number, left_bound, right_bound, split=0.5, use_insideoutside=False, split_insideoutside='inside',
-                    prev_leftright='right', completed_sections=0, verbose=False):
+def section_search(target, sorted_arr, split=0.5, use_insideoutside=False, split_insideoutside='inside', verbose=True):
     """ Generalization of integer binary search such that the split (0.5 for binary) may be changed.
         This becomes somewhat convoluted as it introduces asymmetry - do you want the 0.7 split on left or right?
         (Fibonacci search for example, for Fibonacci sequence math reasons, keeps ~0.618 split on left side always.)
@@ -197,71 +196,89 @@ def _section_search(number, left_bound, right_bound, split=0.5, use_insideoutsid
                 Normal             19.948935              20.987887               20.528782
                 Note inside/outside perform the exact same on a uniform distribution, as you would expect!
                 On uniform, golden-section search (0.618) is about 3.8% worse here than binary search (0.5).
-    :param number: the integer to search for (within the bounds)
-    :param left_bound: smaller integer boundary
-    :param right_bound: larger integer boundary
+    :param target: the integer value to search for (within the array)
+    :param sorted_arr: pre-sorted array of integer values
     :param split: fractional split of bounds; set 0.5 for binary search
+    :param use_insideoutside: set True to use my persistent "inside/outside" split system
     :param split_insideoutside: "inside/outside" split concept defined in description above
-    :param prev_leftright: state used during recursion - "previous left/right" concept defined in description above
-    :param completed_sections: state used during recursion - how many splits have already been done on initial range
     :param verbose: set True for print statements describing splits
-    :return: integer number of splits needed to arrive at number within [left_bound, right_bound]
+    :return: integer number of comparisons (think splits) needed to arrive at target within sorted array
+             or None if target is not found within array
     """
-    assert left_bound <= number <= right_bound
     assert 0 < split < 1
     assert split_insideoutside in ['inside', 'outside']
-    assert prev_leftright in ['left', 'right']
 
-    # Recursion break condition - in theory, you should never need to check whether left and right bounds equal
-    # if you check will always reach
-    if number == left_bound or number == right_bound:
-        return completed_sections
+    # Initialize
+    i_left = 0  # Left lower bound index
+    i_right = len(sorted_arr) - 1   # Right upper bound index
+    completed_comparisons = 0
+    prev_leftright = 'right'    # Arbitrarily intialized; note difference it makes when switching inside/outside
 
-    # Complicated cases describing how someone might use a ratio split in relation to "center" of range
-    split_size_floor = int(split * (right_bound - left_bound))  # Account for possibility of non-int via 2 pivots later
-    if ((split_insideoutside == 'inside' and prev_leftright == 'right')
-            or (split_insideoutside == 'outside' and prev_leftright == 'left')):
-        # Put split from left to right - e.g. split=0.7 -> [-------|---]
-        pivot_left = left_bound + split_size_floor
-        pivot_right = pivot_left + 1    # Next int
-    elif ((split_insideoutside == 'inside' and prev_leftright == 'left')
-            or (split_insideoutside == 'outside' and prev_leftright == 'right')):
-        # Put split from right to left - e.g. split=0.7 -> [---|-------]
-        pivot_right = right_bound - split_size_floor
-        pivot_left = pivot_right - 1    # Previous int
-    else:
-        raise ValueError(f"IMPOSSIBLE: ratio split case ('{split_insideoutside}', '{prev_leftright}')")
+    # Perform binary search until failure condition: boundary indexes overlap
+    while i_left <= i_right:
+        split_size_floor = int(split * (i_right - i_left))  # "floor" because left/right confusing later
 
-    # Split towards number's appropriate bounds
+        # Complicated cases describing how someone might use a ratio split in relation to "center" of range
+        if (use_insideoutside is False
+                or (split_insideoutside == 'inside' and prev_leftright == 'right')
+                or (split_insideoutside == 'outside' and prev_leftright == 'left')):
+            # Put split from left to right - e.g. split=0.7 -> [-------|---]
+            i_mid = i_left + split_size_floor     # int in [i_left, i_right-1]
+        elif ((split_insideoutside == 'inside' and prev_leftright == 'left')
+              or (split_insideoutside == 'outside' and prev_leftright == 'right')):
+            # Put split from right to left - e.g. split=0.7 -> [---|-------]
+            i_mid = i_right - split_size_floor    # int in [i_left+1, i_right]
+        else:
+            raise ValueError(f"IMPOSSIBLE: ratio split case ('{split_insideoutside}', '{prev_leftright}')")
+
+        # Split towards target's appropriate bounds
+        left_bound = sorted_arr[i_left]
+        right_bound = sorted_arr[i_right]
+        pivot = sorted_arr[i_mid]
+        completed_comparisons += 1  # Not done yet, but want this ahead of verbose
+        if verbose:
+            print(f"Evaluation {completed_comparisons}: target {target}")
+            print(f"\tindexes: [{i_left}, {i_mid}] | [{i_mid}, {i_right}]")
+            print(f"\tvalues:  [{left_bound}, {pivot}] | [{pivot}, {right_bound}]")
+        if target < pivot:
+            if verbose:
+                print(f"Went LEFT!")
+            i_right = i_mid - 1     # May now violate i_right > i_left!
+            prev_leftright = 'left'
+        elif target > pivot:
+            if verbose:
+                print(f"Went RIGHT!")
+            i_left = i_mid + 1  # May now violate i_left < i_right!
+            prev_leftright = 'right'
+        else:
+            if verbose:
+                print(f"****FOUND {pivot} at index {i_mid} after {completed_comparisons} comparisons!")
+            return completed_comparisons
+
+    # Unsuccessful at finding target in sorted_arr
     if verbose:
-        print(f"Evaluation {completed_sections+1}:")
-        print(f"[{left_bound}, {pivot_left}] | [{pivot_right}, {right_bound}]")
-    if number <= pivot_left:
-        if verbose:
-            print(f"Went LEFT!")
-        return _section_search(number, left_bound, pivot_left, split, split_insideoutside,
-                               'left', completed_sections+1, verbose)
-    elif number >= pivot_right:
-        if verbose:
-            print(f"Went RIGHT!")
-        return _section_search(number, pivot_right, right_bound, split, split_insideoutside,
-                               'right', completed_sections+1, verbose)
-    else:
-        raise ValueError(f"IMPOSSIBLE: number ({number}) could not split using "
-                         f"the 2 integer pivots: ...{pivot_left}][{pivot_right}...")
+        print(f"****UNFOUND {target} after {completed_comparisons} comparisons!")
+    return None
 
 
-def binary_search(number, left_bound, right_bound, verbose=False):
-    return _section_search(number, left_bound, right_bound, 0.5, 'inside', 'right', 0, verbose)
+def binary_search(target, sorted_arr, verbose=False):
+    return section_search(target, sorted_arr, 0.5, use_insideoutside=False, verbose=verbose)
 
 
-def golden_section_search_inside(number, left_bound, right_bound, verbose=False):
-    return _section_search(number, left_bound, right_bound, 1/GOLDEN_RATIO, 'inside', 'right', 0, verbose)
+def fibonacci_search(target, sorted_arr, verbose=False):
+    # Not strictly Fibonacci search because I skip straight to golden ratio...
+    # Note that default use_insideoutside=False puts split on the left, as desired
+    return section_search(target, sorted_arr, split=1/GOLDEN_RATIO, use_insideoutside=False, verbose=verbose)
 
 
-def golden_section_search_outside(number, left_bound, right_bound, verbose=False):
-    # Note I choose "outside", "left" so (only) first split matches that of golden_section_search_inside()
-    return _section_search(number, left_bound, right_bound, 1/GOLDEN_RATIO, 'outside', 'left', 0, verbose)
+def golden_section_search_inside(target, sorted_arr, verbose=False):
+    return section_search(target, sorted_arr, split=1/GOLDEN_RATIO, use_insideoutside=True,
+                          split_insideoutside='inside', verbose=verbose)
+
+
+def golden_section_search_outside(target, sorted_arr, verbose=False):
+    return section_search(target, sorted_arr, split=1/GOLDEN_RATIO, use_insideoutside=True,
+                          split_insideoutside='outside', verbose=verbose)
 
 
 # Run the simulations ##########################################################

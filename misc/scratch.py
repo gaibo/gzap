@@ -1,3 +1,82 @@
+def _section_search(target, sorted_arr, split=0.5, use_insideoutside=False,
+                    split_insideoutside='inside', verbose=False):
+    """ Generalization of integer binary search such that the split (0.5 for binary) may be changed.
+        This becomes somewhat convoluted as it introduces asymmetry - do you want the 0.7 split on left or right?
+        (Fibonacci search for example, for Fibonacci sequence math reasons, keeps ~0.618 split on left side always.)
+        My answer is to introduce concept of always keeping split fraction "inside" or "outside", which requires
+        storing state on whether the previous split sent you "left" or "right". e.g.,
+
+        [----------] (10 difference between bounds), split=0.7; initial inside/outside N/A, previous left/right N/A
+        Split 1 - arbitrary because no state; let it be "inside", as if previous "right": [-------|---]
+        Split 2a - inside, previous left:  [--|-----]
+        Split 2b - inside, previous right:          [--|-]
+        Split 2c - outside, previous left: [-----|--]
+        Split 2d - outside, previous right:         [-|--]
+
+        I'm imagining "inside" vs. "outside" as a way someone would try to bias splits
+        to benefit in certain distributions - if you know numbers near the center of the
+        bounds are more common, could you get there faster by playing with this parameter?
+        Answer: Empirically, a split >0.5 does better on normal distribution with "outside" vs. "inside", but both
+                are significantly worse than just binary search. e.g., on a million random numbers [0, 1,000,000],
+                Mean # of Splits  Binary 0.5  Golden 0.618 (Inside)  Golden 0.618 (Outside)
+                Uniform            19.951814              20.701467               20.701008
+                Normal             19.948935              20.987887               20.528782
+                Note inside/outside perform the exact same on a uniform distribution, as you would expect!
+                On uniform, golden-section search (0.618) is about 3.8% worse here than binary search (0.5).
+    :param number: the integer to search for (within the bounds)
+    :param left_bound: smaller integer boundary
+    :param right_bound: larger integer boundary
+    :param split: fractional split of bounds; set 0.5 for binary search
+    :param split_insideoutside: "inside/outside" split concept defined in description above
+    :param prev_leftright: state used during recursion - "previous left/right" concept defined in description above
+    :param completed_sections: state used during recursion - how many splits have already been done on initial range
+    :param verbose: set True for print statements describing splits
+    :return: integer number of splits needed to arrive at number within [left_bound, right_bound]
+    """
+    assert left_bound <= number <= right_bound
+    assert 0 < split < 1
+    assert split_insideoutside in ['inside', 'outside']
+    assert prev_leftright in ['left', 'right']
+
+    # Recursion break condition - in theory, you should never need to check whether left and right bounds equal
+    # if you check will always reach
+    if number == left_bound or number == right_bound:
+        return completed_sections
+
+    # Complicated cases describing how someone might use a ratio split in relation to "center" of range
+    split_size_floor = int(split * (right_bound - left_bound))  # Account for possibility of non-int via 2 pivots later
+    if ((split_insideoutside == 'inside' and prev_leftright == 'right')
+            or (split_insideoutside == 'outside' and prev_leftright == 'left')):
+        # Put split from left to right - e.g. split=0.7 -> [-------|---]
+        pivot_left = left_bound + split_size_floor
+        pivot_right = pivot_left + 1    # Next int
+    elif ((split_insideoutside == 'inside' and prev_leftright == 'left')
+            or (split_insideoutside == 'outside' and prev_leftright == 'right')):
+        # Put split from right to left - e.g. split=0.7 -> [---|-------]
+        pivot_right = right_bound - split_size_floor
+        pivot_left = pivot_right - 1    # Previous int
+    else:
+        raise ValueError(f"IMPOSSIBLE: ratio split case ('{split_insideoutside}', '{prev_leftright}')")
+
+    # Split towards number's appropriate bounds
+    if verbose:
+        print(f"Evaluation {completed_sections+1}:")
+        print(f"[{left_bound}, {pivot_left}] | [{pivot_right}, {right_bound}]")
+    if number <= pivot_left:
+        if verbose:
+            print(f"Went LEFT!")
+        return _section_search(number, left_bound, pivot_left, split, split_insideoutside,
+                               'left', completed_sections+1, verbose)
+    elif number >= pivot_right:
+        if verbose:
+            print(f"Went RIGHT!")
+        return _section_search(number, pivot_right, right_bound, split, split_insideoutside,
+                               'right', completed_sections+1, verbose)
+    else:
+        raise ValueError(f"IMPOSSIBLE: number ({number}) could not split using "
+                         f"the 2 integer pivots: ...{pivot_left}][{pivot_right}...")
+
+
 # Simplified way to get email attachment
 # Specify mail server
 conn = imaplib.IMAP4_SSL("outlook.office365.com")
