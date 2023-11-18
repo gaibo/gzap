@@ -1,7 +1,8 @@
 from requests_html import HTMLSession
 import pandas as pd
-import time
 import random
+from threading import Event
+from signal import SIGTERM, SIGINT, SIGBREAK, signal
 
 if __name__ == '__main__':
     # Prompt for user input
@@ -11,8 +12,10 @@ if __name__ == '__main__':
               "...>> ")
     if raw_input == '':
         NIKE_LINK = "https://www.nike.com/t/air-max-90-se-mens-shoes-sXJXK0/DV2614-100"     # Air Max 90 "Moving Co"
+        print(f"Querying default (Air Max 90 \"Moving Company\" - {NIKE_LINK}), please wait...")
     else:
         NIKE_LINK = raw_input
+        print("Querying above link, please wait...")
 
     # Create requests_html session
     # TODO: I prefer the "going down, going up, going sideways" recursive tree flexibility of BeautifulSoup;
@@ -22,13 +25,21 @@ if __name__ == '__main__':
     COLLECTION_DATAFRAME = pd.DataFrame()   # Initialize storage DF
 
     # Repeatedly scrape Nike for sizes
-    while True:
+    FINISH_SCRAPING = Event()     # Set up interrupting event to end infinite loop
+
+    def finish_handler(signum, _frame):
+        print(f"Interrupted by {signum}; finishing scraping...")
+        FINISH_SCRAPING.set()
+
+    signal(SIGTERM, finish_handler)
+    signal(SIGINT, finish_handler)
+    signal(SIGBREAK, finish_handler)
+    while not FINISH_SCRAPING.is_set():
         # Send request, get response
         nike_response = session.get(NIKE_LINK)
         # Render Nike's extremely complicated JavaScript
         # NOTE: stock cannot be ascertained without rendering JavaScript
-        # TODO: make render retry like 5 times with lower timeout, because this is really unstable
-        nike_response.html.render(timeout=20)    # Nike takes between default 8 and 15 seconds
+        nike_response.html.render(retries=8, wait=3, scrolldown=3, timeout=30)  # Very finicky
         curr_time = pd.Timestamp('now')     # Time of rendering, i.e. when site "loads"
 
         # Find shoe's "select sizes" section and check which sizes are out-of-stock
@@ -58,7 +69,9 @@ if __name__ == '__main__':
         COLLECTION_DATAFRAME.loc[curr_time, in_stock] = True
         print(COLLECTION_DATAFRAME, end='\n\n')
 
-        # Sleep for approximately 4 hours (+- 15 minute "human error" range)
-        # TODO: sleep does not play well with PyCharm's console's response to Ctrl+C; either way, I'd like to
-        #       do cleanup and retain the DataFrame. I'll rewrite this using threading
-        time.sleep(4*60*60 + random.uniform(-15*60, 15*60))
+        # Wait for approximately 4 hours (+- 15 minute "human error" range)
+        FINISH_SCRAPING.wait(4*60*60 + random.uniform(-15*60, 15*60))
+
+    # Cleanup
+    print("Closing HTMLSession...")
+    session.close()
