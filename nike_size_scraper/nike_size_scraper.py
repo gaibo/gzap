@@ -27,21 +27,28 @@ if __name__ == '__main__':
     pd.options.display.expand_frame_repr = False
 
     # Repeatedly scrape Nike for sizes
-    FINISH_SCRAPING = Event()     # Set up interrupting event to end infinite loop
+    FINISH_SCRAPING = Event()   # Set up interrupting event to end infinite loop; NOTE: doesn't work on Windows...
 
     def finish_handler(signum, _frame):
-        print(f"Interrupted by {signum}; finishing scraping...")
+        print(f"Interrupted by {signum}; finishing scrape...")
         FINISH_SCRAPING.set()
 
     signal(SIGTERM, finish_handler)
     signal(SIGINT, finish_handler)
+    FIRST_TIME_THROUGH = True   # Print human-readable shoe info, only once
     while not FINISH_SCRAPING.is_set():
         # Send request, get response
         nike_response = session.get(NIKE_LINK)
         # Render Nike's extremely complicated JavaScript (this is the time-intensive part)
         # NOTE: stock cannot be ascertained without rendering JavaScript
         nike_response.html.render(retries=8, wait=3, scrolldown=3, timeout=30)  # Very finicky, maybe anti-bot
-        curr_time = pd.Timestamp('now')     # Time of rendering, i.e. when site "loads"
+        curr_time = pd.Timestamp('now')     # Time of rendering, i.e. when site "loads
+        if FIRST_TIME_THROUGH:
+            # Print human-readable shoe info, only once
+            title = nike_response.html.find("h1#pdp_product_title")[0].text
+            color_desc = nike_response.html.find("div ul li.description-preview__color-description.ncss-li")[0].text
+            print(f"Product found: {title}, \"{color_desc.replace('Shown: ', '')}\"")
+            FIRST_TIME_THROUGH = False
 
         # Find product's sizes and check which sizes are disabled/enabled
         # NOTE: these CSS selectors are tailored from inspecting Nike in browser;
@@ -74,7 +81,7 @@ if __name__ == '__main__':
             if not diff.empty:
                 print("\nALERT! Sizing stock change:")
                 if (diff == 0).any():
-                    print(f"\tOut of stock: {list(diff[diff == 0].index)}")
+                    print(f"\tOut of stock: {list(diff[diff == 0].index)}\n")
                 if (diff == "In-Stock").any():
                     print(f'\tIn stock: {list(diff[diff == "In-Stock"].index)}\n')
         # TODO: ask for email, ask for desired size(s), send email?
