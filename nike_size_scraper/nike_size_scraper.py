@@ -2,7 +2,7 @@ from requests_html import HTMLSession
 import pandas as pd
 import random
 from threading import Event
-from signal import SIGTERM, SIGINT, SIGBREAK, signal
+from signal import SIGTERM, SIGINT, signal
 
 if __name__ == '__main__':
     # Prompt for user input
@@ -11,7 +11,7 @@ if __name__ == '__main__':
               "     - Press <Enter> to start with a default example\n"
               "...>> ")
     if raw_input == '':
-        NIKE_LINK = "https://www.nike.com/t/air-trainer-1-mens-shoes-0vx2ft/DM0521-100"     # Air Trainer Chlorophyll
+        NIKE_LINK = "https://www.nike.com/t/air-trainer-1-mens-shoes-0vx2ft/DM0521-100"     # Air Trainer "Chlorophyll"
         # NIKE_LINK = "https://www.nike.com/t/air-max-90-se-mens-shoes-sXJXK0/DV2614-100"     # Air Max 90 "Moving Co"
         print(f"Querying default (Air Trainer 1 \"Chlorophyll\" - {NIKE_LINK}), please wait...")
     else:
@@ -24,6 +24,7 @@ if __name__ == '__main__':
     #       may rewrite this at some point with Selenium+BS instead
     session = HTMLSession()
     COLLECTION_DATAFRAME = pd.DataFrame()   # Initialize storage DF
+    pd.options.display.expand_frame_repr = False
 
     # Repeatedly scrape Nike for sizes
     FINISH_SCRAPING = Event()     # Set up interrupting event to end infinite loop
@@ -34,7 +35,6 @@ if __name__ == '__main__':
 
     signal(SIGTERM, finish_handler)
     signal(SIGINT, finish_handler)
-    signal(SIGBREAK, finish_handler)    # Windows-specific
     while not FINISH_SCRAPING.is_set():
         # Send request, get response
         nike_response = session.get(NIKE_LINK)
