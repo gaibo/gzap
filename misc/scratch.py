@@ -1,3 +1,29 @@
+fuzzy_slot_specific = mod_path.glob(f'**/*0{mod_slot}*')  # Might latch onto _001.nutexb, which we don't want
+
+# From StackOverflow user Ferdinand Beyer - iterable wrapper to indicate when we have last value
+# Be careful though - the wrapped iterable will be "spent" after one use, so get your code right!
+def lookahead(iterable):
+    """Pass through all values from the given iterable, augmented by the
+    information if there are more values to come after the current one
+    (True), or if it is the last value (False).
+    """
+    # Get an iterator and pull the first value.
+    it = iter(iterable)
+    last = next(it)
+    # Run the iterator to exhaustion (starting from the second value).
+    for val in it:
+        # Report the *previous* value (more to come).
+        yield last, True
+        last = val
+    # Report the last value.
+    yield last, False
+
+fdsa = [1, 2, 3, 4]
+for v, theres_more in lookahead(fdsa):
+    if not theres_more:
+        print(v)
+# Should print just 4
+
 def _section_search(target, sorted_arr, split=0.5, use_insideoutside=False,
                     split_insideoutside='inside', verbose=False):
     """ Generalization of integer binary search such that the split (0.5 for binary) may be changed.

@@ -1,3 +1,5 @@
+pyinstaller --onefile --icon icon\nike_white.ico nike_size_scraper.py
+
 def aesthetic_integer_bins(int_arr):
     unique_ints = np.unique(int_arr)
     return np.arange(unique_ints.min()-0.5, unique_ints.max()+1, 0.5)   # Go 0.5 below min and 0.5 above max

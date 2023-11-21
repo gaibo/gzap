@@ -1,3 +1,69 @@
+        try:
+            out_of_stock = [float(s.attrs['value'].split(':')[-1]) for s in disabled_sizes]     # Try convert '9' to 9
+            in_stock = [float(s.attrs['value'].split(':')[-1]) for s in enabled_sizes]
+            if COLLECTION_DATAFRAME.empty:
+                # Re-initialize column order with sorted numeric sizes
+                COLLECTION_DATAFRAME = pd.DataFrame(columns=sorted(out_of_stock + in_stock))
+        except ValueError:
+            out_of_stock = [s.attrs['value'].split(':')[-1] for s in disabled_sizes]    # Keep 'M' as string
+            in_stock = [s.attrs['value'].split(':')[-1] for s in enabled_sizes]
+            if COLLECTION_DATAFRAME.empty:
+                # Re-initialize hard-coded column order to non-numeric sizes (may include non-existent sizes)
+                COLLECTION_DATAFRAME = pd.DataFrame(columns=['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'])
+
+        select_sizes_section_search = nike_response.html.find("div.mt2-sm.css-hzulvp")
+        select_sizes_section = select_sizes_section_search[0]
+        disabled_sizes = select_sizes_section.find(":disabled")
+        enabled_sizes = select_sizes_section.find(":enabled")
+
+nike_response = requests.get(NIKE_LINK)
+nike_soup = BeautifulSoup(nike_response.text, features='lxml')
+
+        with open(readable_param_patch_msg_name[0], 'rb') as msg_name:
+            msg_name_data = xmltodict.parse(f)
+
+def collect_keylist_valuelist(nested_dict : dict,
+                              keylist: List = None, valuelist: List = None) -> Tuple[List[Any], List[Any]]:
+    """ Return list of all nested dictionary keys and list of all dictionary values after walking it
+        NOTE: this is meant to parallel "walking" file structure directories; see collect_dirlist_filelist()
+        NOTE: while collect_dirlist_filelist() does not need to worry about
+    :param nested_dict: Python dictionary
+    :param keylist: used to pass state during recursion; set None if using with root (outermost) dict!
+    :param valuelist: used to pass state during recursion; set None if using with root (outermost) dict!
+    :return: (list of keys, list of values)
+    """
+    # Wait, we need to worry about duplicate keys; outputted list with directories because no duplicate
+    if keylist is None:
+        keylist = []
+    if valuelist is None:
+        valuelist = []
+    for key, value in nested_dict.items():
+        keylist.append(key)
+
+
+# And we could brute force and search for other stuff cycling through the other slots lmao
+    # Alternatively, we actually look for each folder in our "known" list
+    # Print (aesthetically) the discovered list
+    # Verify that source slot number is in each; print otherwise
+    # Should be able to pipe to debug: result should raise error or None on failing to detect slot (can't even start),
+    # otherwise return True for no issues, False for issues, either way print messages (we can redirect prints)
+
+    # We're gonna do a DFS basically; recursive, so each step needs to be progress the work
+    # Rules of printing:
+    #   - assume you are a directory and your name is already printed (root node will be done by wrapper)
+    #   - sort your children - directories first, files second, alphabetical (maybe by suffix??)
+    #   - print children by sorted order, recursing on directories
+
+mod_name_slot_match_context = mod_name_slot_first_match.group(0)  # e.g. 'c03' or 'C06'
+
+# This is a Frankenstein code example (from StackOverflow) for using ABCs to do generic types
+# It is easily much clearer to do this with Protocols rather than ABCs!
+# Though it goes from "TypeError instantiating an abstract method on creation" to "static type checker error"
+class Comparable(metaclass=ABCMeta):
+    @abstractmethod
+    def __lt__(self, other: Any) -> bool: ...
+CT = TypeVar('CT', bound=Comparable)    # Generic type where comparisons are possible! (All you need is <)
+
 # Complicated cases describing how someone might use a ratio split in relation to "center" of range
     split_size_floor = int(split * (right_bound - left_bound))  # Account for possibility of non-int via 2 pivots later
     if ((split_insideoutside == 'inside' and prev_leftright == 'right')
