@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from typing import Sequence, Any, TypeVar, Protocol, Optional
 mpl.use('Qt5Agg')   # matplotlib 3.5 changed default backend and PyCharm freezes; revert to avoid problem
 
 # Explanation ##################################################################
@@ -21,7 +22,7 @@ than doing the same with "0.618", and by the end of the night I had added nice d
 I wouldn't realize until a couple months later - when I revisited the code for a write-up - how nonsensically 
 contextless the "it" was that I proved.
 
-    This function/script/experiment is my attempt to explain my misunderstanding of the way golden-section 
+    This function/script/experiment must now attempt to explain my misunderstanding in the way golden-section 
 search works. Because, well first of all, it's not remotely comparable to binary search. Skipping right over
 the dozens of hours it took me to piece it together: golden-section search makes perfect sense in the context 
 of finding local extrema in functions, a process that requires COMPARING 2 VALUES IN THE SAMPLE to determine
@@ -29,7 +30,7 @@ which section to recursively search next. That is virtually unrelated to binary 
 IN HAND to compare to values in a SORTED sample.
 
     Think of golden-section search as trying to figure out the number of grams of sugar that tastes best in
-a vat of iced tea (and, uh, assume your taste buds don't tell you any first derivative info like whether 
+a vat of iced tea (and, uh, assume your taste buds don't tell you any first derivative info i.e. whether 
 you'd like it sweeter at a given level... actually this is a terrible example but whatever, just assume you 
 can only compare relative taste levels): you're pretty sure 0g is too bitter, and 1000g is too sweet. You 
 might naturally say to sample at 500g - but then all you find out is it tastes way better than 0g and 1000g; 
@@ -102,26 +103,30 @@ when it goes right:
  -------------------------------------------------------------[-----------------------|---------------]
          89  144       233            377                    610                     *843            987
            55     89           144                233                    233                 144
-It is (perhaps obviously) a "worse" version of binary search that was practical on ancient machines because
-it avoided multiplication/division and had possible cache or non-uniform storage access efficiencies. Though 
-I jumped straight to the golden ratio instead of coding for the Fibonacci numbers, this type of "variation on
-binary search" is what my first hour result that initial afternoon tried to explain. Emphasis on "tried".
+note that 843 is NOT a Fib number! But it must be this way when we split the right subsection into Fibonacci 
+intervals; visually you can see how if we always went left, we'd stay exclusively with actual Fib numbers. 
+Fibonacci search is (perhaps obviously) a "worse" version of binary search that was practical on ancient machines 
+because it avoided multiplication/division and had possible cache or non-uniform storage access efficiencies. 
+Though I jumped straight to the golden ratio instead of coding for the Fibonacci numbers, this type of "variation 
+on binary search" is what my first hour result that initial afternoon tried to explain. Emphasis on "tried" - 
+it took a whole lot of sitting and thinking afterwards to put it in context. 
 
     Here lay the next major problem with my quick project - I, uh, maybe didn't fully understand binary search. 
 We already had an inkling of that when I revealed it took me hours to understand why golden-section can do 
-extrema while binary can't. Specifically, I was stuck thinking that binary search just places a target number
-within a domain... which is kind of true, but NOT ENTIRELY, BECAUSE THAT'S TRIVIAL. Technically, it tries 
-to find a target value among sorted values by narrowing the range of indexes - I didn't even think about 
+extrema while binary can't. Specifically, I was stuck visualizing binary search as placing a target number 
+into a continuous number line... which is a sub-case, but A TRIVIAL ONE (you know the number!). Technically, 
+it tries to find a target value among sorted values by narrowing the range of INDEXES - I didn't even think about 
 distribution of array values BEYOND THE INDEXES; I also didn't code for not finding the value (i.e. I used a 
-questionable break condition), and I overengineered the logic by trying to have two pivots.
-    Prior to this, I hadn't mapped out in my head that x and f(x) in math can correspond to indexes and array 
+questionable break condition), and I overengineered the logic by trying to have two integer halfway marks.
+    Prior to this project, I hadn't mapped in my head that x and f(x) in math can correspond to indexes and array 
 values at those indexes, i.e. i and a[i]. This matters because I had written my Monte Carlo experiment to 
-just find target values (drawn from a distribution)... in a linear index between 0 and 1,000,000. Ignoring that 
-that's a trivial task, I hadn't thought about how we can and should map a second distribution to that array a[] 
-- search performs very differently when the values mapped to the indexes increase exponentially vs. linearly! 
+just find target values (to my credit, drawn from a distribution)... in a linear index between 0 and 1,000,000. 
+Ignoring that that's a trivial task, I hadn't thought about how we can and should map a second distribution to 
+that array a[] - search performs very differently when the values mapped to the indexes increase exponentially 
+vs. linearly, etc.! 
 
 The new mission statement as I committed to re-writing the code looked something like this:
-1) Fix basic binary search algo to use array instead of just domain; simplify logic and fix break condition
+1) Fix basic binary search algo to use array instead of just domain; simplify algo logic and fix break condition
   - test all the variations of
     "inserting uniformly distributed targets into sorted values with uniformly distributed frequency"
                normally                                              normally
@@ -172,8 +177,17 @@ plt.show()  # First figure of script may not show without this
 
 # Functions ####################################################################
 
-def section_search(target, sorted_arr, split=0.5, use_insideoutside=False, split_insideoutside='inside', verbose=True):
-    """ Generalization of integer binary search such that the split (0.5 for binary) may be changed.
+# NOTE: This is me trying to practice Python type-hinting and generic types...
+class SupportsLT(Protocol):
+    def __lt__(self, __other: Any, /) -> bool: ...  # Double underscore for positional-only arg
+
+
+CT = TypeVar('CT', bound=SupportsLT)    # "Comparable" generic type! (in Python 3 implementations all you need is <)
+
+
+def section_search(target: CT, sorted_arr: Sequence[CT], split: float = 0.5, use_insideoutside: bool = False,
+                   split_insideoutside: str = 'inside', verbose: bool = True) -> Optional[int]:
+    """ Generalization of binary search such that the split (0.5 for binary) may be changed.
         This becomes somewhat convoluted as it introduces asymmetry - do you want the 0.7 split on left or right?
         (Fibonacci search for example, for Fibonacci sequence math reasons, keeps ~0.618 split on left side always.)
         My answer is to introduce concept of always keeping split fraction "inside" or "outside", which requires
@@ -195,9 +209,9 @@ def section_search(target, sorted_arr, split=0.5, use_insideoutside=False, split
                 Uniform            19.951814              20.701467               20.701008
                 Normal             19.948935              20.987887               20.528782
                 Note inside/outside perform the exact same on a uniform distribution, as you would expect!
-                On uniform, golden-section search (0.618) is about 3.8% worse here than binary search (0.5).
-    :param target: the integer value to search for (within the array)
-    :param sorted_arr: pre-sorted array of integer values
+                On uniform, Fibonacci search (0.618) is about 3.8% worse here than binary search (0.5).
+    :param target: (comparable) value to search for (within the array)
+    :param sorted_arr: pre-sorted array of (indexable, comparable) values
     :param split: fractional split of bounds; set 0.5 for binary search
     :param use_insideoutside: set True to use my persistent "inside/outside" split system
     :param split_insideoutside: "inside/outside" split concept defined in description above
@@ -209,12 +223,12 @@ def section_search(target, sorted_arr, split=0.5, use_insideoutside=False, split
     assert split_insideoutside in ['inside', 'outside']
 
     # Initialize
-    i_left = 0  # Left lower bound index
-    i_right = len(sorted_arr) - 1   # Right upper bound index
+    i_left: int = 0  # Left lower bound index
+    i_right: int = len(sorted_arr) - 1   # Right upper bound index
     completed_comparisons = 0
     prev_leftright = 'right'    # Arbitrarily intialized; note difference it makes when switching inside/outside
 
-    # Perform binary search until failure condition: boundary indexes overlap
+    # Perform binary search until failure condition: boundary indexes overlap (still need to check at index if equals)
     while i_left <= i_right:
         split_size_floor = int(split * (i_right - i_left))  # "floor" because left/right confusing later
 
@@ -223,41 +237,41 @@ def section_search(target, sorted_arr, split=0.5, use_insideoutside=False, split
                 or (split_insideoutside == 'inside' and prev_leftright == 'right')
                 or (split_insideoutside == 'outside' and prev_leftright == 'left')):
             # Put split from left to right - e.g. split=0.7 -> [-------|---]
-            i_mid = i_left + split_size_floor     # int in [i_left, i_right-1]
+            i_mid: int = i_left + split_size_floor     # int in [i_left, i_right-1]
         elif ((split_insideoutside == 'inside' and prev_leftright == 'left')
               or (split_insideoutside == 'outside' and prev_leftright == 'right')):
             # Put split from right to left - e.g. split=0.7 -> [---|-------]
-            i_mid = i_right - split_size_floor    # int in [i_left+1, i_right]
+            i_mid: int = i_right - split_size_floor    # int in [i_left+1, i_right]
         else:
             raise ValueError(f"IMPOSSIBLE: ratio split case ('{split_insideoutside}', '{prev_leftright}')")
 
         # Split towards target's appropriate bounds
-        left_bound = sorted_arr[i_left]
-        right_bound = sorted_arr[i_right]
-        pivot = sorted_arr[i_mid]
+        value_left: CT = sorted_arr[i_left]
+        value_right: CT = sorted_arr[i_right]
+        value_mid: CT = sorted_arr[i_mid]
         completed_comparisons += 1  # Not done yet, but want this ahead of verbose
         if verbose:
             print(f"Evaluation {completed_comparisons}: target {target}")
             print(f"\tindexes: [{i_left}, {i_mid}] | [{i_mid}, {i_right}]")
-            print(f"\tvalues:  [{left_bound}, {pivot}] | [{pivot}, {right_bound}]")
-        if target < pivot:
+            print(f"\tvalues:  [{value_left}, {value_mid}] | [{value_mid}, {value_right}]")
+        if target < value_mid:
             if verbose:
                 print(f"Went LEFT!")
             i_right = i_mid - 1     # May now violate i_right > i_left!
             prev_leftright = 'left'
-        elif target > pivot:
+        elif target > value_mid:
             if verbose:
                 print(f"Went RIGHT!")
             i_left = i_mid + 1  # May now violate i_left < i_right!
             prev_leftright = 'right'
         else:
             if verbose:
-                print(f"****FOUND {pivot} at index {i_mid} after {completed_comparisons} comparisons!")
+                print(f"****FOUND {value_mid} at index {i_mid} after {completed_comparisons} comparisons!")
             return completed_comparisons
 
     # Unsuccessful at finding target in sorted_arr
     if verbose:
-        print(f"****UNFOUND {target} after {completed_comparisons} comparisons!")
+        print(f"****UNFOUND {target} after all {completed_comparisons} comparisons!")
     return None
 
 
@@ -284,11 +298,14 @@ def golden_section_search_outside(target, sorted_arr, verbose=False):
 # Run the simulations ##########################################################
 
 # Numpy "vectorized" versions of search algos we can apply to the arrays of numbers
-binary_search_apply = np.vectorize(lambda n: binary_search(n, 0, MAX_INTEGER), otypes=[int])
-golden_search_inside_apply = np.vectorize(lambda n: golden_section_search_inside(n, 0, MAX_INTEGER), otypes=[int])
-golden_search_outside_apply = np.vectorize(lambda n: golden_section_search_outside(n, 0, MAX_INTEGER), otypes=[int])
+binary_search_apply = np.vectorize(lambda n, a: binary_search(n, a), otypes=[int])
+fibonacci_search_apply = np.vectorize(lambda n, a: fibonacci_search(n, a), otypes=[int])
+golden_search_inside_apply = np.vectorize(lambda n, a: golden_section_search_inside(n, a), otypes=[int])
+golden_search_outside_apply = np.vectorize(lambda n, a: golden_section_search_outside(n, a), otypes=[int])
 
 # Finally, run the search algos on the random numbers
+sorted_uniform_random = np.sort(uniform_random)
+sorted_normal_random = np.sort(normal_random)
 uniform_binary_cuts = binary_search_apply(uniform_random)
 normal_binary_cuts = binary_search_apply(normal_random)
 uniform_golden_inside_cuts = golden_search_inside_apply(uniform_random)
@@ -307,7 +324,7 @@ means_table = \
                  index=['Uniform', 'Normal'])
 print(means_table)
 
-# Visualize # splits distributions - histogram, control for integer bins
+# Visualize number-of-splits distributions - histogram, control for integer bins
 
 
 def aesthetic_integer_bins(int_arr):
@@ -341,6 +358,7 @@ ax.set_title(f"Results: Uniform Distribution, {N_SIMULATIONS:,.0f} Samples\n"
              f"Ratio splits of [0, {MAX_INTEGER:,.0f}] needed to arrive at random number")
 ax.legend()
 fig.tight_layout()
+
 # Normal
 fig, ax = plt.subplots()
 ax.hist(normal_binary_cuts, bins=aesthetic_integer_bins(normal_binary_cuts), alpha=0.5,
@@ -371,9 +389,3 @@ print(f"Under uniform distribution,\n"
 print(f"Under normal distribution,\n"
       f"  binary search is {binary_supremacy_normal*100:.2f}% more efficient\n"
       f"  than Fibonacci search over [0, {MAX_INTEGER:,.0f}], {N_SIMULATIONS:,.0f} simulations.")
-
-# It is at this point that I went and actually looked up Golden section search/Fibonacci search.
-# I believe the actual Fibonacci search "intelligently" chooses between "inside" and "outside"
-# at each step, so it is somehow even more complicated than my version at the moment.
-# I will need to check this and fully understand how it works!
-# TODO: I think Fibonacci is actually dumber than that - it's just my thing but without consistent inside/outside
