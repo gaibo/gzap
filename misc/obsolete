@@ -1,3 +1,24 @@
+# means_table = \
+#     pd.DataFrame({'Binary': [uniform_binary_cuts.mean(), normal_binary_cuts.mean()],
+#                   'Golden (Inside)': [uniform_golden_inside_cuts.mean(), normal_golden_inside_cuts.mean()],
+#                   'Golden (Outside)': [uniform_golden_outside_cuts.mean(), normal_golden_outside_cuts.mean()]},
+#                  index=['Uniform', 'Normal'])
+
+uniform_binary_cuts = binary_search_apply(uniform_random)   # i.e. This is the result array of "cuts to find each
+normal_binary_cuts = binary_search_apply(normal_random)
+uniform_golden_inside_cuts = golden_search_inside_apply(uniform_random)
+normal_golden_inside_cuts = golden_search_inside_apply(normal_random)
+uniform_golden_outside_cuts = golden_search_outside_apply(uniform_random)   # Identical to "inside" Golden for uniform
+normal_golden_outside_cuts = golden_search_outside_apply(normal_random)
+
+binary_search_apply_UNIFORM = np.vectorize(lambda n: binary_search(n, ARRAY_UNIFORM), otypes=[int])
+binary_search_apply_NORMAL = np.vectorize(lambda n: binary_search(n, ARRAY_NORMAL), otypes=[int])
+fibonacci_search_apply_UNIFORM = np.vectorize(lambda n: fibonacci_search(n, ARRAY_UNIFORM), otypes=[int])
+binary_search_apply_NORMAL = np.vectorize(lambda n: binary_search(n, ARRAY_NORMAL), otypes=[int])
+fibonacci_search_apply = np.vectorize(lambda n, a: fibonacci_search(n, a), otypes=[int])
+golden_search_inside_apply = np.vectorize(lambda n, a: golden_section_search_inside(n, a), otypes=[int])
+golden_search_outside_apply = np.vectorize(lambda n, a: golden_section_search_outside(n, a), otypes=[int])
+
         try:
             out_of_stock = [float(s.attrs['value'].split(':')[-1]) for s in disabled_sizes]     # Try convert '9' to 9
             in_stock = [float(s.attrs['value'].split(':')[-1]) for s in enabled_sizes]

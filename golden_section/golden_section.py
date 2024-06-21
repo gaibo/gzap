@@ -5,144 +5,62 @@ import matplotlib.pyplot as plt
 from typing import Sequence, Any, TypeVar, Protocol, Optional
 mpl.use('Qt5Agg')   # matplotlib 3.5 changed default backend and PyCharm freezes; revert to avoid problem
 
+
 # Explanation ##################################################################
 
 """
-    Apparently in 1980s China, schools (and agricultural/industrial-focused society) hammered into kids 
-the concept of golden-section search, i.e. use of the golden ratio number (1.618 or its inverse 0.618; 
-more on that later) to do optimization problems by hand. This came to light when I asked my parents a 
-coding interview question, only for them to simultaneously recite "0.618" before I had even laid out details 
-(FYI: the answer did not involve golden ratio or even binary search, but rather clever load balancing).
-    Baffled by their unfamiliar dependence on the golden ratio (which sounded completely archaic to my 
-late-2000s American education), I went on some tirade about how binary search is the end-all in any scenario 
-involving search. They suggested I prove it by writing code.
-    It was a great idea - I'd knock out a Monte Carlo-type experiment in half an hour and get some coding
-practice. In an hour, I had a result saying binary search was about 4% more efficent (fewer average "splits") 
-than doing the same with "0.618", and by the end of the night I had added nice documentation and pretty charts. 
-I wouldn't realize until a couple months later - when I revisited the code for a write-up - how nonsensically 
-contextless the "it" was that I proved.
+This section has been moved to the independent README. 
 
-    This function/script/experiment must now attempt to explain my misunderstanding in the way golden-section 
-search works. Because, well first of all, it's not remotely comparable to binary search. Skipping right over
-the dozens of hours it took me to piece it together: golden-section search makes perfect sense in the context 
-of finding local extrema in functions, a process that requires COMPARING 2 VALUES IN THE SAMPLE to determine
-which section to recursively search next. That is virtually unrelated to binary search, where you have A VALUE 
-IN HAND to compare to values in a SORTED sample.
+One thing I'll re-emphasize here is that while I created this file with the 
+name golden_section.py and the intention to explore golden-section search's 
+relation to binary search, I actually found out that's all wrong! 
 
-    Think of golden-section search as trying to figure out the number of grams of sugar that tastes best in
-a vat of iced tea (and, uh, assume your taste buds don't tell you any first derivative info i.e. whether 
-you'd like it sweeter at a given level... actually this is a terrible example but whatever, just assume you 
-can only compare relative taste levels): you're pretty sure 0g is too bitter, and 1000g is too sweet. You 
-might naturally say to sample at 500g - but then all you find out is it tastes way better than 0g and 1000g; 
-d'oh, what next? You now naturally say why not compare 333g to 667g - well that works!
-[---------------------------------|----------------------------------|---------------------------------]
-0                                333                                667                              1000
-You may find out both taste better than 0g and 1000g, and 667g tastes better than 333g. So now you can be
-pretty certain anything below 333g is not going to beat 333g and definitely won't beat 667g. You can shrink
-your range to 0.667 of its original size now.
- ---------------------------------[----------------------|------------|-----------|----------------------]
-0                                333                    *555         667         *777                  1000
-It's at this point you have a revelation - we already have the 667g taste data point, but it's smack dab
-in the middle of our new range, and we don't know which side of 667g will taste better (because of our non-
-differentiable taste buds). It seems wasteful to pick 2 new taste points to trisect the range. Wouldn't there 
-exist a ratio to split the range where one more taste perfectly maintains the previous split ratio?
-                                                   c
-                  a                                                    b
-[--------------------------------------|------------------------|--------------------------------------]
-0                                     382                      618                                   1000
- --------------------------------------[------------------------|--------------|------------------------]
-0                                     382                      618            *764                    1000
-Yeah so golden ratio is that ratio. The math is pretty straightforward:
+I implemented a "generalized" binary search and tested binary search against 
+its Golden ratio-using variant, Fibonacci search. The results are all about that. 
 
-a + c = b; a/b = c/(b-c)
-let's get rid of c and try to distill a and b into a ratio - it's 3 variables with 2 equations, 
-but we can still get a ratio
-a/b = (b-a)/(b-(b-a))
-a/b = (b-a)/a
-a/b = b/a - 1
-we have particular interest in relative ratio of a/b, so let's name it n
-n + 1 = 1/n     # Remember how 0.618 + 1 = 1/0.618 = 1.618? What a cool property
-n^2 + n - 1 = 0
-quadratic formula: n = (-1 + sqrt(5))/2 = 0.618
-So ratio of short section to long is 0.618, but what if we want to sanity check long to whole?
-b/(a+b) = 1/(a/b + 1) = 1/1.618 = 0.618!
-
-That's cool - now you only need 1 taste (see 764g above) and 1 compare per iteration to cut the range
-to 0.618 of its previous size. For one more step in the example, say 618g tastes better than 764g:
- --------------------------------------[---------------|---------|--------------]------------------------
-0                                     382             *528      618            764                     1000
-
-Appendix? For completion, note that you can try to do a variation with bisection splits:
-[--------------------------------------------------|-------------------------|-------------------------]
-0                                                 500                       750                      1000
-where it winds up either:
- --------------------------------------------------[-------------------------|-------------------------]
-0                                                 500                       750                      1000
-or:
-[--------------------------------------------------|-------------------------]-------------------------
-0                                                 500                       750                      1000
-In a uniform distribution (certainly not accurate for sugar tasting), these range reductions of 0.5 and 0.75
-(750g tasting better or worse) have the same chance, so on average this is a 0.625, which beats trisection
-(0.667) but still loses to golden (0.618). Note also something interesting if we still care about number of
-tastes - you could naturally alternate between "bisection" and "trisection" (what I'm calling the very first 
-example with 333g and 667g) based on whether you wind up left or right. Though these patterns are cool, math 
-generally favors the load balancing solution, i.e. the stable golden ratio.
-
-    Anyway, what does relate golden-section search to binary search is a derivative called Fibonacci search. 
-This is a confusing hack to do something akin to binary search but without division, because computers sucked 
-in the 1950s. It exploits the fact that the ratio of a Fibonacci number to the next approaches the golden ratio, 
-and that you can get from one Fib number to another with only addition/subtraction.
-Fibonacci numbers: 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987...
-[-------------------------------------------------------------|--------------------------------------]
-         89  144       233            377                    610                                    987
-when it goes left:
-[--------------------------------------|-----------------------]--------------------------------------
-         89  144       233            *377                    610                                    987
-           55     89           144                233                            377
-when it goes right:
- -------------------------------------------------------------[-----------------------|---------------]
-         89  144       233            377                    610                     *843            987
-           55     89           144                233                    233                 144
-note that 843 is NOT a Fib number! But it must be this way when we split the right subsection into Fibonacci 
-intervals; visually you can see how if we always went left, we'd stay exclusively with actual Fib numbers. 
-Fibonacci search is (perhaps obviously) a "worse" version of binary search that was practical on ancient machines 
-because it avoided multiplication/division and had possible cache or non-uniform storage access efficiencies. 
-Though I jumped straight to the golden ratio instead of coding for the Fibonacci numbers, this type of "variation 
-on binary search" is what my first hour result that initial afternoon tried to explain. Emphasis on "tried" - 
-it took a whole lot of sitting and thinking afterwards to put it in context. 
-
-    Here lay the next major problem with my quick project - I, uh, maybe didn't fully understand binary search. 
-We already had an inkling of that when I revealed it took me hours to understand why golden-section can do 
-extrema while binary can't. Specifically, I was stuck visualizing binary search as placing a target number 
-into a continuous number line... which is a sub-case, but A TRIVIAL ONE (you know the number!). Technically, 
-it tries to find a target value among sorted values by narrowing the range of INDEXES - I didn't even think about 
-distribution of array values BEYOND THE INDEXES; I also didn't code for not finding the value (i.e. I used a 
-questionable break condition), and I overengineered the logic by trying to have two integer halfway marks.
-    Prior to this project, I hadn't mapped in my head that x and f(x) in math can correspond to indexes and array 
-values at those indexes, i.e. i and a[i]. This matters because I had written my Monte Carlo experiment to 
-just find target values (to my credit, drawn from a distribution)... in a linear index between 0 and 1,000,000. 
-Ignoring that that's a trivial task, I hadn't thought about how we can and should map a second distribution to 
-that array a[] - search performs very differently when the values mapped to the indexes increase exponentially 
-vs. linearly, etc.! 
-
-The new mission statement as I committed to re-writing the code looked something like this:
-1) Fix basic binary search algo to use array instead of just domain; simplify algo logic and fix break condition
-  - test all the variations of
-    "inserting uniformly distributed targets into sorted values with uniformly distributed frequency"
-               normally                                              normally
-  - consider effect of duplicates and missing values; could minimize "collisions" by making integer range 
-    much larger than array size, but then we get a lot of missing target values, which affects our average 
-    number of splits metric for efficiency
-2) Add functinoality for Fibonacci search - I had all this complicated logic for "inside" and "outside" 
-   (see function for concept explanation) but it couldn't replicate the static 1.618:1 left:right setup
+I did not in the end implement golden-section search proper, because it turns out 
+that was never the original disagreement! Let this be a record of how arguments 
+can arise from "sophisticated misunderstanding"!
 """
+
 
 # [MANUAL] CONFIGURATIONS ######################################################
 
-# Default example - draw a million integers distributed on [0, 1,000,000]
-MIN_INTEGER = 0
-MAX_INTEGER = 1_000_000
-N_SIMULATIONS = 1_000_000
+"""
+Default experiment:
+Sample a million integers distributed over [0, 100,000,000] as "targets" to find
+via search in a sorted array of size 10,000,000 that also comes from a distribution 
+over the same interval.
+The "simulation" is thus 1,000,000 searches over various distribution scenarios.
+
+- Note that we control the likelihood a given number may not even be in the array. 
+  In this example, the 100,000,001 possible integers is 10x the size of the array, 
+  so for example with uniform distributions there is a 1/10 chance of actually 
+  finding a given target in the array. The rest of the searches will go "all the 
+  way" to the worst case scenario number of splits - in this sense, this would 
+  control how much we weight and punish worst case performance for a given search.
+  This is one mechanic through which the default numbers would affect analysis 
+  of efficiency of the different searches!
+
+- Note that this means we must choose one distribution from which to sample "targets" 
+  and another distribution from which to sample values for "sorted arrays"!
+  - For my setup, each can be "uniform" or "normal" - that's 4 combinations.
+
+- I specifically set up the default numbers to avoid confusing conflations. However, 
+  note that if we had an additional constraint that the array size is the same as 
+  the number of integers in the interval (e.g. array of size 1,000,001, interval 
+  [0, 1,000,000]), we could construct a "trivial" case where we let the sorted 
+  array's values be equal to their indexes (e.g. 0 to 1,000,000). This is trivial 
+  in the sense that indexing a target number into the array actually wouldn't even 
+  require search.
+  - This is simply a special sub-case of filling the sorted array with the uniform 
+    distribution, so I will not specifically build for it, as intuition can be 
+    gained from existing results.
+"""
+# TODO: How would results be affected from tweaking these numbers?
+MIN_INTEGER, MAX_INTEGER = 0, 100_000_000
+ARRAY_SIZE = 10_000_000
+N_SIMULATIONS = 1_000_000   # i.e. Number of targets
 
 
 # Generate random numbers for the simulation ###################################
@@ -150,29 +68,45 @@ N_SIMULATIONS = 1_000_000
 # Constants
 GOLDEN_RATIO = (1 + 5**0.5) / 2     # 1.618...; note that 1/GR == GR-1 == 0.618
 # As of numpy 1.17, Generator is preferable function for doing random numbers
-rng = np.random.default_rng()   # Random float uniformly distributed over [0, 1)
+RNG = np.random.default_rng()   # Random float uniformly distributed over [0, 1)
 
-# Uniform distribution random integers array of size N_SIMULALATIONS
-uniform_random = rng.integers(MIN_INTEGER, MAX_INTEGER, endpoint=True, size=N_SIMULATIONS)    # [MIN_INT, MAX_INT]
+# Uniform distribution random integers for "targets" and sorted array
+TARGETS_UNIFORM = RNG.integers(MIN_INTEGER, MAX_INTEGER, endpoint=True, size=N_SIMULATIONS)
+# NOTE: I will just reuse the same sorted array for all N_SIMULATIONS... that's fine right?
+ARRAY_UNIFORM = np.sort(RNG.integers(MIN_INTEGER, MAX_INTEGER, endpoint=True, size=ARRAY_SIZE))
 
-# Normal distribution random integers array of size N_SIMULALATIONS
+# Normal distribution random integers for "targets" and sorted array
 mu = (MAX_INTEGER-MIN_INTEGER) / 2    # Set center of bell curve at center of range [MIN_INTEGER, MAX_INTEGER]
 sigma = (MAX_INTEGER-MIN_INTEGER) / 6   # Set std such that 3 std each direction (99.7%) is the "bounds" of our range
-normal_random = rng.normal(mu, sigma, size=N_SIMULATIONS).clip(MIN_INTEGER, MAX_INTEGER).round()    # Clamp and round
+TARGETS_NORMAL = RNG.normal(mu, sigma, size=N_SIMULATIONS).clip(MIN_INTEGER, MAX_INTEGER).round()   # Clamp and round
+ARRAY_NORMAL = np.sort(RNG.normal(mu, sigma, size=ARRAY_SIZE).clip(MIN_INTEGER, MAX_INTEGER).round())
 
-# Visualize integer distributions
+# Visualize target integer distributions
 fig, ax = plt.subplots()
-ax.hist(uniform_random, color='C3', alpha=0.5, label='Uniform Distribution')    # Should look like a rectangle block
-ax.hist(normal_random, color='C4', alpha=0.5, label='Normal Distribution (with clamping and rounding)')     # Bell curve
+ax.hist(TARGETS_UNIFORM, color='C3', alpha=0.5, label='Uniform Distribution')    # Should look like a rectangle block
+ax.hist(TARGETS_NORMAL, color='C4', alpha=0.5, label='Normal Distribution (with clamping and rounding)')    # Bell curve
 ax.xaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
 ax.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
 ax.set_xlabel('Random Number from Generator')
 ax.set_ylabel('Frequency (# of Occurrences)')
-ax.set_title(f"Sanity Check: Here are the numbers we will try to locate via\n"
-             f"recursive search algos on range [{MIN_INTEGER:,.0f}, {MAX_INTEGER:,.0f}]")
+ax.set_title(f"Sanity Check: Here are the \"target\" integers we will try to locate\n"
+             f"via recursive search algos on range [{MIN_INTEGER:,.0f}, {MAX_INTEGER:,.0f}]")
 ax.legend()
 fig.tight_layout()
 plt.show()  # First figure of script may not show without this
+
+# Visualize array integer distributions
+fig, ax = plt.subplots()
+ax.hist(ARRAY_UNIFORM, color='C3', alpha=0.5, label='Uniform Distribution')    # Should look like a rectangle block
+ax.hist(ARRAY_NORMAL, color='C4', alpha=0.5, label='Normal Distribution (with clamping and rounding)')    # Bell curve
+ax.xaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
+ax.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
+ax.set_xlabel('Random Number from Generator')
+ax.set_ylabel('Frequency (# of Occurrences)')
+ax.set_title(f"Sanity Check: Here are the integers filling the \"sorted arrays\"\n"
+             f"inside which we will search for the \"targets\"")
+ax.legend()
+fig.tight_layout()
 
 
 # Functions ####################################################################
@@ -297,32 +231,92 @@ def golden_section_search_outside(target, sorted_arr, verbose=False):
 
 # Run the simulations ##########################################################
 
-# Numpy "vectorized" versions of search algos we can apply to the arrays of numbers
-binary_search_apply = np.vectorize(lambda n, a: binary_search(n, a), otypes=[int])
-fibonacci_search_apply = np.vectorize(lambda n, a: fibonacci_search(n, a), otypes=[int])
-golden_search_inside_apply = np.vectorize(lambda n, a: golden_section_search_inside(n, a), otypes=[int])
-golden_search_outside_apply = np.vectorize(lambda n, a: golden_section_search_outside(n, a), otypes=[int])
+# Experiment variables
+search_types = ['binary', 'fibonacci', 'golden_inside', 'golden_outside']
+search_dispatch = {
+    'binary': binary_search,
+    'fibonacci': fibonacci_search,
+    'golden_inside': golden_section_search_inside,
+    'golden_outside': golden_section_search_outside
+}
+array_types = ['uniform', 'normal']
+array_dispatch = {
+    'uniform': ARRAY_UNIFORM,
+    'normal': ARRAY_NORMAL
+}
+target_types = ['uniform', 'normal']
+target_dispatch = {
+    'uniform': TARGETS_UNIFORM,
+    'normal': TARGETS_NORMAL
+}
 
-# Finally, run the search algos on the random numbers
-sorted_uniform_random = np.sort(uniform_random)
-sorted_normal_random = np.sort(normal_random)
-uniform_binary_cuts = binary_search_apply(uniform_random)
-normal_binary_cuts = binary_search_apply(normal_random)
-uniform_golden_inside_cuts = golden_search_inside_apply(uniform_random)
-normal_golden_inside_cuts = golden_search_inside_apply(normal_random)
-uniform_golden_outside_cuts = golden_search_outside_apply(uniform_random)   # Identical to "inside" Golden for uniform
-normal_golden_outside_cuts = golden_search_outside_apply(normal_random)
+# Numpy "vectorized" versions of search algos we can apply to the arrays of targets
+apply_search_to_targets_dict = {}
+for search_type in search_types:
+    for array_type in array_types:
+        apply_search_to_targets_dict[search_type, array_type] = \
+            np.vectorize(lambda n: search_dispatch[search_type](n, array_dispatch[array_type]), otypes=[float])
+
+# Finally, run the search algos on the targets and record results
+results_dict = {}
+for target_type in target_types:
+    for search_type in search_types:
+        for array_type in array_types:
+            print(f"Calculating {target_type}, {search_type}, {array_type}...")
+            results_dict[target_type, search_type, array_type] = \
+                apply_search_to_targets_dict[search_type, array_type](target_dispatch[target_type])
+            print("Done.")
 
 
 # Results - Binary vs. Golden ##################################################
 
 # Table
 means_table = \
-    pd.DataFrame({'Binary': [uniform_binary_cuts.mean(), normal_binary_cuts.mean()],
-                  'Golden (Inside)': [uniform_golden_inside_cuts.mean(), normal_golden_inside_cuts.mean()],
-                  'Golden (Outside)': [uniform_golden_outside_cuts.mean(), normal_golden_outside_cuts.mean()]},
-                 index=['Uniform', 'Normal'])
+    pd.DataFrame({'Binary': [np.nanmean(results_dict['uniform', 'binary', 'uniform']),
+                             np.nanmean(results_dict['uniform', 'binary', 'normal']),
+                             np.nanmean(results_dict['normal', 'binary', 'uniform']),
+                             np.nanmean(results_dict['normal', 'binary', 'normal'])],
+                  'Fibonacci': [np.nanmean(results_dict['uniform', 'fibonacci', 'uniform']),
+                                np.nanmean(results_dict['uniform', 'fibonacci', 'normal']),
+                                np.nanmean(results_dict['normal', 'fibonacci', 'uniform']),
+                                np.nanmean(results_dict['normal', 'fibonacci', 'normal'])],
+                  'Golden (Inside)': [np.nanmean(results_dict['uniform', 'golden_inside', 'uniform']),
+                                      np.nanmean(results_dict['uniform', 'golden_inside', 'normal']),
+                                      np.nanmean(results_dict['normal', 'golden_inside', 'uniform']),
+                                      np.nanmean(results_dict['normal', 'golden_inside', 'normal'])],
+                  'Golden (Outside)': [np.nanmean(results_dict['uniform', 'golden_outside', 'uniform']),
+                                       np.nanmean(results_dict['uniform', 'golden_outside', 'normal']),
+                                       np.nanmean(results_dict['normal', 'golden_outside', 'uniform']),
+                                       np.nanmean(results_dict['normal', 'golden_outside', 'normal'])]},
+                 index=['Uniform Targets, Uniform Array',
+                        'Uniform Targets, Normal Array',
+                        'Normal Targets, Uniform Array',
+                        'Normal Targets, Normal Array'])
 print(means_table)
+
+# NOTE: This is a sanity check on how many targets actually exist in the sorted array; constant across each row...
+n_table = \
+    pd.DataFrame({'Binary': [pd.Series(results_dict['uniform', 'binary', 'uniform']).dropna().shape[0],
+                             pd.Series(results_dict['uniform', 'binary', 'normal']).dropna().shape[0],
+                             pd.Series(results_dict['normal', 'binary', 'uniform']).dropna().shape[0],
+                             pd.Series(results_dict['normal', 'binary', 'normal']).dropna().shape[0]],
+                  'Fibonacci': [pd.Series(results_dict['uniform', 'fibonacci', 'uniform']).dropna().shape[0],
+                                pd.Series(results_dict['uniform', 'fibonacci', 'normal']).dropna().shape[0],
+                                pd.Series(results_dict['normal', 'fibonacci', 'uniform']).dropna().shape[0],
+                                pd.Series(results_dict['normal', 'fibonacci', 'normal']).dropna().shape[0]],
+                  'Golden (Inside)': [pd.Series(results_dict['uniform', 'golden_inside', 'uniform']).dropna().shape[0],
+                                      pd.Series(results_dict['uniform', 'golden_inside', 'normal']).dropna().shape[0],
+                                      pd.Series(results_dict['normal', 'golden_inside', 'uniform']).dropna().shape[0],
+                                      pd.Series(results_dict['normal', 'golden_inside', 'normal']).dropna().shape[0]],
+                 'Golden (Outside)': [pd.Series(results_dict['uniform', 'golden_outside', 'uniform']).dropna().shape[0],
+                                      pd.Series(results_dict['uniform', 'golden_outside', 'normal']).dropna().shape[0],
+                                      pd.Series(results_dict['normal', 'golden_outside', 'uniform']).dropna().shape[0],
+                                      pd.Series(results_dict['normal', 'golden_outside', 'normal']).dropna().shape[0]]},
+                 index=['Uniform Targets, Uniform Array',
+                        'Uniform Targets, Normal Array',
+                        'Normal Targets, Uniform Array',
+                        'Normal Targets, Normal Array'])
+print(n_table)
 
 # Visualize number-of-splits distributions - histogram, control for integer bins
 
@@ -335,6 +329,9 @@ def aesthetic_integer_bins(int_arr):
     :param int_arr: numpy array of integers to be binned
     :return: numpy array of bin boundaries (usually float, as it includes fractional bounds around integers)
     """
+    if int_arr.dtype != int:
+        # Try removing NaNs - easiest way is to use pandas dropna()
+        int_arr = pd.Series(int_arr).dropna().astype(int)   # Explicitly cast to int as well
     unique_ints = np.unique(int_arr)
     step = np.min(np.diff(unique_ints))     # Usually 1 when dealing with consecutive integers
     # From half a step below min to half a step above max, allowing each integer to be "centered"
@@ -343,13 +340,35 @@ def aesthetic_integer_bins(int_arr):
 
 
 # Uniform
+# TODO: Figure out which charts/stats are actually important!
 fig, ax = plt.subplots()
-ax.hist(uniform_binary_cuts, bins=aesthetic_integer_bins(uniform_binary_cuts), alpha=0.5,
-        label=f"Binary (0.5); Mean {means_table.loc[('Uniform', 'Binary')]:.2f}")
-ax.hist(uniform_golden_inside_cuts, bins=aesthetic_integer_bins(uniform_golden_inside_cuts), alpha=0.5,
-        label=f"Golden (0.618) \"Inside\"; Mean {means_table.loc[('Uniform', 'Golden (Inside)')]:.2f}")
-ax.hist(uniform_golden_outside_cuts, bins=aesthetic_integer_bins(uniform_golden_outside_cuts), alpha=0.5,
-        label=f"Golden (0.618) \"Outside\"; Mean {means_table.loc[('Uniform', 'Golden (Outside)')]:.2f}")
+# ax.hist(uniform_binary_cuts, bins=aesthetic_integer_bins(uniform_binary_cuts), alpha=0.5,
+#         label=f"Binary (0.5); Mean {means_table.loc[('Uniform', 'Binary')]:.2f}")
+# ax.hist(uniform_golden_inside_cuts, bins=aesthetic_integer_bins(uniform_golden_inside_cuts), alpha=0.5,
+#         label=f"Golden (0.618) \"Inside\"; Mean {means_table.loc[('Uniform', 'Golden (Inside)')]:.2f}")
+# ax.hist(uniform_golden_outside_cuts, bins=aesthetic_integer_bins(uniform_golden_outside_cuts), alpha=0.5,
+#         label=f"Golden (0.618) \"Outside\"; Mean {means_table.loc[('Uniform', 'Golden (Outside)')]:.2f}")
+ax.hist(results_dict['uniform', 'binary', 'uniform'], bins=aesthetic_integer_bins(results_dict['uniform', 'binary', 'uniform']), alpha=0.5,
+        label=f"Binary (0.5) Uniform-Uniform; Mean {means_table.loc[('Uniform Targets, Uniform Array', 'Binary')]:.2f}")
+ax.hist(results_dict['uniform', 'binary', 'normal'], bins=aesthetic_integer_bins(results_dict['uniform', 'binary', 'normal']), alpha=0.5,
+        label=f"Binary (0.5) Uniform-Normal; Mean {means_table.loc[('Uniform Targets, Normal Array', 'Binary')]:.2f}")
+ax.hist(results_dict['normal', 'binary', 'uniform'], bins=aesthetic_integer_bins(results_dict['normal', 'binary', 'uniform']), alpha=0.5,
+        label=f"Binary (0.5) Normal-Uniform; Mean {means_table.loc[('Normal Targets, Uniform Array', 'Binary')]:.2f}")
+ax.hist(results_dict['normal', 'binary', 'normal'], bins=aesthetic_integer_bins(results_dict['normal', 'binary', 'normal']), alpha=0.5,
+        label=f"Binary (0.5) Normal-Normal; Mean {means_table.loc[('Normal Targets, Normal Array', 'Binary')]:.2f}")
+
+# ax.hist(results_dict['uniform', 'binary', 'uniform'], bins=aesthetic_integer_bins(results_dict['uniform', 'binary', 'uniform']), alpha=0.5,
+#         label=f"Binary (0.5) Uniform-Uniform; Mean {means_table.loc[('Uniform Targets, Uniform Array', 'Binary')]:.2f}")
+# ax.hist(results_dict['uniform', 'binary', 'normal'], bins=aesthetic_integer_bins(results_dict['uniform', 'binary', 'normal']), alpha=0.5,
+#         label=f"Binary (0.5); Mean {means_table.loc[('Uniform', 'Binary')]:.2f}")
+# ax.hist(results_dict['uniform', 'binary', 'uniform'], bins=aesthetic_integer_bins(results_dict['uniform', 'binary', 'uniform']), alpha=0.5,
+#         label=f"Binary (0.5); Mean {means_table.loc[('Uniform', 'Binary')]:.2f}")
+# ax.hist(results_dict['uniform', 'binary', 'normal'], bins=aesthetic_integer_bins(results_dict['uniform', 'binary', 'normal']), alpha=0.5,
+#         label=f"Binary (0.5); Mean {means_table.loc[('Uniform', 'Binary')]:.2f}")
+# ax.hist(uniform_golden_inside_cuts, bins=aesthetic_integer_bins(uniform_golden_inside_cuts), alpha=0.5,
+#         label=f"Golden (0.618) \"Inside\"; Mean {means_table.loc[('Uniform', 'Golden (Inside)')]:.2f}")
+# ax.hist(uniform_golden_outside_cuts, bins=aesthetic_integer_bins(uniform_golden_outside_cuts), alpha=0.5,
+#         label=f"Golden (0.618) \"Outside\"; Mean {means_table.loc[('Uniform', 'Golden (Outside)')]:.2f}")
 ax.xaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
 ax.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
 ax.set_xlabel('# of Splits to Arrive at Number')
